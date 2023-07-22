@@ -1,0 +1,14 @@
+* text=auto
+
+*.cpp text
+*.hpp text
+*.c text
+*.h text
+*.lua text
+*.py text
+*.md text
+*.txt text
+
+*.png binary
+*.jpg binary
+*.pft binary

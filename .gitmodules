@@ -1,0 +1,18 @@
+[submodule "libs/libzippp"]
+	path = libs/libzippp
+	url = https://github.com/ctabin/libzippp
+[submodule "libs/imgui"]
+	path = libs/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "libs/lua54"]
+	path = libs/lua54
+	url = https://github.com/scratchminer/lua54
+[submodule "libs/unicorn"]
+	path = libs/unicorn
+	url = https://github.com/unicorn-engine/unicorn
+[submodule "libs/nlohmann_json"]
+	path = libs/nlohmann_json
+	url = https://github.com/nlohmann/json
+[submodule "libs/capstone"]
+	path = libs/capstone
+	url = https://github.com/capstone-engine/capstone
