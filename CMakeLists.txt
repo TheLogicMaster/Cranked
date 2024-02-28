@@ -10,11 +10,9 @@ find_package(PythonInterp)
 
 find_package(ZLIB REQUIRED)
 find_package(FFI REQUIRED)
-find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(OpenGL REQUIRED)
 
-file(GLOB IMGUI_SOURCES libs/imgui/*.cpp libs/imgui/backends/imgui_impl_sdl2.cpp libs/imgui/backends/imgui_impl_opengl2.cpp)
+file(GLOB IMGUI_SOURCES libs/imgui/*.cpp libs/imgui/backends/imgui_impl_sdl2.cpp libs/imgui/backends/imgui_impl_sdlrenderer2.cpp)
 add_library(imgui STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui PUBLIC libs/imgui libs/imgui/backends ${SDL2_INCLUDE_DIRS})
 
@@ -22,8 +20,6 @@ add_subdirectory(libs/unicorn)
 add_subdirectory(libs/capstone)
 add_subdirectory(libs/libzippp)
 add_subdirectory(libs/nlohmann_json)
-
-add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 
 file(GLOB lua_sources libs/lua54/*.c)
 list(FILTER lua_sources EXCLUDE REGEX ".*luac?\\.c$")
@@ -35,12 +31,12 @@ file(GLOB emulator_sources src/*.cpp src/gen/*.cpp src/gen/*.hpp) # Bad practice
 list(FILTER emulator_sources EXCLUDE REGEX ".*(main|libretro)\\.cpp$")
 
 add_library(emulator STATIC ${emulator_sources} ${lua_sources})
-target_include_directories(emulator PUBLIC libs libs/unicorn/include libs/lua54 ${ZLIB_INCLUDE_DIRS} ${FFI_INCLUDE_DIRS} ${CAPSTONE_INCLUDE_DIRS})
-target_link_libraries(emulator stdc++fs imgui unicorn libzippp nlohmann_json::nlohmann_json ${ZLIB_LIBRARIES} ${FFI_LIBRARIES} ${CAPSTONE_LIBRARIES})
+target_include_directories(emulator PUBLIC libs libs/unicorn/include libs/lua54 libs/capstone/include ${ZLIB_INCLUDE_DIRS} ${FFI_INCLUDE_DIRS})
+target_link_libraries(emulator stdc++fs imgui unicorn libzippp nlohmann_json::nlohmann_json capstone ${ZLIB_LIBRARIES} ${FFI_LIBRARIES})
 
 add_executable(emulator_main src/main.cpp)
-target_include_directories(emulator_main PUBLIC ${OPENGL_INCLUDE_DIR} ${GLEW_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
-target_link_libraries(emulator_main emulator ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${SDL2_LIBRARIES})
+target_include_directories(emulator_main PUBLIC ${SDL2_INCLUDE_DIRS})
+target_link_libraries(emulator_main emulator ${SDL2_LIBRARIES})
 
 set_property(TARGET libzippp PROPERTY POSITION_INDEPENDENT_CODE ON) # Needed on static libs for the libretro shared library core to compile
 set_property(TARGET emulator PROPERTY POSITION_INDEPENDENT_CODE ON)

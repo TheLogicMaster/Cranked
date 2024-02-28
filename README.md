@@ -18,10 +18,8 @@ and todo items. Expect many crashes.
 
 ### Dependencies
 - libzip
-- ZLib
+- ZLib (Requires BZip2 and LibSSL)
 - LibFFI
-- GLEW
-- OpenGL
 - SDL2
 
 Recursively clone the repo with: `git clone --recursive https://github.com/TheLogicMaster/Cranked`.
