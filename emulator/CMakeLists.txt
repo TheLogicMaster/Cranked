@@ -41,7 +41,7 @@ file(GLOB emulator_sources
 )
 
 add_library(emulator STATIC ${emulator_sources} ${lua_sources})
-target_include_directories(emulator PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/capstone/include libs/zlib ${FFI_INCLUDE_DIRS})
+target_include_directories(emulator PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/capstone/include libs/zlib ${CMAKE_CURRENT_BINARY_DIR}/libs/ffi/include)
 target_link_libraries(emulator unicorn libzippp nlohmann_json::nlohmann_json capstone libffi ${ZLIB_LIBRARIES})
 
 function(embed_resource resource_file header_file variable_name args)
