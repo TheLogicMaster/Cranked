@@ -15,12 +15,7 @@ and todo items. Expect many crashes.
 ![From Lua](media/Screenshot_2.png)
 
 ## Building
-
-### Dependencies
-- libzip
-- ZLib (Requires BZip2 and LibSSL)
-- LibFFI
-- SDL2
+Libraries are all embedded as submodules except for SDL2, which is required for building desktop targets.
 
 Recursively clone the repo with: `git clone --recursive https://github.com/TheLogicMaster/Cranked`.
 
@@ -54,14 +49,15 @@ likely crash at the moment and there is little in the way of useful debug output
 - Test building on Windows/Mac
 - Emulated core dumps with disassembly
 - Create a testing framework to compare console output to the official simulator
-- Finish font-ends (Libretro core just crashes at the moment)
+- Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
+- Java library with native libs for Android app consumption
 - Further investigation for native resource ownership and memory management (Plus Lua sprite/bitmap interactions)
 - Scoreboard support
 - Investigate Catalog app (Find internal APIs), see if emulator can play encrypted games with a dumped key or something
 - System UI/software from SDK
 - Investigate pre-2.0.0 binaries to handle uncompressed data
-- Verify that no C++ uncaught exceptions are thrown in native implementation or Unicorn state could be clobbered, Lua should be safe, though
 - Emulator API wrapper to hide all the messy internals, possible C compatible
+- Use namespaces
 - Values checks, since plenty of null/illegal API parameters will cause a native seg-fault
 - SDK version checks for API backwards compatibility
 - GitHub Actions release builds

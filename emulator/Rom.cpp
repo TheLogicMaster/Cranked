@@ -5,9 +5,8 @@
 #include <fstream>
 #include <cstring>
 #include <filesystem>
-#include <memory>
 
-Rom::Rom(const std::string &path) : path(path) {
+Rom::Rom(const std::string &path, Emulator *emulator) : emulator(emulator), path(path) {
     if (!std::filesystem::is_directory(path)) {
         zip = std::make_unique<libzippp::ZipArchive>(path);
         zip->open(libzippp::ZipArchive::ReadOnly);
@@ -89,6 +88,7 @@ void Rom::load() {
 
     if (zip) {
         for (auto &entry : zip->getEntries()) { // Preload zip entry data, to avoid having to abstract into common file-type API
+            if (!entry.isFile()) continue;
             std::vector<uint8_t> data(entry.getSize());
             auto zipData = entry.readAsBinary();
             memcpy(data.data(), zipData, data.size());
@@ -100,7 +100,7 @@ void Rom::load() {
                     .size = (uint32_t) entry.getSize(),
                     .extra = 0,
                     .data = data,
-                    .modTime = std::chrono::system_clock::from_time_t(entry.getDate()),
+                    .modTime = entry.getDate(),
             });
         }
     } else {
@@ -120,7 +120,7 @@ void Rom::load() {
                     .size = entry.is_directory() ? 0 : (uint32_t) entry.file_size(),
                     .extra = 0,
                     .data = {},
-                    .modTime = std::chrono::file_clock::to_sys(entry.last_write_time()),
+                    .modTime = to_time_t(entry.last_write_time()),
             });
         }
     }
@@ -390,12 +390,12 @@ Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
         auto samples = audioDataSize;
         audio.samples.resize(samples);
         for (int i = 0; i < samples; i++)
-            audio.samples[i] = (int16_t) (((int) std::bit_cast<int8_t>(data[16 + i]) - 0x80) << 8); // Todo: Verify conversion
+            audio.samples[i] = (int16_t) (((int) bit_cast<int8_t>(data[16 + i]) - 0x80) << 8); // Todo: Verify conversion
     } else if (format == SoundFormat::Mono16bit or format == SoundFormat::Stereo16bit) {
         auto samples = audioDataSize / 2;
         audio.samples.resize(samples);
         for (int i = 0; i < samples; i++)
-            audio.samples[i] = std::bit_cast<int16_t>(readUint16LE(data + 16 + i * 2));
+            audio.samples[i] = bit_cast<int16_t>(readUint16LE(data + 16 + i * 2));
     } else { // 4-bit IMA ADPCM
         static constexpr int IMA_INDEX_TABLE[]{
                 -1, -1, -1, -1, 2, 4, 6, 8,
@@ -525,7 +525,7 @@ Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     data += 16; // Previous 32-bit word is reserved
     auto frameCount = readUint16LE(data);
     data += 4; // Previous 16-bit word is reserved
-    auto framerate = std::bit_cast<float>(readUint32LE(data));
+    auto framerate = bit_cast<float>(readUint32LE(data));
     auto width = readUint16LE(data + 4);
     auto height = readUint16LE(data + 6);
     data += 8;
@@ -618,4 +618,13 @@ Rom::FileType Rom::getFileType(const uint8_t *header) {
         return FileType::PFT;
     else
         return FileType::UNKNOWN;
+}
+
+void Rom::logMessage(LogLevel level, const char *format, ...) const {
+    if (!emulator)
+        return;
+    va_list args;
+    va_start(args, format);
+    emulator->logMessageVA(level, format, args);
+    va_end(args);
 }

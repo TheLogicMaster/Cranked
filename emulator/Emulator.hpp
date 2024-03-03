@@ -15,9 +15,9 @@
 #include "lauxlib.h"
 #include "unicorn/unicorn.h"
 #include "nlohmann/json.hpp"
-#include <capstone/platform.h>
-#include <capstone/capstone.h>
-#include <ffi.h>
+#include "capstone/platform.h"
+#include "capstone/capstone.h"
+#include "ffi.h"
 
 #include <utility>
 #include <string>
@@ -30,9 +30,12 @@
 #include <vector>
 #include <string>
 
+// Todo: A wrapper class to hide internals
 class Emulator {
 public:
     typedef void(* InternalUpdateCallback)(Emulator *emulator);
+
+    typedef void(* LoggingCallback)(Emulator *emulator, LogLevel level, const char *format, va_list args);
 
     enum class State {
         Stopped,
@@ -40,11 +43,11 @@ public:
         Stopping,
     };
 
-    explicit Emulator(InternalUpdateCallback updateCallback);
+    explicit Emulator(InternalUpdateCallback updateCallback, void *userdata = nullptr);
     Emulator(const Emulator &) = delete;
     Emulator & operator=(const Emulator &) = delete;
     ~Emulator();
-    void load(std::shared_ptr<Rom> program);
+    void load(const std::string &path);
     void unload();
     void reset();
     void start();
@@ -260,9 +263,29 @@ public:
         }
     }
 
-    inline std::string getLuaError() {
-        auto message = lua_tostring(getLuaContext(), -1);
-        return message ? message : "Invalid error message";
+    inline std::string getLuaError(int result = LUA_ERRRUN) {
+        switch (result) {
+            case -1:
+                return "Native exception";
+            case LUA_OK:
+                return "Ok";
+            case LUA_YIELD:
+                return "Yield";
+            case LUA_ERRRUN:{
+                auto message = lua_tostring(getLuaContext(), -1);
+                return message ? message : "Invalid error message";
+            }
+            case LUA_ERRSYNTAX:
+                return "Syntax error";
+            case LUA_ERRMEM:
+                return "Memory allocation error";
+            case LUA_ERRERR:
+                return "Error running message handler";
+            case LUA_ERRFILE:
+                return "File error";
+            default:
+                return "Unknown";
+        }
     }
 
     inline void setQualifiedLuaGlobal(const char *name) {
@@ -324,7 +347,7 @@ public:
         lua_getglobal(getLuaContext(), "playdate");
         lua_getfield(getLuaContext(), -1, name.c_str());
         if (!lua_isnil(getLuaContext(), -1))
-            lua_call(getLuaContext(), 0, 0);
+            lua_call(getLuaContext(), 0, 0); // Todo: Protected?
         lua_settop(getLuaContext(), start);
     }
 
@@ -337,7 +360,7 @@ public:
         lua_pushstring(getLuaContext(), name.c_str());
         for (float arg : args)
             lua_pushnumber(getLuaContext(), arg);
-        lua_call(getLuaContext(), args.size() + 1, 1);
+        lua_call(getLuaContext(), args.size() + 1, 1); // Todo: Protected?
         bool handled = lua_toboolean(getLuaContext(), -1);
         lua_settop(getLuaContext(), start);
         return handled;
@@ -416,12 +439,27 @@ public:
         return change;
     }
 
+    inline static void logMessageCallback(Emulator *emulator, LogLevel level, const char *format, va_list args) {
+        vprintf(format, args);
+    }
+
+    inline void logMessageVA(LogLevel level, const char *format, va_list args) {
+        if (loggingCallback)
+            loggingCallback(this, level, format, args);
+    }
+
+    inline void logMessage(LogLevel level, const char *format, ...) {
+        va_list args;
+        va_start(args, format);
+        logMessageVA(level, format, args);
+        va_end(args);
+    }
+
     Graphics graphics = Graphics(this);
     File files = File(this);
     Menu menu = Menu(this);
-    std::shared_ptr<Rom> rom;
+    std::unique_ptr<Rom> rom;
     HeapAllocator heap = HeapAllocator(HEAP_SIZE);
-    std::string luaWrapperError;
     std::unordered_map<std::string, cref_t> emulatedStringLiterals;
     std::unordered_set<std::string> loadedLuaFiles;
 
@@ -453,7 +491,9 @@ public:
     bool hasLua{};
     bool hasNative{};
     cref_t nativeEventCallback{};
-    InternalUpdateCallback internalUpdateCallback{};
+    InternalUpdateCallback internalUpdateCallback;
+    LoggingCallback loggingCallback = logMessageCallback;
+    void *internalUserdata;
     int apiSize;
 
     std::vector<char> codeMemory;

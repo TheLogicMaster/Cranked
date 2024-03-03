@@ -4,6 +4,42 @@
 #include <memory>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
+#include <bit>
+#include <chrono>
+
+enum class LogLevel {
+    Verbose,
+    Info,
+    Warning,
+    Error
+};
+
+template <typename TP>
+std::time_t to_time_t(TP tp)
+{
+    using namespace std::chrono;
+#if __ANDROID__
+    return system_clock::to_time_t(time_point_cast<system_clock::duration>(tp - TP::clock::now() + system_clock::now()));
+#else
+    return system_clock::to_time_t(clock_cast<system_clock>(tp));
+#endif
+}
+
+template <class T2, class T1>
+inline T2 bit_cast(T1 t1) {
+#if __ANDROID__
+    static_assert(sizeof(T1) == sizeof(T2), "Types must match sizes");
+    static_assert(std::is_standard_layout_v<T1> && std::is_trivial_v<T1>, "Requires POD input");
+    static_assert(std::is_standard_layout_v<T2> && std::is_trivial_v<T2>, "Requires POD output");
+
+    T2 t2;
+    memcpy( std::addressof(t2), std::addressof(t1), sizeof(T1) );
+    return t2;
+#else
+    return std::bit_cast<T2>(t1);
+#endif
+}
 
 std::vector<uint8_t> decompressData(const uint8_t *data, size_t length, size_t expectedSize);
 

@@ -2,6 +2,7 @@
 #include "Emulator.hpp"
 
 #include <regex>
+#include <chrono>
 
 void File::init() {
     romDataPath = appDataPath / emulator->rom->getBundleID();
@@ -100,10 +101,11 @@ const char *File::getType(const std::string &path) {
 int File::stat(const std::string &path, FileStat_32 &stat) {
     auto dataPath = romDataPath / sanitizePath(path);
     auto romFile = emulator->rom->findRomFile(path);
-    auto setTime = [&](const std::chrono::system_clock::time_point &modTime){
+    auto setTime = [&](const std::time_t &modTime){
         // Todo: Respect timezone offsets
-        auto ymd = std::chrono::year_month_day{std::chrono::floor<std::chrono::days>(modTime)};
-        auto timeOffset = modTime - std::chrono::floor<std::chrono::days>(modTime);
+        auto modTimePoint = std::chrono::system_clock::from_time_t(modTime);
+        auto ymd = std::chrono::year_month_day{std::chrono::floor<std::chrono::days>(modTimePoint)};
+        auto timeOffset = modTimePoint - std::chrono::floor<std::chrono::days>(modTimePoint);
         std::chrono::hh_mm_ss time{timeOffset};
         stat.m_year = (int) ymd.year();
         stat.m_month = (int) (uint) ymd.month();
@@ -115,7 +117,7 @@ int File::stat(const std::string &path, FileStat_32 &stat) {
     if (std::filesystem::exists(dataPath)) {
         stat.isdir = std::filesystem::is_directory(dataPath);
         stat.size = (uint32_t) std::filesystem::file_size(dataPath);
-        setTime(std::chrono::file_clock::to_sys(std::filesystem::last_write_time(dataPath)));
+        setTime(to_time_t(std::filesystem::last_write_time(dataPath)));
         return 0;
     } else if (romFile) {
         stat.isdir = false;

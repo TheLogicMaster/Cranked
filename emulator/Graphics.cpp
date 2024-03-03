@@ -4,7 +4,7 @@
 
 Graphics::Graphics(class Emulator *emulator) : emulator(emulator), heap(emulator->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
 
-inline LCDBitmap_32::LCDBitmap_32(int width, int height, class Graphics *graphics)
+inline LCDBitmap_32::LCDBitmap_32(int width, int height, Graphics *graphics)
         : width(width), height(height), graphics(graphics), data(vheap_vector<uint8_t>(width * height, graphics->heap.allocator<uint8_t>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
@@ -98,7 +98,7 @@ void Graphics::drawRect(int x, int y, int width, int height, LCDColor color) {
     drawLine(x, y + height, x + width, y + height, context.lineWidth, color);
 }
 
-void Graphics::drawText(const void* text, int len, [[maybe_unused]] PDStringEncoding encoding, int x, int y, LCDFont_32 *font) {
+void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, LCDFont_32 *font) {
     // Todo: Support encodings
     // Todo: Kerning
     const char *string = (const char *) text;
@@ -182,7 +182,7 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
     dx = 2 * ry * ry * x;
     dy = 2 * rx * rx * y;
     auto draw = [&] {
-        double q1 = 90 - 180 / std::numbers::pi * atan2(y, x);
+        double q1 = 90 - 180 / PI * atan2(y, x);
         double q2 = 360 - q1;
         double q3 = 180 + q1;
         double q4 = 180 - q1;
@@ -258,6 +258,12 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
     }
 }
 
+LCDBitmap_32 *Graphics::allocateBitmap(int width, int height) {
+    auto bitmap = heap.construct<LCDBitmap_32>(width, height, this);
+    allocatedBitmaps.emplace(bitmap);
+    return bitmap;
+}
+
 LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
     auto &bitmapTable = loadedBitmapTables[path];
     if (bitmapTable.cells.empty())
@@ -276,6 +282,23 @@ LCDBitmap_32 *Graphics::getImage(const std::string &path) {
         image = emulator->rom->getImage(path);
     auto bitmap = getImage(image.cell);
     allocatedBitmaps.emplace(bitmap);
+    return bitmap;
+}
+
+LCDBitmap_32 *Graphics::getImage(const Rom::ImageCell &source) {
+    auto bitmap = heap.construct<LCDBitmap_32>(source.width, source.height, this);
+    auto stride = (int) std::ceil((float) source.width / 8);
+    auto readBitmapData = [&](const uint8_t *src, uint8_t *dest){
+        for (int i = 0; i < source.height; i++)
+            for (int j = 0; j < source.width; j++)
+                if (src[i * source.width + j])
+                    dest[stride * i + j / 8] |= 0x80 >> (j % 8);
+    };
+    readBitmapData(source.data.data(), bitmap->data.data());
+    if (!source.mask.empty()) {
+        bitmap->mask = heap.construct<LCDBitmap_32>(source.width, source.height, this);
+        readBitmapData(source.mask.data(), bitmap->mask->data.data());
+    }
     return bitmap;
 }
 

@@ -62,8 +62,7 @@ bool retro_load_game(const retro_game_info *info) {
         return false;
     }
 
-    rom = std::make_shared<Rom>(info->path);
-    emulator->load(rom);
+    emulator->load(info->path);
     emulator->start();
 
     return true;

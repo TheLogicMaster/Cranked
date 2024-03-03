@@ -333,6 +333,7 @@ def main():
             f.write(');\n')
         f.write('\n')
 
+    # Todo: `decltype` and `uintptr_t` aren't needed since type is always cref_t
     with open(os.path.join(project_path, 'src', 'gen', 'PlaydateFunctionMappings.cpp'), 'w') as f:
         f.write('// Auto-generated Playdate native function mappings\n\n')
         f.write('#include "PlaydateAPI.hpp"\n')

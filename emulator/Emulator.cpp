@@ -35,7 +35,7 @@
 //    return false;
 //}
 
-Emulator::Emulator(InternalUpdateCallback updateCallback) : internalUpdateCallback(updateCallback) {
+Emulator::Emulator(InternalUpdateCallback updateCallback, void *userdata) : internalUpdateCallback(updateCallback), internalUserdata(userdata) {
     apiSize = populatePlaydateApiStruct(apiMemory.data());
 
     assertUC(uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &nativeEngine), "Failed to initialize native engine");
@@ -121,8 +121,8 @@ void Emulator::init() {
                 for (auto source : PRELOADED_SOURCES)
                     if (file.name == source) {
                         luaL_loadbuffer(luaInterpreter, (char *) file.data.data(), file.data.size(), file.name.c_str());
-                        if (lua_pcall(luaInterpreter, 0, 0, 0) != LUA_OK)
-                            throw std::runtime_error("Failed to load '" + file.name + "': " + getLuaError());
+                        if (int result = lua_pcall(luaInterpreter, 0, 0, 0); result != LUA_OK)
+                            throw std::runtime_error("Failed to load '" + file.name + "': " + getLuaError(result));
                         loadedLuaFiles.emplace(source, source + strlen(source) - 4);
                         break;
                     }
@@ -131,17 +131,19 @@ void Emulator::init() {
         if (!lastLuaFile)
             throw std::runtime_error("Failed to find main Lua file");
         luaL_loadbuffer(luaInterpreter, (char *) lastLuaFile->data.data(), lastLuaFile->data.size(), lastLuaFile->name.c_str());
-        if (lua_pcall(luaInterpreter, 0, 0, 0) != LUA_OK)
-            throw std::runtime_error("Failed to load '" + lastLuaFile->name + "': " + getLuaError());
+        if (int result = lua_pcall(luaInterpreter, 0, 0, 0); result != LUA_OK)
+            throw std::runtime_error("Failed to load '" + lastLuaFile->name + "': " + getLuaError(result));
         lua_settop(luaInterpreter, 0);
     }
 
     initialized = true;
 }
 
-void Emulator::load(std::shared_ptr<Rom> program) {
+void Emulator::load(const std::string &path) {
+    reset();
+
     unload();
-    rom = std::move(program);
+    rom = std::make_unique<Rom>(path, this);
     rom->load();
 
     hasLua = rom->hasLua;
@@ -155,8 +157,6 @@ void Emulator::load(std::shared_ptr<Rom> program) {
         // Probably can't use JIT, since the memory page has to be read/writable since relocations being specifically for code or data probably isn't known from PDX
         assertUC(uc_mem_map_ptr(nativeEngine, CODE_PAGE_ADDRESS, size, UC_PROT_READ|UC_PROT_WRITE|UC_PROT_EXEC, codeMemory.data()), "Failed to map program memory");
     }
-
-    reset();
 }
 
 void Emulator::unload() {
@@ -173,7 +173,7 @@ void Emulator::unload() {
 }
 
 void Emulator::reset() {
-    state == State::Stopped;
+    state = State::Stopped;
     nativeUpdateCallback = 0;
     nativeUpdateUserdata = 0;
     emulatedLuaFunctions.clear();
@@ -182,7 +182,6 @@ void Emulator::reset() {
     disableUpdateLoop = false;
     crankSoundsEnabled = true;
     statsInterval = 0;
-    luaInterpreter = nullptr;
 
     nativeContextStackDepth = 0;
     for (auto context : nativeContextStack)
@@ -191,6 +190,7 @@ void Emulator::reset() {
 
     if (luaInterpreter)
         lua_close(luaInterpreter);
+    luaInterpreter = nullptr;
 
     luaReferences.clear();
     loadedLuaFiles.clear();
@@ -312,7 +312,7 @@ void Emulator::update() {
                     if (result == LUA_OK)
                         lua_resetthread(luaUpdateThread);
                     else if (result != LUA_YIELD) {
-                        std::string error(getLuaError());
+                        std::string error(getLuaError(result));
                         inLuaUpdate = false;
                         lua_resetthread(luaUpdateThread);
                         throw std::runtime_error("Failed to run Lua update loop: " + error);
@@ -358,19 +358,23 @@ void Emulator::updateInternals() {
         internalUpdateCallback(this);
 }
 
-void *Emulator::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {
+void *Emulator::luaAllocator(void *userData, void *ptr, [[maybe_unused]] size_t osize, size_t nsize) {
     auto emulator = (Emulator *) userData;
     if (nsize == 0) {
         emulator->heap.free(ptr);
         return nullptr;
     }
-    return emulator->heap.reallocate(ptr, (int) nsize);
+    try {
+        return emulator->heap.reallocate(ptr, (int) nsize);
+    } catch (std::exception &ex) {
+        return nullptr;
+    }
 }
 
-void Emulator::luaHook(lua_State *luaState, lua_Debug *luaDebug) {
+void Emulator::luaHook(lua_State *luaState, [[maybe_unused]] lua_Debug *luaDebug) {
     // Todo: This hook may slow things down, so potentially set the hook with a count of 1 from a different thread (sethook is the only thread-safe Lua function)
     // Todo: Yielding is destructive if there's a native function in the call stack, so probably only do so if emulator is forcefully stopped
-    // Todo: Nested hooks are disabled, so a Lua->C->Lua chain could block the entire program, but probably not a real concern
+    // Todo: Nested hooks are disabled, so a Lua->Hook->...->Lua chain could block the entire program, but probably not a real concern
     auto emulator = fromLuaContext(luaState);
     if (emulator->state == State::Stopped)
         lua_yield(luaState, 0);
@@ -379,6 +383,10 @@ void Emulator::luaHook(lua_State *luaState, lua_Debug *luaDebug) {
 }
 
 void Emulator::nativeFunctionDispatch(int index) {
+    struct ArgBuffer {
+        uint32_t data[4]; // This must hold enough data to store any native argument
+    };
+
     if (index >= FUNCTION_TABLE_SIZE)
         throw std::runtime_error("Native function out of range");
     auto &metadata = playdateFunctionTable[index];
@@ -482,7 +490,7 @@ void Emulator::nativeFunctionDispatch(int index) {
 
     auto argCount = argTypes.size() + 1;
     std::vector<ffi_type *> ffiArgTypes(argCount);
-    std::vector<uint32_t[4]> argValues(argCount - 1); // 4x 32-bit int struct max size
+    std::vector<ArgBuffer> argValues(argCount - 1);
     std::vector<void *> ffiArgs(argCount);
 
     // Pass `this` as first arg
@@ -491,7 +499,7 @@ void Emulator::nativeFunctionDispatch(int index) {
     ffiArgs[0] = &emulator;
 
     for (int i = 0; i < argCount - 1; i++)
-        ffiArgs[i + 1] = argValues[i];
+        ffiArgs[i + 1] = argValues[i].data;
 
     auto argTypeToFFI = [](ArgType type){
         static ffi_type struct2Type, struct4Type;
@@ -581,22 +589,22 @@ void Emulator::nativeFunctionDispatch(int index) {
     ffi_cif cif;
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, argCount, ffiReturnType, ffiArgTypes.data()) != FFI_OK)
         throw std::runtime_error("Failed to prep FFI CIF");
-    uint32_t returnValue[4]{};
-    ffi_call(&cif, (void (*)()) metadata.func, returnValue, ffiArgs.data());
+    ArgBuffer returnValue{};
+    ffi_call(&cif, (void (*)()) metadata.func, returnValue.data, ffiArgs.data());
 
     // Push return type
     if (returnType == ArgType::float_t)
-        writeRegister(UC_ARM_REG_S0, returnValue[0]);
+        writeRegister(UC_ARM_REG_S0, returnValue.data[0]);
     else if (returnType == ArgType::double_t)
-        assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0, returnValue), "Register write failed");
+        assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0, returnValue.data), "Register write failed");
     else if (wideReturn) {
-        writeRegister(UC_ARM_REG_R0 + 0, returnValue[0]);
-        writeRegister(UC_ARM_REG_R0 + 1, returnValue[1]);
+        writeRegister(UC_ARM_REG_R0 + 0, returnValue.data[0]);
+        writeRegister(UC_ARM_REG_R0 + 1, returnValue.data[1]);
     } else if (returnType == ArgType::ptr_t)
-        writeRegister(UC_ARM_REG_R0, toVirtualAddress(*(void **) returnValue));
+        writeRegister(UC_ARM_REG_R0, toVirtualAddress(*(void **) returnValue.data));
     else if (returnType == ArgType::struct2_t or returnType == ArgType::struct4_t) {
         for (int i = 0; i < (returnType == ArgType::struct2_t ? 2 : 4); i++)
-            writeRegister(UC_ARM_REG_R0 + i, returnValue[i]);
+            writeRegister(UC_ARM_REG_R0 + i, returnValue.data[i]);
     } else if (returnType != ArgType::void_t)
-        writeRegister(UC_ARM_REG_R0, returnValue[0]);
+        writeRegister(UC_ARM_REG_R0, returnValue.data[0]);
 }

@@ -6,10 +6,11 @@
 #include "HeapAllocator.hpp"
 
 #include <cmath>
-#include <numbers>
 #include <unordered_map>
 #include <unordered_set>
 #include <optional>
+
+class Graphics;
 
 struct Vec2 {
     int x, y;
@@ -84,14 +85,14 @@ struct LCDBitmap_32 {
     int height;
     bool inverted{};
     vheap_vector<uint8_t> data;
-    class Graphics *graphics;
+    Graphics *graphics;
     LCDBitmap_32 *mask; // Always owns mask
 
     LCDBitmap_32(const LCDBitmap_32 &other);
 
     LCDBitmap_32(LCDBitmap_32 &&other) noexcept;
 
-    LCDBitmap_32(int width, int height, class Graphics *graphics);
+    LCDBitmap_32(int width, int height, Graphics *graphics);
 
     ~LCDBitmap_32();
 
@@ -404,11 +405,7 @@ public:
         allocatedSprites.erase(sprite);
     }
 
-    inline LCDBitmap_32 *allocateBitmap(int width, int height) {
-        auto bitmap = heap.construct<LCDBitmap_32>(width, height, this);
-        allocatedBitmaps.emplace(bitmap);
-        return bitmap;
-    }
+    LCDBitmap_32 *allocateBitmap(int width, int height);
 
     inline void freeBitmap(LCDBitmap_32 *bitmap) {
         heap.destruct(bitmap);
@@ -431,22 +428,7 @@ public:
     LCDBitmap_32 *getImage(const std::string &path);
 
     // Doesn't add to allocatedBitmaps
-    inline LCDBitmap_32 *getImage(const Rom::ImageCell &source) {
-        auto bitmap = heap.construct<LCDBitmap_32>(source.width, source.height, this);
-        auto stride = (int) std::ceil((float) source.width / 8);
-        auto readBitmapData = [&](const uint8_t *src, uint8_t *dest){
-            for (int i = 0; i < source.height; i++)
-                for (int j = 0; j < source.width; j++)
-                    if (src[i * source.width + j])
-                        dest[stride * i + j / 8] |= 0x80 >> (j % 8);
-        };
-        readBitmapData(source.data.data(), bitmap->data.data());
-        if (!source.mask.empty()) {
-            bitmap->mask = heap.construct<LCDBitmap_32>(source.width, source.height, this);
-            readBitmapData(source.mask.data(), bitmap->mask->data.data());
-        }
-        return bitmap;
-    }
+    LCDBitmap_32 *getImage(const Rom::ImageCell &source);
 
     LCDFont_32 *getFont(const std::string &path);
 
@@ -462,7 +444,7 @@ public:
     Rom::Font systemFontSource;
     LCDFont_32 *systemFont{};
     uint32_t displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
-    bool displayBufferNativeEndian{};
+    bool displayBufferNativeEndian = false;
     uint32_t displayBufferOnColor = 0xB0AEA7FF;
     uint32_t displayBufferOffColor = 0x302E27FF;
     LCDBitmap_32 *frameBuffer{}, *previousFrameBuffer{};

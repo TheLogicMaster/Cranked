@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PlaydateTypes.hpp"
+#include "Utils.hpp"
 
 #include "libzippp.h"
 
@@ -10,6 +11,8 @@
 #include <unordered_map>
 #include <memory>
 #include <filesystem>
+
+class Emulator;
 
 class Rom {
 public:
@@ -42,7 +45,7 @@ public:
         uint32_t size{};
         uint32_t extra{}; // Used for audio
         std::vector<uint8_t> data; // Populated for PDZ contents
-        std::chrono::time_point<std::chrono::system_clock> modTime;
+        std::time_t modTime;
     };
 
     struct ImageCell {
@@ -97,7 +100,7 @@ public:
         std::vector<std::vector<uint8_t>> frames;
     };
 
-    explicit Rom(const std::string &path);
+    explicit Rom(const std::string &path, Emulator *emulator = nullptr);
     ~Rom();
     void load();
     void unload();
@@ -122,7 +125,7 @@ public:
     }
 
     inline std::string getVersion() {
-        return manifest["version"];
+        return manifest["version"]; // Todo: Supported version checks
     }
 
     inline int getBuildNumber() {
@@ -195,6 +198,8 @@ public:
         return readVideo(data.data(), data.size());
     }
 
+    void logMessage(LogLevel level, const char *format, ...) const;
+
     static std::vector<File> loadPDZ(const std::vector<uint8_t> &data);
     static StringTable readStringTable(const uint8_t *data, size_t dataSize);
     static Font readFont(const uint8_t *data, size_t dataSize);
@@ -205,6 +210,7 @@ public:
     static Video readVideo(const uint8_t *data, size_t dataSize);
     static FileType getFileType(const uint8_t *header);
 
+    Emulator *emulator; // Only present for logging, so optional
     bool loaded{};
     std::unique_ptr<libzippp::ZipArchive> zip;
     std::filesystem::path path;

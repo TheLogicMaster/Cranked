@@ -56,7 +56,7 @@ int main(int argc, const char *args[]) {
 
     };
     Emulator emulator(callback);
-    emulator.load(std::make_shared<Rom>(args[1]));
+    emulator.load(args[1]);
     emulator.start();
 
     SDL_Texture* displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);

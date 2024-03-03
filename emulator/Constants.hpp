@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
+// Todo: Move to static class members, utilize namespaces
+
+static constexpr double PI = 3.14159265358979323846;
+
 static constexpr int DISPLAY_WIDTH = 400;
 static constexpr int DISPLAY_HEIGHT = 240;
 static constexpr int DISPLAY_BUFFER_WIDTH = 416;

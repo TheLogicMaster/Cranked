@@ -332,7 +332,7 @@ int32_t playdate_graphics_setBitmapMask(Emulator *emulator, LCDBitmap_32 *bitmap
     return 0; // Todo: Return value?
 }
 
-LCDBitmap_32 *playdate_graphics_getBitmapMask(Emulator *emulator, LCDBitmap_32 *bitmap) {
+LCDBitmap_32 *playdate_graphics_getBitmapMask([[maybe_unused]] Emulator *emulator, LCDBitmap_32 *bitmap) {
     return bitmap->mask;
 }
 
@@ -366,7 +366,7 @@ int32_t playdate_sys_formatString(Emulator *emulator, cref_t *ret, uint8_t *fmt,
     return size;
 }
 
-void playdate_sys_logToConsole(Emulator *emulator, uint8_t *fmt, ...) {
+void playdate_sys_logToConsole([[maybe_unused]] Emulator *emulator, uint8_t *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
@@ -382,7 +382,7 @@ void playdate_sys_error(Emulator *emulator, uint8_t *fmt, ...) {
     emulator->stop();
 }
 
-int32_t playdate_sys_getLanguage(Emulator *emulator) {
+int32_t playdate_sys_getLanguage([[maybe_unused]] Emulator *emulator) {
     return (int) PDLanguage::English;
 }
 
@@ -390,7 +390,7 @@ uint32_t playdate_sys_getCurrentTimeMilliseconds(Emulator *emulator) {
     return emulator->currentMillis;
 }
 
-uint32_t playdate_sys_getSecondsSinceEpoch(Emulator *emulator, uint32_t *milliseconds) {
+uint32_t playdate_sys_getSecondsSinceEpoch([[maybe_unused]] Emulator *emulator, uint32_t *milliseconds) {
     return duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
@@ -761,9 +761,9 @@ int32_t playdate_lua_callFunction(Emulator *emulator, uint8_t *name, int32_t nar
         lua_copy(emulator->getLuaContext(), -1, -2 - nargs);
         lua_pop(emulator->getLuaContext(), 1);
     }
-    if (lua_pcall(emulator->getLuaContext(), nargs, LUA_MULTRET, 0) != LUA_OK) {
-        auto message = lua_tostring(emulator->getLuaContext(), -1);
-        *outerr = emulator->getEmulatedStringLiteral(std::string("Error calling function: ") + emulator->getLuaError());
+    if (int result = lua_pcall(emulator->getLuaContext(), nargs, LUA_MULTRET, 0); result != LUA_OK) {
+        if (outerr)
+            *outerr = emulator->getEmulatedStringLiteral(std::string("Error calling function: ") + emulator->getLuaError(result));
         return 0;
     }
     return 1;

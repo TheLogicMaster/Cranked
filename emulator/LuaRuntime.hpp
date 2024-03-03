@@ -304,9 +304,14 @@ inline LuaValGuard LuaVal::getField(const char *name) {
 template<class T, int I>
 struct LuaWrapperArgsHelper {};
 
+struct LuaArgBuffer {
+    uint32_t data[4];
+};
+static_assert(sizeof(LuaVal) <= sizeof(LuaArgBuffer)); // Ensure LuaVal fits in values array
+
 template<class T, typename... R, int I>
 struct LuaWrapperArgsHelper<std::tuple<T, R...>, I> {
-    inline static void get(lua_State *luaContext, ffi_type **types, uint64_t (*values)[2]) {
+    inline static void get(lua_State *luaContext, ffi_type **types, LuaArgBuffer *values) {
         LuaWrapperArgsHelper<std::tuple<T>, I>::get(luaContext, types, values);
         LuaWrapperArgsHelper<std::tuple<R...>, I + 1>::get(luaContext, types, values);
     }
@@ -314,7 +319,7 @@ struct LuaWrapperArgsHelper<std::tuple<T, R...>, I> {
 
 template<class T, int I>
 struct LuaWrapperArgsHelper<std::tuple<T>, I> {
-    inline static void get(lua_State *luaContext, ffi_type **types, uint64_t (*values)[2]) {
+    inline static void get(lua_State *luaContext, ffi_type **types, LuaArgBuffer *values) {
         if constexpr (std::is_same_v<T, Emulator *> or std::is_same_v<T, lua_State *>) // Forward declaration does not work here
             return; // Just ignore Emulator or lua_State context arg in signature, since index is offset by 1 accordingly
         else if constexpr (std::is_same_v<T, LuaVal>) {
@@ -325,7 +330,7 @@ struct LuaWrapperArgsHelper<std::tuple<T>, I> {
                 luaArgType.elements = luaArgTypeElements;
             }
             types[I] = &luaArgType;
-            *(LuaVal *) &values[I] = {luaContext, I};
+            *(LuaVal *) values[I].data = {luaContext, I};
         } else if constexpr (std::is_pointer_v<T> and std::is_class_v<std::remove_pointer_t<T>>) { // Treat all struct(class) pointers as unwrapped userdata objects
             types[I] = &ffi_type_pointer;
             lua_getfield(luaContext, I, "userdata");
@@ -363,7 +368,6 @@ struct LuaWrapperArgsHelper<std::tuple<T>, I> {
 
 /**
  * This wraps a native function and marshals the arguments from the Lua stack and back (Only supports single return values for conversion)
- * Values checks are done for string arguments, otherwise errors can be raised like: `emulator->luaWrapperError = "Error"` (Preferably use `LuaRet`)
  * Use `LuaArg` for parameters like tables that aren't convertable or where more control is needed
  * Use `LuaRet` for return types where the function is in charge of pushing return values onto the Lua stack
  * Returned std::string* values are deleted but cstrings are left alone
@@ -381,10 +385,11 @@ inline int luaNativeWrapper(lua_State *luaContext) {
 
     std::vector<ffi_type *> ffiArgTypes(argCount);
     std::vector<void *> ffiArgs(argCount);
-    std::vector<uint64_t[2]> argValues(argCount);
+
+    std::vector<LuaArgBuffer> argValues(argCount);
 
     for (int i = 0; i < argCount; i++)
-        ffiArgs[i] = &argValues[i];
+        ffiArgs[i] = argValues[i].data;
 
     // Set first arg as Emulator or lua_State if needed
     auto emulator = Emulator::fromLuaContext(luaContext);
@@ -393,20 +398,9 @@ inline int luaNativeWrapper(lua_State *luaContext) {
         ffiArgTypes[0] = &ffi_type_pointer;
     }
 
-    auto &wrapperError = emulator->luaWrapperError;
-    wrapperError.clear(); // This shouldn't be set, but prevent confusing errors
-
     // Read args off of Lua stack
-    static_assert(sizeof(LuaVal) <= sizeof(decltype(argValues)::value_type)); // Ensure LuaVal fits in values array
     if constexpr (luaArgCount > 0)
         LuaWrapperArgsHelper<typename Helper::ArgTypes, takesContext ? 0 : 1>::get(luaContext, &ffiArgTypes[0], &argValues[0]);
-
-    // Check for wrapper arg error
-    if (!wrapperError.empty()) { // Todo: This could really just be a thrown exception with Lua compiled as C++
-        luaL_error(luaContext, wrapperError.c_str());
-        wrapperError.clear();
-        return 1;
-    }
 
     // Determine FFI return type
     ffi_type *ffiReturnType;
@@ -443,13 +437,10 @@ inline int luaNativeWrapper(lua_State *luaContext) {
     static_assert(sizeof(LuaRet) <= sizeof(returnValue)); // Ensure LuaRet fits in returnValue
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, argCount, ffiReturnType, ffiArgTypes.data()) != FFI_OK)
         throw std::runtime_error("Failed to prep FFI CIF in Lua wrapper");
-    ffi_call(&cif, (void (*)()) F, &returnValue, ffiArgs.data());
-
-    // Check for "thrown" error
-    if (!wrapperError.empty()) {
-        luaL_error(luaContext, wrapperError.c_str());
-        wrapperError.clear();
-        return 1;
+    try {
+        ffi_call(&cif, (void (*)()) F, &returnValue, ffiArgs.data());
+    } catch (std::exception &ex) {
+        return luaL_error(luaContext, ex.what());
     }
 
     // Push result
