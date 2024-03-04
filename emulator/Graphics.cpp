@@ -2,9 +2,10 @@
 #include "Emulator.hpp"
 #include "gen/SystemFont.hpp"
 
-Graphics::Graphics(class Emulator *emulator) : emulator(emulator), heap(emulator->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
+Graphics::Graphics(Emulator *emulator)
+        : emulator(emulator), heap(emulator->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
 
-inline LCDBitmap_32::LCDBitmap_32(int width, int height, Graphics *graphics)
+LCDBitmap_32::LCDBitmap_32(int width, int height, Graphics *graphics)
         : width(width), height(height), graphics(graphics), data(vheap_vector<uint8_t>(width * height, graphics->heap.allocator<uint8_t>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
@@ -30,12 +31,43 @@ LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     return *this;
 }
 
-LCDFontPage_32::LCDFontPage_32(Graphics *graphics) : glyphs(vheap_map<int, LCDFontGlyph_32>(graphics->heap.pairAllocator<int, LCDFontGlyph_32>())) {}
+LCDFontGlyph_32::LCDFontGlyph_32(LCDBitmap_32 &&bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable)
+        : bitmap(bitmap), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable) {}
+
+LCDFontPage_32::LCDFontPage_32(Graphics *graphics)
+        : glyphs(vheap_map<int, LCDFontGlyph_32>(graphics->heap.pairAllocator<int, LCDFontGlyph_32>())) {}
 
 LCDFont_32::LCDFont_32(Graphics *graphics, int tracking, int glyphWidth, int glyphHeight)
         : tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight), pages(vheap_map<int, LCDFontPage_32>(graphics->heap.pairAllocator<int, LCDFontPage_32>())) {}
 
-LCDBitmapTable_32::LCDBitmapTable_32(Graphics *graphics, int cellsPerRow) : cellsPerRow(cellsPerRow), graphics(graphics), bitmaps(graphics->heap.allocator<LCDBitmap_32>()) {}
+LCDBitmapTable_32::LCDBitmapTable_32(Graphics *graphics, int cellsPerRow)
+        : cellsPerRow(cellsPerRow), graphics(graphics), bitmaps(graphics->heap.allocator<LCDBitmap_32>()) {}
+
+LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) {
+    if (&other == this)
+        return *this;
+    bitmaps = other.bitmaps;
+    cellsPerRow = other.cellsPerRow;
+    return *this;
+}
+
+bool LCDBitmap_32::getBufferPixel(int x, int y) {
+    if (x < 0 or x >= width or y < 0 or y >= height)
+        return false;
+    int offset = 7 - x % 8;
+    auto stride = (int) std::ceil((float) width / 8);
+    return data[y * stride + x / 8] & (1 << offset);
+}
+
+void LCDBitmap_32::setBufferPixel(int x, int y, bool color) {
+    if (x < 0 or x >= width or y < 0 or y >= height)
+        return;
+    int offset = 7 - x % 8;
+    auto stride = (int) std::ceil((float) width / 8);
+    auto &word = data[y * stride + x / 8];
+    word &= ~(1 << offset);
+    word |= color << offset;
+}
 
 void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
     if (x < 0 or x >= width or y < 0 or y >= height)
@@ -65,6 +97,70 @@ void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
         setBufferPixel(x, y, c == LCDSolidColor::White);
 }
 
+LCDSolidColor LCDBitmap_32::getPixel(int x, int y) {
+    bool pixel = getBufferPixel(x, y);
+    if (inverted)
+        pixel = not pixel;
+    return mask and not mask->getBufferPixel(x, y) ? LCDSolidColor::Clear : LCDSolidColor(pixel);
+}
+
+// Todo: Could be more efficient using memset and such (Patterns add complexity)
+void LCDBitmap_32::clear(LCDColor color) {
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            drawPixel(x, y, color);
+}
+
+void LCDBitmap_32::drawLine(int x1, int y1, int x2, int y2, LCDColor color) {
+    // Todo: Line ending styles
+    // Todo: Draws slightly differently from official implementation, steps differently
+    bool vertical = abs(y2 - y1) > abs(x2 - x1);
+    if (vertical) {
+        std::swap(x1, y1);
+        std::swap(x2, y2);
+    }
+    if (x1 > x2) {
+        std::swap(x1, x2);
+        std::swap(y1, y2);
+    }
+    int dx = x2 - x1;
+    int dy = abs(y2 - y1);
+    int err = dx / 2;
+    int yStep = y1 < y2 ? 1 : -1;
+    for (; x1 <= x2; x1++) {
+        if (vertical)
+            drawPixel(y1, x1, color);
+        else
+            drawPixel(x1, y1, color);
+        err -= dy;
+        if (err < 0) { // Todo: Maybe err check should happen before first draw
+            y1 += yStep;
+            err += dx;
+            if (vertical)
+                drawPixel(y1, x1, color);
+            else
+                drawPixel(x1, y1, color);
+        }
+    }
+}
+
+// Todo: Can be more efficient since it's done in horizontal segments
+void LCDBitmap_32::fillRect(int x, int y, int w, int h, LCDColor color) {
+    for (int i = 0; i < h; i++) {
+        if (y + i >= height)
+            break;
+        for (int j = 0; j < w; j++) {
+            if (x + j >= width)
+                break;
+            drawPixel(x, y, color);
+        }
+    }
+}
+
+void Graphics::pushContext(LCDBitmap_32 *target) {
+    displayContextStack.emplace_back(DisplayContext{.bitmap = target ? target : frameBuffer, .lineWidth = 1});
+}
+
 void Graphics::popContext() {
     if (displayContextStack.empty())
         return;
@@ -76,6 +172,30 @@ void Graphics::popContext() {
     if (context.bitmap != frameBuffer)
         emulator->releaseLuaReference(context.bitmap);
     displayContextStack.pop_back();
+}
+
+void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
+    auto &context = getCurrentDisplayContext();
+    auto pos = ignoreOffset ? Vec2{x, y} : context.drawOffset + Vec2{x, y};
+    if (!context.clipRect.contains(pos))
+        return;
+    context.bitmap->drawPixel(pos.x, pos.y, color);
+}
+
+LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
+    auto &context = getCurrentDisplayContext();
+    auto pos = ignoreOffset ? Vec2{x, y} : context.drawOffset + Vec2{x, y};
+    return context.bitmap->getPixel(pos.x, pos.y);
+}
+
+void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, LCDColor color) {
+    auto &context = getCurrentDisplayContext();
+    auto start = Vec2{x1, y1} + context.drawOffset;
+    auto end = Vec2{x2, y2} + context.drawOffset;
+    // Todo: Clipping
+    // Todo: Width
+    // Todo: Line caps
+    context.bitmap->drawLine(start.x, start.y, end.x, end.y, color);
 }
 
 void Graphics::drawRect(int x, int y, int width, int height, LCDColor color) {
@@ -96,6 +216,65 @@ void Graphics::drawRect(int x, int y, int width, int height, LCDColor color) {
     drawLine(x, y, x, y + height, context.lineWidth, color);
     drawLine(x + width, y, x + width, y + height, context.lineWidth, color);
     drawLine(x, y + height, x + width, y + height, context.lineWidth, color);
+}
+
+void Graphics::fillRect(int x, int y, int width, int height, LCDColor color) {
+    for (int i = 0; i < height; i++)
+        drawLine(x, y + i, x + width - 1, y + i, 1, color);
+}
+
+void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
+    auto lineWidth = getCurrentDisplayContext().lineWidth;
+    drawLine(x1, y1, x2, y2, lineWidth, color);
+    drawLine(x1, y1, x3, y3, lineWidth, color);
+    drawLine(x2, y2, x3, y3, lineWidth, color);
+}
+
+void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, std::optional<Rect> sourceRect) {
+    auto &context = getCurrentDisplayContext();
+    auto mode = context.bitmapDrawMode;
+    bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
+    bool flipX = flip == LCDBitmapFlip::FlippedX or flip == LCDBitmapFlip::FlippedXY;
+    if (sourceRect)
+        sourceRect = *sourceRect - Vec2{x, y};
+    for (int i = 0; i < bitmap->height; i++)
+        for (int j = 0; j < bitmap->width; j++) {
+            auto pixel = bitmap->getPixel(j, i);
+            int pixelX = x + (flipX ? bitmap->width - 1 - j : j);
+            int pixelY = y + (flipY ? bitmap->height - 1 - i : i);
+            if (pixel == LCDSolidColor::Clear)
+                continue;
+            if (sourceRect and sourceRect->contains({pixelX, pixelY}))
+                continue;
+            switch (mode) {
+                case LCDBitmapDrawMode::Copy:
+                    drawPixel(pixelX, pixelY, pixel, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::WhiteTransparent:
+                    if (pixel != LCDSolidColor::White)
+                        drawPixel(pixelX, pixelY, pixel, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::BlackTransparent:
+                    if (pixel != LCDSolidColor::Black)
+                        drawPixel(pixelX, pixelY, pixel, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::FillWhite:
+                    drawPixel(pixelX, pixelY, LCDSolidColor::White, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::FillBlack:
+                    drawPixel(pixelX, pixelY, LCDSolidColor::Black, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::XOR:
+                    drawPixel(pixelX, pixelY, getPixel(pixelX, pixelY, ignoreOffset) == pixel ? LCDSolidColor::Black : LCDSolidColor::White, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::NXOR:
+                    drawPixel(pixelX, pixelY, getPixel(pixelX, pixelY, ignoreOffset) != pixel ? LCDSolidColor::Black : LCDSolidColor::White, ignoreOffset);
+                    break;
+                case LCDBitmapDrawMode::Inverted:
+                    drawPixel(pixelX, pixelY, pixel == LCDSolidColor::White ? LCDSolidColor::Black : LCDSolidColor::White, ignoreOffset);
+                    break;
+            }
+        }
 }
 
 void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, LCDFont_32 *font) {
@@ -256,12 +435,6 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
             d2 += dx - dy + rx * rx;
         }
     }
-}
-
-LCDBitmap_32 *Graphics::allocateBitmap(int width, int height) {
-    auto bitmap = heap.construct<LCDBitmap_32>(width, height, this);
-    allocatedBitmaps.emplace(bitmap);
-    return bitmap;
 }
 
 LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
