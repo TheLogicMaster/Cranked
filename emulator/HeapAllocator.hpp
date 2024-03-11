@@ -14,9 +14,10 @@
 #include <unordered_set>
 #include <cstring>
 
+// Todo: Mirrored data structure to detect heap corruption
 class HeapAllocator {
 public:
-    const size_t ALIGNMENT = 8; // Todo: Should probably use `alignof(max_align_t)`, but memory is currently aligned to multiples of `Node` (8 byte)
+    const size_t ALIGNMENT = 8; // Should probably use `alignof(max_align_t)`, but memory is currently aligned to multiples of `Node` (8 byte)
 
     template<typename T>
     struct AdaptorSTL {

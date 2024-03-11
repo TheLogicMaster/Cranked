@@ -10,18 +10,32 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
+struct Userdata {
+    SDL_AudioDeviceID audioDevice;
+};
+
 int main(int argc, const char *args[]) {
     if (argc != 2) {
         printf("Usage: emulator_main <pdx_path>");
         return -1;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER))
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
         throw std::runtime_error(std::string("Failed to init SDL: ") + SDL_GetError());
 
 #ifdef SDL_HINT_IME_SHOW_UI
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 #endif
+
+    SDL_AudioSpec audioSpec{
+            .freq = 44100,
+            .format = AUDIO_S16,
+            .channels = 2,
+            .samples = 1024,
+    };
+    SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(nullptr, false, &audioSpec, nullptr, false);
+    if (!audioDevice)
+        printf("Failed to initialize audio: %s\n", SDL_GetError());
 
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 440, 480, windowFlags);
@@ -52,10 +66,20 @@ int main(int argc, const char *args[]) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
+    Userdata userdata{
+        .audioDevice = audioDevice
+    };
     auto callback = [](Emulator *emulator){
-
+        auto device = ((Userdata *)emulator->internalUserdata)->audioDevice;
+        if (device) {
+            int toQueue = 1024 - (int) SDL_GetQueuedAudioSize(device) / 4;
+            int16_t buffer[1024 * 2];
+            emulator->audio.sampleAudio(buffer, toQueue);
+            SDL_QueueAudio(device, buffer, toQueue * 4);
+        }
     };
     Emulator emulator(callback);
+    emulator.internalUserdata = &userdata;
     emulator.load(args[1]);
     emulator.start();
 
@@ -98,6 +122,9 @@ int main(int argc, const char *args[]) {
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
     }
+
+    if (audioDevice)
+        SDL_CloseAudioDevice(audioDevice);
 
     SDL_DestroyTexture(displayTexture);
 

@@ -28,6 +28,7 @@ foreach(source IN LISTS lua_sources)
 endforeach()
 
 file(GLOB emulator_sources
+        Audio.cpp
         Emulator.cpp
         File.cpp
         Graphics.cpp

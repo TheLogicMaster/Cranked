@@ -36,8 +36,6 @@
 //}
 
 Emulator::Emulator(InternalUpdateCallback updateCallback, void *userdata) : internalUpdateCallback(updateCallback), internalUserdata(userdata) {
-    apiSize = populatePlaydateApiStruct(apiMemory.data());
-
     assertUC(uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &nativeEngine), "Failed to initialize native engine");
 
     // Enable VFP
@@ -86,6 +84,7 @@ void Emulator::init() {
     startTime = elapsedTimeStart = std::chrono::system_clock::now();
 
     if (hasNative) {
+        apiSize = populatePlaydateApiStruct(apiMemory.data(), rom->sdkVersion.isValid() ? rom->sdkVersion : version);
         writeRegister(UC_ARM_REG_SP, STACK_ADDRESS + STACK_SIZE);
         memcpy(codeMemory.data() + CODE_OFFSET, rom->binary.data(), rom->binary.size());
         memset(codeMemory.data() + CODE_OFFSET + rom->binary.size(), 0, codeMemory.size() - rom->binary.size() - CODE_OFFSET);
@@ -375,6 +374,8 @@ void Emulator::luaHook(lua_State *luaState, [[maybe_unused]] lua_Debug *luaDebug
     // Todo: This hook may slow things down, so potentially set the hook with a count of 1 from a different thread (sethook is the only thread-safe Lua function)
     // Todo: Yielding is destructive if there's a native function in the call stack, so probably only do so if emulator is forcefully stopped
     // Todo: Nested hooks are disabled, so a Lua->Hook->...->Lua chain could block the entire program, but probably not a real concern
+    // Todo: Could nested hooks be hacked in?
+    // Todo: Exceptions thrown in here are likely an issue
     auto emulator = fromLuaContext(luaState);
     if (emulator->state == State::Stopped)
         lua_yield(luaState, 0);
@@ -393,6 +394,10 @@ void Emulator::nativeFunctionDispatch(int index) {
     auto argTypes = metadata.argTypes;
     auto returnType = metadata.returnType;
 
+    auto isWide = [](ArgType type) {
+        return type == ArgType::int64_t or type == ArgType::uint64_t or type == ArgType::double_t;
+    };
+
     // Substitute struct args with 2 or 4 integers, which is sufficient for the current structs
     for (int i = 0; i < argTypes.size(); i++) {
         auto arg = argTypes[i];
@@ -405,26 +410,45 @@ void Emulator::nativeFunctionDispatch(int index) {
     }
 
     // Varargs only works with format string parameter
-    bool isVarargs = metadata.argTypes.size() >= 2 and metadata.argTypes[metadata.argTypes.size() - 1] == ArgType::varargs_t;
+    bool isVarargs = false;
+    bool isVaList = false;
+    cref_t vaListPtr{};
+    if (metadata.argTypes.size() >= 2) {
+        auto lastType = metadata.argTypes[metadata.argTypes.size() - 1];
+        isVarargs = lastType == ArgType::varargs_t;
+        isVaList = lastType == ArgType::va_list_t;
+    }
+    bool isVariadic = isVarargs or isVaList;
+    std::vector<ArgType> varargsTypes{};
     const char *formatString;
-    if (isVarargs) {
+    if (isVariadic) {
         int offset = 0;
         for (auto type : argTypes) {
-            if (type == ArgType::varargs_t)
+            if (type == ArgType::varargs_t or type == ArgType::va_list_t)
                 break;
-            bool wide = type == ArgType::int64_t or type == ArgType::uint64_t;
+            bool wide = isWide(type);
             if (wide and (offset % 2) != 0)
                 offset++;
             offset += wide ? 2 : 1;
         }
         offset -= 1;
         argTypes.pop_back();
+
         uint32_t virtualAddress;
         if (offset < 4)
             virtualAddress = readRegister(UC_ARM_REG_R0 + offset);
         else
-            virtualAddress = virtualRead<uint32_t>(readRegister(UC_ARM_REG_SP) + 4 * (index - 4));
+            virtualAddress = virtualRead<uint32_t>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
         formatString = fromVirtualAddress<const char>(virtualAddress);
+        offset++;
+
+        if (isVaList) {
+            if (offset < 4)
+                vaListPtr = readRegister(UC_ARM_REG_R0 + offset);
+            else
+                vaListPtr = virtualRead<uint32_t>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
+        }
+
         const char *c = formatString;
         while (*c) {
             if (*c == '%') {
@@ -445,50 +469,52 @@ void Emulator::nativeFunctionDispatch(int index) {
                     auto &width = match[2];
                     auto &precision = match[3];
                     if (width.str().find('*') != std::string::npos)
-                        argTypes.push_back(ArgType::int32_t);
+                        varargsTypes.push_back(ArgType::int32_t);
                     if (precision.str().find('*') != std::string::npos)
-                        argTypes.push_back(ArgType::int32_t);
+                        varargsTypes.push_back(ArgType::int32_t);
                 }
                 if (*c == 'c')
-                    argTypes.push_back(*(c - 1) == 'l' ? ArgType::uint16_t : ArgType::uint8_t);
+                    varargsTypes.push_back(*(c - 1) == 'l' ? ArgType::uint16_t : ArgType::uint8_t);
                 else if (*c == 's' or *c == 'n' or *c == 'p')
-                    argTypes.push_back(ArgType::ptr_t);
+                    varargsTypes.push_back(ArgType::ptr_t);
                 else if (*c == 'd' or *c == 'i') {
                     if (*(c - 1) == 'h') {
                         if (*(c - 2) == 'h')
-                            argTypes.push_back(ArgType::int8_t);
+                            varargsTypes.push_back(ArgType::int8_t);
                         else
-                            argTypes.push_back(ArgType::int16_t);
+                            varargsTypes.push_back(ArgType::int16_t);
                     } else if ((*(c - 1) == 'l' and *(c - 2) == 'l') or *(c - 1) == 'j')
-                        argTypes.push_back(ArgType::int64_t);
+                        varargsTypes.push_back(ArgType::int64_t);
                     else if (*(c - 1) == 'z')
-                        argTypes.push_back(ArgType::uint32_t);
+                        varargsTypes.push_back(ArgType::uint32_t);
                     else
-                        argTypes.push_back(ArgType::int32_t);
+                        varargsTypes.push_back(ArgType::int32_t);
                 }
                 else if (*c == 'x' or *c == 'X' or *c == 'u' or *c == 'o') {
                     if (*(c - 1) == 'h') {
                         if (*(c - 2) == 'h')
-                            argTypes.push_back(ArgType::uint8_t);
+                            varargsTypes.push_back(ArgType::uint8_t);
                         else
-                            argTypes.push_back(ArgType::uint16_t);
+                            varargsTypes.push_back(ArgType::uint16_t);
                     } else if ((*(c - 1) == 'l' and *(c - 2) == 'l') or *(c - 1) == 'j')
-                        argTypes.push_back(ArgType::uint64_t);
+                        varargsTypes.push_back(ArgType::uint64_t);
                     else if (*(c - 1) == 't')
-                        argTypes.push_back(ArgType::int32_t);
+                        varargsTypes.push_back(ArgType::int32_t);
                     else
-                        argTypes.push_back(ArgType::uint32_t);
+                        varargsTypes.push_back(ArgType::uint32_t);
                 }
                 else if (*c == 'f' or *c == 'F' or *c == 'e' or *c == 'E' or *c == 'a' or *c == 'A' or *c == 'g' or *c == 'G')
-                    argTypes.push_back(ArgType::double_t);
+                    varargsTypes.push_back(ArgType::double_t);
                 else
                     break;
             }
             c++;
         }
+        if (isVarargs)
+            argTypes.insert(argTypes.end(), varargsTypes.begin(), varargsTypes.end());
     }
 
-    auto argCount = argTypes.size() + 1;
+    auto argCount = argTypes.size() + 1 + (isVaList ? (int)varargsTypes.size() : 0);
     std::vector<ffi_type *> ffiArgTypes(argCount);
     std::vector<ArgBuffer> argValues(argCount - 1);
     std::vector<void *> ffiArgs(argCount);
@@ -530,26 +556,28 @@ void Emulator::nativeFunctionDispatch(int index) {
         }
     };
 
+    // Todo: Variadic parameters should be either converted to native sizes or use emulated sizes with custom string formatting implementations
+
     // Read args from registers and stack and set types
     int currentReg = 0;
     int currentFloatReg = 0;
     auto sp = readRegister(UC_ARM_REG_SP);
-    for (int i = 0; i < argCount - 1; i++) {
+    for (int i = 0; i < (int)argTypes.size(); i++) {
         auto type = argTypes[i];
-        bool wide = type == ArgType::int64_t or type == ArgType::uint64_t;
-        if (wide and currentReg < 4 and (currentReg % 2) != 0) // Wide types
+        bool wide = isWide(type);
+        if ((wide and (isVarargs or type != ArgType::double_t)) and currentReg < 4 and currentReg % 2 != 0)
             currentReg++;
-        if (type == ArgType::double_t and currentFloatReg < 16 and (currentFloatReg % 2) != 0)
+        if (type == ArgType::double_t and currentFloatReg < 16 and currentFloatReg % 2 != 0)
             currentFloatReg++;
-        if (type == ArgType::float_t) {
+        if (type == ArgType::float_t and !isVarargs) {
             if (currentFloatReg >= 16) {
-                *(uint32_t *) &argValues[i] = virtualRead<uint32_t>(sp);
+                *(float *) &argValues[i] = virtualRead<float>(sp);
                 sp += 4;
             } else
                 *(uint32_t *) &argValues[i] = readRegister(UC_ARM_REG_S0 + currentFloatReg++);
-        } else if (type == ArgType::double_t) {
+        } else if (type == ArgType::double_t and !isVarargs) {
             if (currentFloatReg >= 15) {
-                assertUC(uc_mem_read(nativeEngine, sp, &argValues[i], sizeof(double)), "Mem read failed");
+                *(double *) &argValues[i] = virtualRead<double>(sp);
                 sp += 8;
             } else {
                 assertUC(uc_reg_read(nativeEngine, UC_ARM_REG_D0 + currentFloatReg / 2, &argValues[i]), "Register read failed");
@@ -581,9 +609,42 @@ void Emulator::nativeFunctionDispatch(int index) {
         ffiArgTypes[i + 1] = argTypeToFFI(type);
     }
 
+    if (isVaList)
+        for (int i = 0; i < (int)varargsTypes.size(); i++) {
+            auto type = varargsTypes[i];
+            ffiArgTypes[argTypes.size() + 1 + i] = argTypeToFFI(type);
+            switch (type) {
+                case ArgType::uint8_t:
+                case ArgType::int8_t:
+                    *(uint8_t *) &argValues[i] = virtualRead<uint8_t>(vaListPtr);
+                    vaListPtr += 1;
+                    break;
+                case ArgType::uint16_t:
+                case ArgType::int16_t:
+                    *(uint16_t *) &argValues[i] = virtualRead<uint16_t>(vaListPtr);
+                    vaListPtr += 2;
+                    break;
+                case ArgType::uint32_t:
+                case ArgType::int32_t:
+                case ArgType::float_t:
+                case ArgType::ptr_t:
+                    *(uint32_t *) &argValues[i] = virtualRead<uint32_t>(vaListPtr);
+                    vaListPtr += 4;
+                    break;
+                case ArgType::uint64_t:
+                case ArgType::int64_t:
+                case ArgType::double_t:
+                    *(uint64_t *) &argValues[i] = virtualRead<uint64_t>(vaListPtr);
+                    vaListPtr += 8;
+                    break;
+                default:
+                    throw std::runtime_error("Unsupported va_list type");
+            }
+        }
+
     // Set return type
     auto ffiReturnType = argTypeToFFI(returnType);
-    bool wideReturn = returnType == ArgType::int64_t or returnType == ArgType::uint64_t or returnType == ArgType::double_t;
+    bool wideReturn = isWide(returnType);
 
     // Call function
     ffi_cif cif;
@@ -591,11 +652,12 @@ void Emulator::nativeFunctionDispatch(int index) {
         throw std::runtime_error("Failed to prep FFI CIF");
     ArgBuffer returnValue{};
     ffi_call(&cif, (void (*)()) metadata.func, returnValue.data, ffiArgs.data());
+    // Todo: Exception handling to restore state?
 
     // Push return type
-    if (returnType == ArgType::float_t)
+    if (returnType == ArgType::float_t and !isVarargs)
         writeRegister(UC_ARM_REG_S0, returnValue.data[0]);
-    else if (returnType == ArgType::double_t)
+    else if (returnType == ArgType::double_t and !isVarargs)
         assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0, returnValue.data), "Register write failed");
     else if (wideReturn) {
         writeRegister(UC_ARM_REG_R0 + 0, returnValue.data[0]);

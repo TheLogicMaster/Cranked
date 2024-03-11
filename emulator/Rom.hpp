@@ -125,7 +125,7 @@ public:
     }
 
     inline std::string getVersion() {
-        return manifest["version"]; // Todo: Supported version checks
+        return manifest["version"];
     }
 
     inline int getBuildNumber() {
@@ -152,11 +152,11 @@ public:
         return manifest["contentWarning2"];
     }
 
-    inline int getPdxVersion() {
+    inline Version getPdxVersion() {
         try {
-            return std::stoi(manifest["pdxversion"]);
+            return Version(std::stoi(manifest["pdxversion"]));
         } catch (std::exception &ex) {
-            return -1;
+            return Version(0);
         }
     }
 
@@ -214,7 +214,7 @@ public:
     bool loaded{};
     std::unique_ptr<libzippp::ZipArchive> zip;
     std::filesystem::path path;
-    std::map<std::string, std::string> manifest;
+    std::map<std::string, std::string> manifest{};
     std::vector<File> outerFiles;
     std::vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?
     std::vector<uint8_t> binary;
@@ -222,6 +222,7 @@ public:
     uint32_t combinedProgramSize{};
     uint32_t eventHandlerAddress{};
     bool hasLua{};
+    Version sdkVersion{};
 
 private:
     constexpr static auto LUA_MAGIC = "\27Lua";

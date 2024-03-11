@@ -14,6 +14,9 @@ Rom::Rom(const std::string &path, Emulator *emulator) : emulator(emulator), path
     try {
         loadManifest();
     } catch (std::exception &ignored) {}
+    sdkVersion = getPdxVersion();
+    if (!sdkVersion.isValid())
+        logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
 }
 
 Rom::~Rom() {

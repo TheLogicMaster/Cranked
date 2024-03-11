@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Constants.hpp"
+#include "Utils.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -10,6 +11,7 @@
 #include <cstdio>
 
 typedef uint32_t cref_t;
+typedef float MIDINote;
 
 enum class ArgType {
     uint8_t,
@@ -25,6 +27,7 @@ enum class ArgType {
     void_t,
     ptr_t, // Translation from virtual to native addresses is done
     varargs_t, // Requires format string parameter proceeding it
+    va_list_t, // Requires format string parameter proceeding it
     // Structs of N 32-bit integers (For parameters, it's passed in consecutive registers then overflows into stack, extra param for pointer as return value)
     // Smaller types work fine so long as they are padded to be 32-bit (Two consecutive char types would be an issue)
     struct2_t,
@@ -202,9 +205,7 @@ enum class TwoPoleFilterType : int32_t {
     HighShelf,
 };
 
-struct LCDVideoPlayer_32 {
-
-};
+struct LCDVideoPlayer_32;
 
 struct LCDBitmap_32;
 
@@ -223,95 +224,51 @@ struct PDMenuItem_32;
 struct SDFile_32;
 
 struct LuaUDObject_32 {
-    // Todo: Possibly void* equivalent, maybe holds either a stack index or a global table key
+    // Todo: Possibly void* equivalent, maybe holds either a stack index or a global table key, maybe a structure that can point to a global table
 };
 
 struct LCDSprite_32;
 
-struct SoundSource_32 {
+struct SoundSource_32;
 
-};
+struct FilePlayer_32;
 
-struct FilePlayer_32 {
+struct AudioSample_32;
 
-};
+struct SamplePlayer_32;
 
-struct AudioSample_32 {
+struct PDSynthSignal_32;
 
-};
+struct PDSynthLFO_32;
 
-struct SamplePlayer_32 {
+struct PDSynthEnvelope_32;
 
-};
+struct PDSynth_32;
 
-struct PDSynthSignal_32 {
+struct ControlSignal_32;
 
-};
+struct PDSynthInstrument_32;
 
-struct PDSynthLFO_32 {
+struct SequenceTrack_32;
 
-};
+struct SoundSequence_32;
 
-struct PDSynthEnvelope_32 {
+struct TwoPoleFilter_32;
 
-};
+struct PDSynthSignalValue_32;
 
-struct PDSynth_32 {
+struct OnePoleFilter_32;
 
-};
+struct BitCrusher_32;
 
-struct ControlSignal_32 {
+struct RingModulator_32;
 
-};
+struct DelayLine_32;
 
-struct PDSynthInstrument_32 {
+struct DelayLineTap_32;
 
-};
+struct Overdrive_32;
 
-struct SequenceTrack_32 {
+struct SoundEffect_32;
 
-};
-
-struct SoundSequence_32 {
-
-};
-
-struct TwoPoleFilter_32 {
-
-};
-
-struct PDSynthSignalValue_32 {
-
-};
-
-struct OnePoleFilter_32 {
-
-};
-
-struct BitCrusher_32 {
-
-};
-
-struct RingModulator_32 {
-
-};
-
-struct DelayLine_32 {
-
-};
-
-struct DelayLineTap_32 {
-
-};
-
-struct Overdrive_32 {
-
-};
-
-struct SoundEffect_32 {
-
-};
-
-struct SoundChannel_32 {
-
-};
+struct SoundChannel_32;

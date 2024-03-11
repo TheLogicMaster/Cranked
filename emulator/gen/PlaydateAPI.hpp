@@ -3,16 +3,17 @@
 #pragma once
 
 #include "../PlaydateTypes.hpp"
+#include "Utils.hpp"
 
-#define PLAYDATE_SDK_VERSION "2.0.0"
+#define PLAYDATE_SDK_VERSION "2.4.1"
 
-constexpr int FUNCTION_TABLE_SIZE = 481;
+constexpr int FUNCTION_TABLE_SIZE = 495;
 
 class Emulator;
 
 extern NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE];
 
-int populatePlaydateApiStruct(void *api);
+int populatePlaydateApiStruct(void *api, Version version);
 
 struct LCDRect_32 {
 	int32_t left;
@@ -92,6 +93,7 @@ struct playdate_graphics_32 {
 	cref_t getBitmapMask;
 	cref_t setStencilImage;
 	cref_t makeFontFromData;
+	cref_t getTextTracking;
 };
 
 struct PDDateTime_32 {
@@ -145,6 +147,10 @@ struct playdate_sys_32 {
 	cref_t convertEpochToDateTime;
 	cref_t convertDateTimeToEpoch;
 	cref_t clearICache;
+	cref_t setButtonCallback;
+	cref_t setSerialMessageCallback;
+	cref_t vaFormatString;
+	cref_t parseString;
 };
 
 struct lua_reg_32 {
@@ -380,6 +386,8 @@ struct playdate_sprite_32 {
 	cref_t setUserdata;
 	cref_t getUserdata;
 	cref_t setStencilImage;
+	cref_t setCenter;
+	cref_t getCenter;
 };
 
 struct playdate_sound_source_32 {
@@ -422,6 +430,7 @@ struct playdate_sound_sample_32 {
 	cref_t getData;
 	cref_t freeSample;
 	cref_t getLength;
+	cref_t decompress;
 };
 
 struct playdate_sound_sampleplayer_32 {
@@ -466,6 +475,7 @@ struct playdate_sound_lfo_32 {
 	cref_t setRetrigger;
 	cref_t getValue;
 	cref_t setGlobal;
+	cref_t setStartPhase;
 };
 
 struct playdate_sound_envelope_32 {
@@ -487,7 +497,7 @@ struct playdate_sound_synth_32 {
 	cref_t newSynth;
 	cref_t freeSynth;
 	cref_t setWaveform;
-	cref_t setGenerator;
+	cref_t setGenerator_deprecated;
 	cref_t setSample;
 	cref_t setAttackTime;
 	cref_t setDecayTime;
@@ -510,6 +520,9 @@ struct playdate_sound_synth_32 {
 	cref_t getVolume;
 	cref_t isPlaying;
 	cref_t getEnvelope;
+	cref_t setWavetable;
+	cref_t setGenerator;
+	cref_t copy;
 };
 
 struct playdate_control_signal_32 {
@@ -560,7 +573,7 @@ struct playdate_sound_track_32 {
 struct playdate_sound_sequence_32 {
 	cref_t newSequence;
 	cref_t freeSequence;
-	cref_t loadMidiFile;
+	cref_t loadMIDIFile;
 	cref_t getTime;
 	cref_t setTime;
 	cref_t setLoops;
@@ -703,6 +716,7 @@ struct playdate_sound_32 {
 	cref_t setOutputsActive;
 	cref_t removeSource;
 	cref_t signal;
+	cref_t getError;
 };
 
 struct playdate_display_32 {
@@ -805,6 +819,10 @@ int32_t playdate_sys_shouldDisplay24HourTime(Emulator *emulator);
 void playdate_sys_convertEpochToDateTime(Emulator *emulator, uint32_t epoch, PDDateTime_32 * datetime);
 uint32_t playdate_sys_convertDateTimeToEpoch(Emulator *emulator, PDDateTime_32 * datetime);
 void playdate_sys_clearICache(Emulator *emulator);
+void playdate_sys_setButtonCallback(Emulator *emulator, cref_t cb, void * buttonud, int32_t queuesize);
+void playdate_sys_setSerialMessageCallback(Emulator *emulator, cref_t callback);
+int32_t playdate_sys_vaFormatString(Emulator *emulator, cref_t * outstr, uint8_t * fmt, ... );
+int32_t playdate_sys_parseString(Emulator *emulator, uint8_t * str, uint8_t * format, ... );
 uint8_t * playdate_file_geterr(Emulator *emulator);
 int32_t playdate_file_listfiles(Emulator *emulator, uint8_t * path, cref_t callback, void * userdata, int32_t showhidden);
 int32_t playdate_file_stat(Emulator *emulator, uint8_t * path, FileStat_32 * stat);
@@ -883,6 +901,7 @@ int32_t playdate_graphics_setBitmapMask(Emulator *emulator, LCDBitmap_32 * bitma
 LCDBitmap_32 * playdate_graphics_getBitmapMask(Emulator *emulator, LCDBitmap_32 * bitmap);
 void playdate_graphics_setStencilImage(Emulator *emulator, LCDBitmap_32 * stencil, int32_t tile);
 LCDFont_32 * playdate_graphics_makeFontFromData(Emulator *emulator, LCDFontData_32 * data, int32_t wide);
+int32_t playdate_graphics_getTextTracking(Emulator *emulator);
 void playdate_sprite_setAlwaysRedraw(Emulator *emulator, int32_t flag);
 void playdate_sprite_addDirtyRect(Emulator *emulator, LCDRect_32 dirtyRect);
 void playdate_sprite_drawSprites(Emulator *emulator);
@@ -944,6 +963,8 @@ void playdate_sprite_clearStencil(Emulator *emulator, LCDSprite_32 * sprite);
 void playdate_sprite_setUserdata(Emulator *emulator, LCDSprite_32 * sprite, void * userdata);
 void * playdate_sprite_getUserdata(Emulator *emulator, LCDSprite_32 * sprite);
 void playdate_sprite_setStencilImage(Emulator *emulator, LCDSprite_32 * sprite, LCDBitmap_32 * stencil, int32_t tile);
+void playdate_sprite_setCenter(Emulator *emulator, LCDSprite_32 * s, float x, float y);
+void playdate_sprite_getCenter(Emulator *emulator, LCDSprite_32 * s, float * x, float * y);
 int32_t playdate_display_getWidth(Emulator *emulator);
 int32_t playdate_display_getHeight(Emulator *emulator);
 void playdate_display_setRefreshRate(Emulator *emulator, float rate);
@@ -983,12 +1004,12 @@ void playdate_sound_fileplayer_setOffset(Emulator *emulator, FilePlayer_32 * pla
 void playdate_sound_fileplayer_setRate(Emulator *emulator, FilePlayer_32 * player, float rate);
 void playdate_sound_fileplayer_setLoopRange(Emulator *emulator, FilePlayer_32 * player, float start, float end);
 int32_t playdate_sound_fileplayer_didUnderrun(Emulator *emulator, FilePlayer_32 * player);
-void playdate_sound_fileplayer_setFinishCallback(Emulator *emulator, FilePlayer_32 * player, cref_t callback);
-void playdate_sound_fileplayer_setLoopCallback(Emulator *emulator, FilePlayer_32 * player, cref_t callback);
+void playdate_sound_fileplayer_setFinishCallback(Emulator *emulator, FilePlayer_32 * player, cref_t callback, void * userdata);
+void playdate_sound_fileplayer_setLoopCallback(Emulator *emulator, FilePlayer_32 * player, cref_t callback, void * userdata);
 float playdate_sound_fileplayer_getOffset(Emulator *emulator, FilePlayer_32 * player);
 float playdate_sound_fileplayer_getRate(Emulator *emulator, FilePlayer_32 * player);
 void playdate_sound_fileplayer_setStopOnUnderrun(Emulator *emulator, FilePlayer_32 * player, int32_t flag);
-void playdate_sound_fileplayer_fadeVolume(Emulator *emulator, FilePlayer_32 * player, float left, float right, int32_t len, cref_t finishCallback);
+void playdate_sound_fileplayer_fadeVolume(Emulator *emulator, FilePlayer_32 * player, float left, float right, int32_t len, cref_t finishCallback, void * userdata);
 void playdate_sound_fileplayer_setMP3StreamSource(Emulator *emulator, FilePlayer_32 * player, cref_t dataSource, void * userdata, float bufferLen);
 AudioSample_32 * playdate_sound_sample_newSampleBuffer(Emulator *emulator, int32_t byteCount);
 int32_t playdate_sound_sample_loadIntoSample(Emulator *emulator, AudioSample_32 * sample, uint8_t * path);
@@ -997,6 +1018,7 @@ AudioSample_32 * playdate_sound_sample_newSampleFromData(Emulator *emulator, uin
 void playdate_sound_sample_getData(Emulator *emulator, AudioSample_32 * sample, cref_t * data, int32_t * format, uint32_t * sampleRate, uint32_t * bytelength);
 void playdate_sound_sample_freeSample(Emulator *emulator, AudioSample_32 * sample);
 float playdate_sound_sample_getLength(Emulator *emulator, AudioSample_32 * sample);
+int32_t playdate_sound_sample_decompress(Emulator *emulator, AudioSample_32 * sample);
 SamplePlayer_32 * playdate_sound_sampleplayer_newPlayer(Emulator *emulator);
 void playdate_sound_sampleplayer_freePlayer(Emulator *emulator, SamplePlayer_32 * player);
 void playdate_sound_sampleplayer_setSample(Emulator *emulator, SamplePlayer_32 * player, AudioSample_32 * sample);
@@ -1009,15 +1031,15 @@ float playdate_sound_sampleplayer_getLength(Emulator *emulator, SamplePlayer_32 
 void playdate_sound_sampleplayer_setOffset(Emulator *emulator, SamplePlayer_32 * player, float offset);
 void playdate_sound_sampleplayer_setRate(Emulator *emulator, SamplePlayer_32 * player, float rate);
 void playdate_sound_sampleplayer_setPlayRange(Emulator *emulator, SamplePlayer_32 * player, int32_t start, int32_t end);
-void playdate_sound_sampleplayer_setFinishCallback(Emulator *emulator, SamplePlayer_32 * player, cref_t callback);
-void playdate_sound_sampleplayer_setLoopCallback(Emulator *emulator, SamplePlayer_32 * player, cref_t callback);
+void playdate_sound_sampleplayer_setFinishCallback(Emulator *emulator, SamplePlayer_32 * player, cref_t callback, void * userdata);
+void playdate_sound_sampleplayer_setLoopCallback(Emulator *emulator, SamplePlayer_32 * player, cref_t callback, void * userdata);
 float playdate_sound_sampleplayer_getOffset(Emulator *emulator, SamplePlayer_32 * player);
 float playdate_sound_sampleplayer_getRate(Emulator *emulator, SamplePlayer_32 * player);
 void playdate_sound_sampleplayer_setPaused(Emulator *emulator, SamplePlayer_32 * player, int32_t flag);
 PDSynth_32 * playdate_sound_synth_newSynth(Emulator *emulator);
 void playdate_sound_synth_freeSynth(Emulator *emulator, PDSynth_32 * synth);
 void playdate_sound_synth_setWaveform(Emulator *emulator, PDSynth_32 * synth, int32_t wave);
-void playdate_sound_synth_setGenerator(Emulator *emulator, PDSynth_32 * synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void * userdata);
+void playdate_sound_synth_setGenerator_deprecated(Emulator *emulator, PDSynth_32 * synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void * userdata);
 void playdate_sound_synth_setSample(Emulator *emulator, PDSynth_32 * synth, AudioSample_32 * sample, uint32_t sustainStart, uint32_t sustainEnd);
 void playdate_sound_synth_setAttackTime(Emulator *emulator, PDSynth_32 * synth, float attack);
 void playdate_sound_synth_setDecayTime(Emulator *emulator, PDSynth_32 * synth, float decay);
@@ -1040,14 +1062,18 @@ void playdate_sound_synth_setVolume(Emulator *emulator, PDSynth_32 * synth, floa
 void playdate_sound_synth_getVolume(Emulator *emulator, PDSynth_32 * synth, float * left, float * right);
 int32_t playdate_sound_synth_isPlaying(Emulator *emulator, PDSynth_32 * synth);
 PDSynthEnvelope_32 * playdate_sound_synth_getEnvelope(Emulator *emulator, PDSynth_32 * synth);
+int32_t playdate_sound_synth_setWavetable(Emulator *emulator, PDSynth_32 * synth, AudioSample_32 * sample, int32_t log2size, int32_t columns, int32_t rows);
+void playdate_sound_synth_setGenerator(Emulator *emulator, PDSynth_32 * synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void * userdata);
+PDSynth_32 * playdate_sound_synth_copy(Emulator *emulator, PDSynth_32 * synth);
 SoundSequence_32 * playdate_sound_sequence_newSequence(Emulator *emulator);
 void playdate_sound_sequence_freeSequence(Emulator *emulator, SoundSequence_32 * sequence);
-int32_t playdate_sound_sequence_loadMidiFile(Emulator *emulator, SoundSequence_32 * seq, uint8_t * path);
+int32_t playdate_sound_sequence_loadMIDIFile(Emulator *emulator, SoundSequence_32 * seq, uint8_t * path);
 uint32_t playdate_sound_sequence_getTime(Emulator *emulator, SoundSequence_32 * seq);
 void playdate_sound_sequence_setTime(Emulator *emulator, SoundSequence_32 * seq, uint32_t time);
 void playdate_sound_sequence_setLoops(Emulator *emulator, SoundSequence_32 * seq, int32_t loopstart, int32_t loopend, int32_t loops);
 int32_t playdate_sound_sequence_getTempo(Emulator *emulator, SoundSequence_32 * seq);
-void playdate_sound_sequence_setTempo(Emulator *emulator, SoundSequence_32 * seq, int32_t stepsPerSecond);
+void playdate_sound_sequence_setTempo(Emulator *emulator, SoundSequence_32 * seq, float stepsPerSecond);
+void playdate_sound_sequence_setTempo_int(Emulator *emulator, SoundSequence_32 * sequence, int32_t stepsPerSecond);
 int32_t playdate_sound_sequence_getTrackCount(Emulator *emulator, SoundSequence_32 * seq);
 SequenceTrack_32 * playdate_sound_sequence_addTrack(Emulator *emulator, SoundSequence_32 * seq);
 SequenceTrack_32 * playdate_sound_sequence_getTrackAtIndex(Emulator *emulator, SoundSequence_32 * seq, uint32_t track);
@@ -1126,6 +1152,7 @@ void playdate_sound_lfo_setDelay(Emulator *emulator, PDSynthLFO_32 * lfo, float 
 void playdate_sound_lfo_setRetrigger(Emulator *emulator, PDSynthLFO_32 * lfo, int32_t flag);
 float playdate_sound_lfo_getValue(Emulator *emulator, PDSynthLFO_32 * lfo);
 void playdate_sound_lfo_setGlobal(Emulator *emulator, PDSynthLFO_32 * lfo, int32_t global);
+void playdate_sound_lfo_setStartPhase(Emulator *emulator, PDSynthLFO_32 * lfo, float phase);
 PDSynthEnvelope_32 * playdate_sound_envelope_newEnvelope(Emulator *emulator, float attack, float decay, float sustain, float release);
 void playdate_sound_envelope_freeEnvelope(Emulator *emulator, PDSynthEnvelope_32 * env);
 void playdate_sound_envelope_setAttack(Emulator *emulator, PDSynthEnvelope_32 * env, float attack);
@@ -1141,7 +1168,7 @@ void playdate_sound_envelope_setRateScaling(Emulator *emulator, PDSynthEnvelope_
 void playdate_sound_source_setVolume(Emulator *emulator, SoundSource_32 * c, float lvol, float rvol);
 void playdate_sound_source_getVolume(Emulator *emulator, SoundSource_32 * c, float * outl, float * outr);
 int32_t playdate_sound_source_isPlaying(Emulator *emulator, SoundSource_32 * c);
-void playdate_sound_source_setFinishCallback(Emulator *emulator, SoundSource_32 * c, cref_t callback);
+void playdate_sound_source_setFinishCallback(Emulator *emulator, SoundSource_32 * c, cref_t callback, void * userdata);
 ControlSignal_32 * playdate_control_signal_newSignal(Emulator *emulator);
 void playdate_control_signal_freeSignal(Emulator *emulator, ControlSignal_32 * signal);
 void playdate_control_signal_clearEvents(Emulator *emulator, ControlSignal_32 * control);
@@ -1183,7 +1210,7 @@ SoundSource_32 * playdate_sound_addSource(Emulator *emulator, cref_t callback, v
 SoundChannel_32 * playdate_sound_getDefaultChannel(Emulator *emulator);
 int32_t playdate_sound_addChannel(Emulator *emulator, SoundChannel_32 * channel);
 int32_t playdate_sound_removeChannel(Emulator *emulator, SoundChannel_32 * channel);
-void playdate_sound_setMicCallback(Emulator *emulator, cref_t callback, void * context, int32_t forceInternal);
+int32_t playdate_sound_setMicCallback(Emulator *emulator, cref_t callback, void * context, int32_t source);
 void playdate_sound_getHeadphoneState(Emulator *emulator, int32_t * headphone, int32_t * headsetmic, cref_t changeCallback);
 void playdate_sound_setOutputsActive(Emulator *emulator, int32_t headphone, int32_t speaker);
 int32_t playdate_sound_removeSource(Emulator *emulator, SoundSource_32 * source);
@@ -1192,6 +1219,7 @@ void playdate_sound_signal_freeSignal(Emulator *emulator, PDSynthSignal_32 * sig
 float playdate_sound_signal_getValue(Emulator *emulator, PDSynthSignal_32 * signal);
 void playdate_sound_signal_setValueScale(Emulator *emulator, PDSynthSignal_32 * signal, float scale);
 void playdate_sound_signal_setValueOffset(Emulator *emulator, PDSynthSignal_32 * signal, float offset);
+uint8_t * playdate_sound_getError(Emulator *emulator);
 int32_t playdate_lua_addFunction(Emulator *emulator, cref_t f, uint8_t * name, cref_t * outErr);
 int32_t playdate_lua_registerClass(Emulator *emulator, uint8_t * name, lua_reg_32 * reg, lua_val_32 * vals, int32_t isstatic, cref_t * outErr);
 void playdate_lua_pushFunction(Emulator *emulator, cref_t f);

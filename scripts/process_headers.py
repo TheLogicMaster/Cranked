@@ -29,7 +29,7 @@ NULL_STRUCT_FIELDS = {
 
 
 class CType:
-    def __init__(self, c_type: str, array='', emu_type=None, wrapper_type=None):
+    def __init__(self, c_type: str, emu_type=None, wrapper_type=None, array=''):
         self.c_type = c_type.strip()
         if emu_type is not None:
             self.emu_type = emu_type
@@ -38,7 +38,7 @@ class CType:
         ptr = array.count('[')
         c_type = re.sub(r'(?:(?<!\w)const\s)+', '', c_type, re.MULTILINE)
         c_type = c_type.strip()
-        if match := re.match(r'\s*struct (\w+)\*', c_type):
+        if match := re.match(r'\s*struct (\w+)\s*\*', c_type):
             self.emu_type = 'uint32_t'
             self.wrapper_type = match[1] + '_32 ' + '*' * c_type.count('*') if c_type.count('*') <= 1 else 'cref_t *'
             return
@@ -55,6 +55,10 @@ class CType:
             return
         if re.match(r'\s*\.\.\.\s*', c_type):
             self.emu_type = '...'
+            self.wrapper_type = '...'
+            return
+        if re.match(r'\s*va_list\s*', c_type):
+            self.emu_type = 'va_list'
             self.wrapper_type = '...'
             return
         type_replacements = {
@@ -118,12 +122,12 @@ class CUnion:
 
 
 class CFuncPtr:
-    def __init__(self, name: str, return_type: CType, owner):
+    def __init__(self, name: str, return_type: CType, owner: 'Struct|None'):
         self.name = name.strip()
-        self.qualified_name = f'{owner.struct_name}_{name}'
+        self.qualified_name = f'{owner.struct_name}_{name}' if owner else name
         self.return_type = return_type
         self.params: list[CField | CFuncPtr | CType] = []
-        self.owner: Struct = owner
+        self.owner: Struct | None = owner
         self.index = -1
 
     def __str__(self):
@@ -142,12 +146,33 @@ class Struct:
         return f'struct {self.struct_name}_32 {{\n{fields_str}}};\n'
 
 
+class VersionedFunction:
+    def __init__(self, until: str, name: str, return_type: CType, params: list[CField | CFuncPtr | CType]):
+        """ Until version is exclusive, name is replacement name """
+        self.name = name
+        self.until = until
+        self.func = CFuncPtr(name, return_type, None)
+        self.func.params = params
+
+
+# Versions must be listed in increasing order for a given API function
+VERSIONED_API_FUNCTIONS = {
+    'playdate_sound_sequence_setTempo': [
+        VersionedFunction('2.1.0', 'playdate_sound_sequence_setTempo_int', CType('void'), [
+            CField('sequence', CType('struct SoundSequence *')),
+            CField('stepsPerSecond', CType('int')),
+        ]),
+    ],
+}
+
+
 def main():
     sdk_path = sys.argv[1] if len(sys.argv) > 1 else os.getenv('PLAYDATE_SDK_PATH')
     if not sdk_path:
         raise Exception('PLAYDATE_SDK_PATH not set or passed in as an argument')
 
     project_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), os.pardir)
+    gen_path = os.path.join(project_path, 'emulator', 'gen')
     base_path = os.path.join(sdk_path, 'C_API')
     subdir = os.path.join(base_path, 'pd_api')
     files = [os.path.join(base_path, 'pd_api.h')]
@@ -180,7 +205,7 @@ def main():
 
         for match in re.findall(r'^\s*(?:typedef)??\s*enum\s*\{[\w\W]*?}\s*(\w+)\s*;', contents, re.MULTILINE):
             known_enums.add(match)
-        for match in re.findall(r'^\s*typedef\s+\w+\s*\(?\*?(\w+)\)?\(.*?\)\s*;', contents, re.MULTILINE):
+        for match in re.findall(r'^\s*typedef\s+\w+\s*\**\s*\(?\*?(\w+)\)?\(.*?\)\s*;', contents, re.MULTILINE):
             known_function_types.add(match)
         for match in re.findall(r'\s*typedef\s*struct\s*\w+\s*(\w+)\s*;', contents):
             known_structs.add(match)
@@ -225,8 +250,6 @@ def main():
         for struct_match in struct_matches:
             struct = Struct(struct_match[0])
             structs.append(struct)
-            if struct.struct_name == 'playdate_sys':
-                print()
             content = '\n'.join([line.split('//')[0].strip() for line in struct_match[1].splitlines()])
             lines = []
             split_depth = 0
@@ -289,14 +312,17 @@ def main():
             api_struct.field_name = field_name
         api_structs.append(api_struct)
         for struct_field in api_struct.fields:
-            if api_struct.struct_name == 'playdate_graphics' and type(struct_field) is CFuncPtr and struct_field.name == 'getDebugBitmap':
-                print()
             if type(struct_field) is CField and 'struct' in struct_field.c_type.c_type:
                 collect_api_structs(find_struct(struct_field.c_type.wrapper_type.split('_32')[0]), api_struct, struct_field.field_name)
             elif type(struct_field) is CFuncPtr and (api_struct.struct_name not in NULL_STRUCT_FIELDS or struct_field.name not in NULL_STRUCT_FIELDS[api_struct.struct_name]):
                 struct_field.index = function_index
                 functions.append(struct_field)
                 function_index += 1
+                if struct_field.qualified_name in VERSIONED_API_FUNCTIONS:
+                    for versioned in VERSIONED_API_FUNCTIONS[struct_field.qualified_name]:
+                        versioned.func.index = function_index
+                        functions.append(versioned.func)
+                        function_index += 1
     api_structs = []
     functions: list[CFuncPtr] = []
     function_index = 0
@@ -305,12 +331,13 @@ def main():
     for custom_api_struct in CUSTOM_API_STRUCTS:
         collect_api_structs(find_struct(custom_api_struct), None, '')
 
-    with open(os.path.join(project_path, 'src', 'gen', 'PlaydateAPI.hpp'), 'w') as f:
+    with open(os.path.join(gen_path, 'PlaydateAPI.hpp'), 'w') as f:
         f.write('// Auto-generated Playdate compatible struct definitions (32-bit word size)\n\n')
 
         f.write('#pragma once\n\n')
 
-        f.write('#include "../PlaydateTypes.hpp"\n\n')
+        f.write('#include "../PlaydateTypes.hpp"\n')
+        f.write('#include "Utils.hpp"\n\n')
 
         f.write(f'#define PLAYDATE_SDK_VERSION "{sdk_version}"\n\n')
 
@@ -320,21 +347,20 @@ def main():
 
         f.write('extern NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE];\n\n')
 
-        f.write('int populatePlaydateApiStruct(void *api);\n\n')
+        f.write('int populatePlaydateApiStruct(void *api, Version version);\n\n')
 
         for struct in structs:
             f.write(f'{struct}\n')
         f.write('\n')
 
         for func in functions:
-            f.write(f'{func.return_type.wrapper_type} {func.owner.struct_name}_{func.name}(Emulator *emulator')
+            f.write(f'{func.return_type.wrapper_type} {func.qualified_name}(Emulator *emulator')
             for param in func.params:
-                f.write(f', {param.c_type.wrapper_type} {param.field_name if param.field_name else ""}')
+                f.write(f', {param.c_type.wrapper_type} {param.field_name if param.field_name and param.c_type.wrapper_type != "..." else ""}')
             f.write(');\n')
         f.write('\n')
 
-    # Todo: `decltype` and `uintptr_t` aren't needed since type is always cref_t
-    with open(os.path.join(project_path, 'src', 'gen', 'PlaydateFunctionMappings.cpp'), 'w') as f:
+    with open(os.path.join(gen_path, 'PlaydateFunctionMappings.cpp'), 'w') as f:
         f.write('// Auto-generated Playdate native function mappings\n\n')
         f.write('#include "PlaydateAPI.hpp"\n')
         f.write('#include "../Emulator.hpp"\n\n')
@@ -346,6 +372,8 @@ def main():
                 return 'ArgType::void_t'
             elif c_type.wrapper_type == '...':
                 return f'ArgType::varargs_t'
+            elif c_type.emu_type == 'va_list':
+                return f'ArgType::va_list_t'
             elif re.fullmatch(r'u?int\d+_t|float|double', c_type.emu_type):
                 return f'ArgType::{c_type.emu_type}{"" if c_type.emu_type.endswith("_t") else "_t"}'
             for typename, native_type in CUSTOM_NATIVE_TYPES.items():
@@ -359,18 +387,26 @@ def main():
             f.write(f'\t{{ "{func.qualified_name}", (void *) {func.qualified_name}, {{ {", ".join(param_types)} }}, {get_native_type(func.return_type)} }},\n')
         f.write('};\n\n')
 
-        f.write('int populatePlaydateApiStruct(void *api) {\n')
+        f.write('int populatePlaydateApiStruct(void *api, Version version) {\n')
         f.write('\tint offset = 0;\n')
         for struct in api_structs:
             f.write(f'\tauto {struct.struct_name} = ({struct.struct_name}_32 *) ((uintptr_t) api + offset);\n')
             if struct.parent_api:
-                f.write(f'\t{struct.parent_api.struct_name}->{struct.field_name} = (decltype({struct.parent_api.struct_name}->{struct.field_name}))')
-                f.write(f' (uintptr_t) (API_ADDRESS + offset);\n')
+                f.write(f'\t{struct.parent_api.struct_name}->{struct.field_name} = API_ADDRESS + offset;\n')
             f.write(f'\toffset += sizeof({struct.struct_name}_32);\n')
             for field in struct.fields:
                 if type(field) is CFuncPtr:
                     if field.index >= 0:
-                        f.write(f'\t{struct.struct_name}->{field.name} = decltype({struct.struct_name}->{field.name})(FUNC_TABLE_ADDRESS + {field.index} * 2 + 1);\n')
+                        f.write(f'\t{struct.struct_name}->{field.name} = FUNC_TABLE_ADDRESS + {field.index} * 2 + 1;\n')
+                        if field.qualified_name in VERSIONED_API_FUNCTIONS:
+                            versioned_index = 0
+                            for versioned in VERSIONED_API_FUNCTIONS[field.qualified_name]:
+                                f.write('\t')
+                                if versioned_index > 0:
+                                    f.write('else ')
+                                f.write(f'if (version < Version("{versioned.until}"))\n')
+                                f.write(f'\t\t{struct.struct_name}->{field.name} = FUNC_TABLE_ADDRESS + {field.index + 1 + versioned_index} * 2 + 1;\n')
+                                versioned_index += 1
         f.write('\treturn offset;\n')
         f.write('}\n')
 

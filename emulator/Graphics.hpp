@@ -30,9 +30,6 @@ struct Vec2 {
 };
 
 struct Rect {
-    Vec2 pos;
-    Vec2 size;
-
     inline bool contains(Vec2 point) {
         return point.x >= pos.x and point.x < pos.x + size.x and point.y >= pos.y and point.y < pos.y + size.y;
     }
@@ -63,32 +60,33 @@ struct Rect {
         }
         return rect;
     }
+
+    Vec2 pos;
+    Vec2 size;
 };
 
 struct Transform {
-    float m11, m12, m21, m22, tx, ty;
-
     // Todo
+
+    float m11, m12, m21, m22, tx, ty;
 };
 
 union LCDColor {
     inline LCDColor(uint32_t value) : pattern(value) {} // NOLINT: Intentional implicit conversion
     inline LCDColor(LCDSolidColor value) : color(value) {} // NOLINT: Intentional implicit conversion
+
     LCDSolidColor color;
     cref_t pattern;
+};
+
+struct LCDVideoPlayer_32 {
+
 };
 
 /**
  * The operations implemented here aren't affected by draw offsets or clipping rects (Except for display buffer writes, which are affected by display offsets)
  */
 struct LCDBitmap_32 {
-    int width;
-    int height;
-    bool inverted{};
-    vheap_vector<uint8_t> data;
-    Graphics *graphics;
-    LCDBitmap_32 *mask; // Always owns mask
-
     LCDBitmap_32(const LCDBitmap_32 &other);
 
     LCDBitmap_32(LCDBitmap_32 &&other) noexcept;
@@ -115,6 +113,13 @@ struct LCDBitmap_32 {
     void fillRect(int x, int y, int w, int h, LCDColor color);
 
     // Todo: Rotate bitmaps using three shears method: https://gautamnagrawal.medium.com/rotating-image-by-any-angle-shear-transformation-using-only-numpy-d28d16eb5076
+
+    int width;
+    int height;
+    bool inverted{};
+    vheap_vector<uint8_t> data;
+    Graphics *graphics;
+    LCDBitmap_32 *mask; // Always owns mask
 };
 
 struct LCDSprite_32 {
@@ -159,6 +164,7 @@ struct LCDBitmapTable_32 {
 
 struct LCDFontGlyph_32 {
     explicit LCDFontGlyph_32(LCDBitmap_32 &&bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable);
+
     int advance;
     std::map<int, int8_t> shortKerningTable;
     std::map<int, int8_t> longKerningTable; // Page 0 entries
@@ -167,11 +173,13 @@ struct LCDFontGlyph_32 {
 
 struct LCDFontPage_32 {
     explicit LCDFontPage_32(Graphics *graphics);
+
     vheap_map<int, LCDFontGlyph_32> glyphs;
 };
 
 struct LCDFont_32 {
     explicit LCDFont_32(Graphics *graphics, int tracking, int glyphWidth, int glyphHeight);
+
     int tracking;
     int glyphWidth;
     int glyphHeight;

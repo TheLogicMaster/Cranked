@@ -184,7 +184,7 @@ static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int m
     auto file = emulator->files.open(path, openMode);
     if (!file) {
         lua_pushnil(context);
-        lua_pushstring(context, (const char *) emulator->fromVirtualAddress(emulator->files.lastError));
+        lua_pushstring(context, emulator->fromVirtualAddress<const char>(emulator->files.lastError));
         return 2;
     }
     pushUserdataObject(emulator, file, "playdate.file.file");
@@ -200,7 +200,7 @@ static LuaRet playdate_file_write_lua(Emulator *context, SDFile_32 *file, const 
     auto result = context->files.write(file, (void *) string, (int) strlen(string));
     if (result < 0) {
         lua_pushinteger(context->getLuaContext(), 0);
-        lua_pushstring(context->getLuaContext(), (const char *) context->fromVirtualAddress(context->files.lastError));
+        lua_pushstring(context->getLuaContext(), context->fromVirtualAddress<const char>(context->files.lastError));
         return 2;
     }
     lua_pushinteger(context->getLuaContext(), result);
@@ -212,7 +212,7 @@ static LuaRet playdate_file_read_lua(Emulator *context, SDFile_32 *file, int byt
     auto result = context->files.read(file, (void *) buffer.data(), bytes);
     if (result < 0) {
         lua_pushnil(context->getLuaContext());
-        lua_pushstring(context->getLuaContext(), (const char *) context->fromVirtualAddress(context->files.lastError));
+        lua_pushstring(context->getLuaContext(), context->fromVirtualAddress<const char>(context->files.lastError));
         return 2;
     }
     lua_pushlstring(context->getLuaContext(), (const char *) buffer.data(), result);

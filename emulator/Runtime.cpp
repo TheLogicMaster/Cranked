@@ -345,6 +345,10 @@ LCDFont_32 *playdate_graphics_makeFontFromData(Emulator *emulator, LCDFontData_3
     return emulator->graphics.getFont((uint8_t *) data, wide);
 }
 
+int32_t playdate_graphics_getTextTracking(Emulator *emulator) {
+    return 0; // Todo
+}
+
 void *playdate_sys_realloc(Emulator *emulator, void* ptr, uint32_t size) {
     // Todo: Check for objects that need to be user freed and call destructors
     if (size == 0) {
@@ -366,6 +370,8 @@ int32_t playdate_sys_formatString(Emulator *emulator, cref_t *ret, uint8_t *fmt,
     return size;
 }
 
+// Todo: Args are passed as emulated sizes, which will cause issues when `int` size is different, and such
+// Todo: Probably needs conversion when calling vararg functions
 void playdate_sys_logToConsole([[maybe_unused]] Emulator *emulator, uint8_t *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -544,6 +550,335 @@ uint32_t playdate_sys_convertDateTimeToEpoch(Emulator *emulator, PDDateTime_32 *
 }
 
 void playdate_sys_clearICache(Emulator *emulator) {} // Not needed, probably
+
+void playdate_sys_setButtonCallback(Emulator *emulator, cref_t cb, void *buttonud, int32_t queuesize) {
+    // Todo
+}
+
+void playdate_sys_setSerialMessageCallback(Emulator *emulator, cref_t callback) {
+    // Todo
+}
+
+int32_t playdate_sys_vaFormatString(Emulator *emulator, cref_t *outstr, uint8_t *fmt, ...) {
+    char *buffer{};
+    va_list list{};
+    va_start(list, fmt);
+    int size = vasprintf(&buffer, (char *)fmt, list);
+    va_end(list);
+    if (size < 0)
+        return -1;
+    try {
+        void *string = emulator->heap.allocate(size);
+        memcpy(string, buffer, size);
+        *outstr = emulator->toVirtualAddress(string);
+    } catch (std::bad_alloc &ex) {
+        size = -1;
+    } catch (...) {
+        free(buffer);
+        throw;
+    }
+    free(buffer);
+    return size;
+}
+
+int32_t playdate_sys_parseString(Emulator *emulator, uint8_t *str, uint8_t *fmt, ...) {
+    va_list list{};
+    va_start(list, fmt);
+    auto string = (const char *) str;
+    auto format = (const char *) fmt;
+    int stringIndex = 0;
+    int formatIndex = 0;
+    int stringLen = strlen(string);
+    int formatLen = strlen(format);
+    int matches = 0;
+
+    while (formatIndex < formatLen) {
+        char c = format[formatIndex++];
+
+        if (isspace(c)) {
+            while (formatIndex < formatLen and isspace(format[formatIndex]))
+                formatIndex++;
+            if (stringIndex >= stringLen or !isspace(string[stringIndex++]))
+                break;
+            while (stringIndex < stringLen and isspace(string[stringIndex]))
+                stringIndex++;
+            continue;
+        } else if (c != '%') {
+            if (stringIndex >= stringLen or string[stringIndex++] != c)
+                break;
+            continue;
+        }
+
+        if (formatIndex >= formatLen)
+            break;
+        c = format[formatIndex++];
+
+        bool ignored = false;
+        if (c == '*') {
+            ignored = true;
+            if (formatIndex >= formatLen)
+                break;
+            c = format[formatIndex++];
+        }
+
+        int widthStart = formatIndex - 1;
+        int width = 0;
+        if (isdigit(c)) {
+            char *end{};
+            strtol(format + widthStart, &end, 10);
+            width = formatIndex = (end - format) - widthStart; // Todo: Verify
+            c = format[formatIndex++];
+        }
+
+        bool failed = false;
+        switch(c) {
+            case '%':
+                if (stringIndex >= stringLen or string[stringIndex++] != '%')
+                    failed = true;
+                break;
+            case 'c':
+                if (width == 0)
+                    width = 1;
+                if (stringLen - stringIndex < width) {
+                    failed = true;
+                    break;
+                }
+                if (!ignored)
+                    memcpy(va_arg(list, char *), string + stringIndex, width);
+                stringIndex += width;
+                matches++;
+                break;
+            case 's': {
+                int i = stringIndex;
+                while (i < stringLen) {
+                    if (isspace(string[i]))
+                        break;
+                    i++;
+                }
+                if (i == stringIndex) {
+                    failed = true;
+                    break;
+                }
+                if (!ignored) {
+                    auto dest = va_arg(list, char *);
+                    memcpy(dest, string + stringIndex, i - stringIndex);
+                    dest[i - stringIndex] = 0;
+                }
+                stringIndex = i;
+                matches++;
+                break;
+            }
+            case '[': { // Not supporting `-` ranges
+                bool inverted = false;
+                if (formatIndex < formatLen and format[formatIndex] == '^') {
+                    inverted = true;
+                    formatIndex++;
+                }
+                std::set<char> set;
+                if (formatIndex < formatLen and format[formatIndex] == ']') {
+                    set.emplace(']');
+                    formatIndex++;
+                }
+                while (true) {
+                    if (formatIndex >= formatLen) {
+                        failed = true;
+                        break;
+                    }
+                    c = format[formatIndex++];
+                    if (c == ']')
+                        break;
+                    set.emplace(c);
+                }
+                if (failed)
+                    break;
+                int i = stringIndex;
+                while (i < stringLen and (width == 0 or i < stringIndex + width)) {
+                    if (set.contains(string[i]) == inverted)
+                        break;
+                    i++;
+                }
+                if (i == stringIndex)
+                    failed = true;
+                else {
+                    auto dest = va_arg(list, char*);
+                    memcpy(dest, string + stringIndex, i - stringIndex);
+                    dest[i - stringIndex] = 0;
+                    stringIndex = i;
+                    matches++;
+                }
+                break;
+            }
+            case 'd':
+            case 'i':
+            case 'u':
+            case 'o':
+            case 'x':
+            case 'X': {
+                int start = stringIndex;
+                while (stringIndex < stringLen) {
+                    char modifier = string[stringIndex];
+                    if (modifier != 'h' and modifier != 'l' and modifier != 'j' and modifier != 'z' and modifier != 't' and modifier != 'L')
+                        break;
+                    stringIndex++;
+                }
+                int modifierCount = stringIndex - start;
+                int64_t result{};
+                uint64_t uresult{};
+                char *end{};
+                switch (c) {
+                    default:
+                    case 'd':
+                        result = strtol(string + stringIndex, &end, 10);
+                        break;
+                    case 'i':
+                        result = strtol(string + stringIndex, &end, 0);
+                        break;
+                    case 'u':
+                        uresult = strtoul(string + stringIndex, &end, 10);
+                        break;
+                    case 'o':
+                        uresult = strtoul(string + stringIndex, &end, 8);
+                        break;
+                    case 'x':
+                    case 'X':
+                        uresult = strtoul(string + stringIndex, &end, 16);
+                        break;
+                }
+                if (end == string + stringIndex) {
+                    failed = true;
+                    break;
+                }
+                ArgType type;
+                if (modifierCount == 0)
+                    type = c == 'd' or c == 'i' ? ArgType::int32_t : ArgType::uint32_t;
+                else if (modifierCount == 1) {
+                    char mod = string[start];
+                    if (mod == 'h')
+                        type = c == 'd' or c == 'i' ? ArgType::int16_t : ArgType::uint16_t;
+                    else if (mod == 'l')
+                        type = c == 'd' or c == 'i' ? ArgType::int32_t : ArgType::uint32_t;
+                    else if (mod == 'j')
+                        type = c == 'd' or c == 'i' ? ArgType::int64_t : ArgType::uint64_t;
+                    else if (mod == 't')
+                        type = ArgType::int32_t;
+                    else if (mod == 'z')
+                        type = ArgType::uint32_t;
+                    else {
+                        failed = true;
+                        break;
+                    }
+                } else if (modifierCount == 2) {
+                    char first = string[start];
+                    char second = string[start + 1];
+                    if (first != second or (first != 'h' and first != 'l')) {
+                        failed = true;
+                        break;
+                    }
+                    if (first == 'h')
+                        type = c == 'd' or c == 'i' ? ArgType::int8_t : ArgType::uint8_t;
+                    else
+                        type = c == 'd' or c == 'i' ? ArgType::int64_t : ArgType::uint64_t;
+                } else {
+                    failed = true;
+                    break;
+                }
+                if (!ignored) {
+                    switch (type) {
+                        default:
+                        case ArgType::int8_t:
+                            *va_arg(list, int8_t *) = result;
+                            break;
+                        case ArgType::uint8_t:
+                            *va_arg(list, uint8_t *) = result;
+                            break;
+                        case ArgType::int16_t:
+                            *va_arg(list, int16_t *) = result;
+                            break;
+                        case ArgType::uint16_t:
+                            *va_arg(list, uint16_t *) = result;
+                            break;
+                        case ArgType::int32_t:
+                            *va_arg(list, int32_t *) = result;
+                            break;
+                        case ArgType::uint32_t:
+                            *va_arg(list, uint32_t *) = result;
+                            break;
+                        case ArgType::int64_t:
+                            *va_arg(list, int64_t *) = result;
+                            break;
+                        case ArgType::uint64_t:
+                            *va_arg(list, uint64_t *) = result;
+                            break;
+                    }
+                }
+                stringIndex = end - string;
+                matches++;
+                break;
+            }
+            case 'n':
+                if (!ignored)
+                    *va_arg(list, int32_t *) = stringIndex;
+                break;
+            case 'a':
+            case 'A':
+            case 'e':
+            case 'E':
+            case 'f':
+            case 'F':
+            case 'g':
+            case 'G': {
+                bool wide = false; // Ignoring `long double`
+                if (stringIndex < stringLen and string[stringIndex] == 'l') {
+                    wide = true;
+                    stringIndex++;
+                }
+                char *end{};
+                if (wide) {
+                    double value = strtod(string + stringIndex, &end);
+                    if (end == string + stringIndex) {
+                        failed = true;
+                        break;
+                    }
+                    if (!ignored)
+                        *va_arg(list, double *) = value;
+                } else {
+                    float value = strtof(string + stringIndex, &end);
+                    if (end == string + stringIndex) {
+                        failed = true;
+                        break;
+                    }
+                    if (!ignored)
+                        *va_arg(list, float *) = value;
+                }
+                stringIndex = end - string;
+                matches++;
+                break;
+            }
+            case 'p': {
+                char *end{};
+                cref_t ptr = strtol(string + stringIndex, &end, 16);
+                if (end == string + stringIndex) {
+                    failed = true;
+                    break;
+                }
+                if (!ignored)
+                    *va_arg(list, cref_t *) = ptr;
+                stringIndex = end - string;
+                matches++;
+                break;
+            }
+            default:
+                failed = true;
+                break;
+        }
+        if (failed)
+            break;
+    }
+
+    va_end(list);
+
+    return matches;
+}
 
 int32_t playdate_lua_addFunction(Emulator *emulator, cref_t f, uint8_t *name, cref_t *outErr) {
     if (!emulator->getLuaContext()) {
@@ -771,7 +1106,7 @@ int32_t playdate_lua_callFunction(Emulator *emulator, uint8_t *name, int32_t nar
 
 void playdate_json_initEncoder(Emulator *emulator, json_encoder_32 *encoder, cref_t write, void *userdata, int32_t pretty) {
     // Encoder API is stored directly after Playdate API, as subtract json_encoder_32 struct size from API size to get address
-    *encoder = *(json_encoder_32 *) emulator->fromVirtualAddress(API_ADDRESS + emulator->apiSize - sizeof(json_encoder_32));
+    *encoder = *emulator->fromVirtualAddress<json_encoder_32>(API_ADDRESS + emulator->apiSize - sizeof(json_encoder_32));
     encoder->writeStringFunc = write;
     encoder->userdata = emulator->toVirtualAddress(userdata);
     encoder->pretty = pretty;
@@ -1066,7 +1401,7 @@ void json_encoder_writeString(Emulator *emulator, json_encoder_32 *encoder, uint
 }
 
 uint8_t *playdate_file_geterr(Emulator *emulator) {
-    return (uint8_t *) emulator->fromVirtualAddress(emulator->files.lastError); // This conversion is redundant, but simplifies things
+    return emulator->fromVirtualAddress<uint8_t>(emulator->files.lastError); // This conversion is redundant, but simplifies things
 }
 
 int32_t playdate_file_listfiles(Emulator *emulator, uint8_t *path, cref_t callback, void *userdata, int32_t showhidden) {
@@ -1388,30 +1723,39 @@ void playdate_sprite_setStencilImage(Emulator *emulator, LCDSprite_32 *sprite, L
     // Todo
 }
 
-void playdate_sound_source_setVolume(Emulator *emulator, SoundSource_32 *c, float lvol, float rvol) {
+void playdate_sprite_setCenter(Emulator *emulator, LCDSprite_32 * s, float x, float y) {
     // Todo
+}
+
+void playdate_sprite_getCenter(Emulator *emulator, LCDSprite_32 * s, float * x, float * y) {
+    // Todo
+}
+
+void playdate_sound_source_setVolume(Emulator *emulator, SoundSource_32 *c, float lvol, float rvol) {
+    c->leftVolume = lvol;
+    c->rightVolume = rvol;
 }
 
 void playdate_sound_source_getVolume(Emulator *emulator, SoundSource_32 *c, float *outl, float *outr) {
-    // Todo
+    *outl = c->leftVolume;
+    *outr = c->rightVolume;
 }
 
 int32_t playdate_sound_source_isPlaying(Emulator *emulator, SoundSource_32 *c) {
-    // Todo
-    return 0;
+    return c->playing;
 }
 
-void playdate_sound_source_setFinishCallback(Emulator *emulator, SoundSource_32 *c, cref_t callback) {
-    // Todo
+void playdate_sound_source_setFinishCallback(Emulator *emulator, SoundSource_32 *c, cref_t callback, void *userdata) {
+    c->completionCallback = callback;
+    c->completionCallbackUserdata = emulator->version < VERSION_2_4_1 ? 0 : emulator->toVirtualAddress(userdata);
 }
 
 FilePlayer_32 *playdate_sound_fileplayer_newPlayer(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<FilePlayer_32>();
 }
 
 void playdate_sound_fileplayer_freePlayer(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
+    emulator->audio.freeSoundSource(player);
 }
 
 int32_t playdate_sound_fileplayer_loadIntoPlayer(Emulator *emulator, FilePlayer_32 *player, uint8_t *path) {
@@ -1429,8 +1773,7 @@ int32_t playdate_sound_fileplayer_play(Emulator *emulator, FilePlayer_32 *player
 }
 
 int32_t playdate_sound_fileplayer_isPlaying(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->playing;
 }
 
 void playdate_sound_fileplayer_pause(Emulator *emulator, FilePlayer_32 *player) {
@@ -1442,11 +1785,13 @@ void playdate_sound_fileplayer_stop(Emulator *emulator, FilePlayer_32 *player) {
 }
 
 void playdate_sound_fileplayer_setVolume(Emulator *emulator, FilePlayer_32 *player, float left, float right) {
-    // Todo
+    player->leftVolume = left;
+    player->rightVolume = right;
 }
 
 void playdate_sound_fileplayer_getVolume(Emulator *emulator, FilePlayer_32 *player, float *left, float *right) {
-    // Todo
+    *left = player->leftVolume;
+    *right = player->rightVolume;
 }
 
 float playdate_sound_fileplayer_getLength(Emulator *emulator, FilePlayer_32 *player) {
@@ -1459,7 +1804,7 @@ void playdate_sound_fileplayer_setOffset(Emulator *emulator, FilePlayer_32 *play
 }
 
 void playdate_sound_fileplayer_setRate(Emulator *emulator, FilePlayer_32 *player, float rate) {
-    // Todo
+    player->rate = rate;
 }
 
 void playdate_sound_fileplayer_setLoopRange(Emulator *emulator, FilePlayer_32 *player, float start, float end) {
@@ -1467,16 +1812,17 @@ void playdate_sound_fileplayer_setLoopRange(Emulator *emulator, FilePlayer_32 *p
 }
 
 int32_t playdate_sound_fileplayer_didUnderrun(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->underran;
 }
 
-void playdate_sound_fileplayer_setFinishCallback(Emulator *emulator, FilePlayer_32 *player, cref_t callback) {
-    // Todo
+void playdate_sound_fileplayer_setFinishCallback(Emulator *emulator, FilePlayer_32 *player, cref_t callback, void *userdata) {
+    player->completionCallback = callback;
+    player->completionCallbackUserdata = emulator->version < VERSION_2_4_1 ? 0 : emulator->toVirtualAddress(userdata);
 }
 
-void playdate_sound_fileplayer_setLoopCallback(Emulator *emulator, FilePlayer_32 *player, cref_t callback) {
-    // Todo
+void playdate_sound_fileplayer_setLoopCallback(Emulator *emulator, FilePlayer_32 *player, cref_t callback, void *userdata) {
+    player->loopCallback = callback;
+    player->loopCallbackUserdata = emulator->version < VERSION_2_4_1 ? 0 : emulator->toVirtualAddress(userdata);
 }
 
 float playdate_sound_fileplayer_getOffset(Emulator *emulator, FilePlayer_32 *player) {
@@ -1485,16 +1831,14 @@ float playdate_sound_fileplayer_getOffset(Emulator *emulator, FilePlayer_32 *pla
 }
 
 float playdate_sound_fileplayer_getRate(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->rate;
 }
 
 void playdate_sound_fileplayer_setStopOnUnderrun(Emulator *emulator, FilePlayer_32 *player, int32_t flag) {
-    // Todo
+    player->stopOnUnderrun = flag;
 }
-
-void playdate_sound_fileplayer_fadeVolume(Emulator *emulator, FilePlayer_32 *player, float left, float right, int32_t len, cref_t finishCallback) {
-    // Todo
+void playdate_sound_fileplayer_fadeVolume(Emulator *emulator, FilePlayer_32 *player, float left, float right, int32_t len, cref_t finishCallback, void * userdata) {
+    // Todo (userdata was added in VERSION_2_4_1, otherwise use 0)
 }
 
 void playdate_sound_fileplayer_setMP3StreamSource(Emulator *emulator, FilePlayer_32 *player, cref_t dataSource, void *userdata, float bufferLen) {
@@ -1502,8 +1846,7 @@ void playdate_sound_fileplayer_setMP3StreamSource(Emulator *emulator, FilePlayer
 }
 
 AudioSample_32 *playdate_sound_sample_newSampleBuffer(Emulator *emulator, int32_t byteCount) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateAudioSample(byteCount);
 }
 
 int32_t playdate_sound_sample_loadIntoSample(Emulator *emulator, AudioSample_32 *sample, uint8_t *path) {
@@ -1522,11 +1865,18 @@ AudioSample_32 *playdate_sound_sample_newSampleFromData(Emulator *emulator, uint
 }
 
 void playdate_sound_sample_getData(Emulator *emulator, AudioSample_32 *sample, cref_t *data, int32_t *format, uint32_t *sampleRate, uint32_t *bytelength) {
-    // Todo
+    if (data)
+        *data = emulator->toVirtualAddress(sample->data.data());
+    if (format)
+        *format = (int32_t )sample->format;
+    if (sampleRate)
+        *sampleRate = sample->sampleRate;
+    if (bytelength)
+        *bytelength = (int32_t)sample->data.size();
 }
 
 void playdate_sound_sample_freeSample(Emulator *emulator, AudioSample_32 *sample) {
-    // Todo
+    emulator->audio.freeAudioSample(sample);
 }
 
 float playdate_sound_sample_getLength(Emulator *emulator, AudioSample_32 *sample) {
@@ -1534,17 +1884,20 @@ float playdate_sound_sample_getLength(Emulator *emulator, AudioSample_32 *sample
     return 0;
 }
 
+int32_t playdate_sound_sample_decompress(Emulator *emulator, AudioSample_32 *sample) {
+    return 0; // Todo
+}
+
 SamplePlayer_32 *playdate_sound_sampleplayer_newPlayer(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<SamplePlayer_32>();
 }
 
 void playdate_sound_sampleplayer_freePlayer(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
+    emulator->audio.freeSoundSource(player);
 }
 
 void playdate_sound_sampleplayer_setSample(Emulator *emulator, SamplePlayer_32 *player, AudioSample_32 *sample) {
-    // Todo
+    player->sample = sample;
 }
 
 int32_t playdate_sound_sampleplayer_play(Emulator *emulator, SamplePlayer_32 *player, int32_t repeat, float rate) {
@@ -1553,8 +1906,7 @@ int32_t playdate_sound_sampleplayer_play(Emulator *emulator, SamplePlayer_32 *pl
 }
 
 int32_t playdate_sound_sampleplayer_isPlaying(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->playing;
 }
 
 void playdate_sound_sampleplayer_stop(Emulator *emulator, SamplePlayer_32 *player) {
@@ -1562,11 +1914,13 @@ void playdate_sound_sampleplayer_stop(Emulator *emulator, SamplePlayer_32 *playe
 }
 
 void playdate_sound_sampleplayer_setVolume(Emulator *emulator, SamplePlayer_32 *player, float left, float right) {
-    // Todo
+    player->leftVolume = left;
+    player->rightVolume = right;
 }
 
 void playdate_sound_sampleplayer_getVolume(Emulator *emulator, SamplePlayer_32 *player, float *left, float *right) {
-    // Todo
+    *left = player->leftVolume;
+    *right = player->rightVolume;
 }
 
 float playdate_sound_sampleplayer_getLength(Emulator *emulator, SamplePlayer_32 *player) {
@@ -1579,19 +1933,22 @@ void playdate_sound_sampleplayer_setOffset(Emulator *emulator, SamplePlayer_32 *
 }
 
 void playdate_sound_sampleplayer_setRate(Emulator *emulator, SamplePlayer_32 *player, float rate) {
-    // Todo
+    player->rate = rate;
 }
 
 void playdate_sound_sampleplayer_setPlayRange(Emulator *emulator, SamplePlayer_32 *player, int32_t start, int32_t end) {
-    // Todo
+    player->loopStart = start;
+    player->loopEnd = end;
 }
 
-void playdate_sound_sampleplayer_setFinishCallback(Emulator *emulator, SamplePlayer_32 *player, cref_t callback) {
-    // Todo
+void playdate_sound_sampleplayer_setFinishCallback(Emulator *emulator, SamplePlayer_32 *player, cref_t callback, void *userdata) {
+    player->completionCallback = callback;
+    player->completionCallbackUserdata = emulator->toVirtualAddress(userdata);
 }
 
-void playdate_sound_sampleplayer_setLoopCallback(Emulator *emulator, SamplePlayer_32 *player, cref_t callback) {
-    // Todo
+void playdate_sound_sampleplayer_setLoopCallback(Emulator *emulator, SamplePlayer_32 *player, cref_t callback, void *userdata) {
+    player->loopCallback = callback;
+    player->loopCallbackUserdata = emulator->version < VERSION_2_4_1 ? 0 : emulator->toVirtualAddress(userdata);
 }
 
 float playdate_sound_sampleplayer_getOffset(Emulator *emulator, SamplePlayer_32 *player) {
@@ -1600,8 +1957,7 @@ float playdate_sound_sampleplayer_getOffset(Emulator *emulator, SamplePlayer_32 
 }
 
 float playdate_sound_sampleplayer_getRate(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->rate;
 }
 
 void playdate_sound_sampleplayer_setPaused(Emulator *emulator, SamplePlayer_32 *player, int32_t flag) {
@@ -1614,7 +1970,7 @@ PDSynthSignal_32 *playdate_sound_signal_newSignal(Emulator *emulator, cref_t ste
 }
 
 void playdate_sound_signal_freeSignal(Emulator *emulator, PDSynthSignal_32 *signal) {
-    // Todo
+    emulator->audio.freeSynthSignal(signal);
 }
 
 float playdate_sound_signal_getValue(Emulator *emulator, PDSynthSignal_32 *signal) {
@@ -1630,41 +1986,50 @@ void playdate_sound_signal_setValueOffset(Emulator *emulator, PDSynthSignal_32 *
     // Todo
 }
 
+uint8_t *playdate_sound_getError(Emulator *emulator) {
+    return emulator->fromVirtualAddress<uint8_t>(emulator->audio.lastError);
+}
+
 PDSynthLFO_32 *playdate_sound_lfo_newLFO(Emulator *emulator, int32_t type) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSynthSignal<PDSynthLFO_32>((LFOType)type);
 }
 
 void playdate_sound_lfo_freeLFO(Emulator *emulator, PDSynthLFO_32 *lfo) {
-    // Todo
+    emulator->audio.freeSynthSignal(lfo);
 }
 
 void playdate_sound_lfo_setType(Emulator *emulator, PDSynthLFO_32 *lfo, int32_t type) {
-    // Todo
+    lfo->type = (LFOType)type;
 }
 
 void playdate_sound_lfo_setRate(Emulator *emulator, PDSynthLFO_32 *lfo, float rate) {
-    // Todo
+    lfo->rate = rate;
 }
 
 void playdate_sound_lfo_setPhase(Emulator *emulator, PDSynthLFO_32 *lfo, float phase) {
-    // Todo
+    lfo->phase = phase;
 }
 
 void playdate_sound_lfo_setCenter(Emulator *emulator, PDSynthLFO_32 *lfo, float center) {
-    // Todo
+    lfo->center = center;
 }
 
 void playdate_sound_lfo_setDepth(Emulator *emulator, PDSynthLFO_32 *lfo, float depth) {
-    // Todo
+    lfo->depth = depth;
 }
 
 void playdate_sound_lfo_setArpeggiation(Emulator *emulator, PDSynthLFO_32 *lfo, int32_t nSteps, float *steps) {
-    // Todo
+    lfo->type = LFOType::Arpeggiator;
+    lfo->arpeggiationSteps.clear();
+    for (int i = 0; i < nSteps; i++)
+        lfo->arpeggiationSteps.push_back(steps[i]);
 }
 
 void playdate_sound_lfo_setFunction(Emulator *emulator, PDSynthLFO_32 *lfo, cref_t lfoFunc, void *userdata, int32_t interpolate) {
-    // Todo
+    lfo->function = lfoFunc;
+    lfo->functionUserdata = emulator->toVirtualAddress(userdata);
+    lfo->functionInterpolate = interpolate;
+    lfo->type = LFOType::Function;
 }
 
 void playdate_sound_lfo_setDelay(Emulator *emulator, PDSynthLFO_32 *lfo, float holdoff, float ramptime) {
@@ -1672,7 +2037,7 @@ void playdate_sound_lfo_setDelay(Emulator *emulator, PDSynthLFO_32 *lfo, float h
 }
 
 void playdate_sound_lfo_setRetrigger(Emulator *emulator, PDSynthLFO_32 *lfo, int32_t flag) {
-    // Todo
+    lfo->reTrigger = flag;
 }
 
 float playdate_sound_lfo_getValue(Emulator *emulator, PDSynthLFO_32 *lfo) {
@@ -1681,40 +2046,43 @@ float playdate_sound_lfo_getValue(Emulator *emulator, PDSynthLFO_32 *lfo) {
 }
 
 void playdate_sound_lfo_setGlobal(Emulator *emulator, PDSynthLFO_32 *lfo, int32_t global) {
-    // Todo
+    lfo->global = global;
+}
+
+void playdate_sound_lfo_setStartPhase(Emulator *emulator, PDSynthLFO_32 * lfo, float phase) {
+    lfo->phase = phase;
 }
 
 PDSynthEnvelope_32 *playdate_sound_envelope_newEnvelope(Emulator *emulator, float attack, float decay, float sustain, float release) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSynthSignal<PDSynthEnvelope_32>(attack, decay, sustain, release);
 }
 
 void playdate_sound_envelope_freeEnvelope(Emulator *emulator, PDSynthEnvelope_32 *env) {
-    // Todo
+    emulator->audio.freeSynthSignal(env);
 }
 
 void playdate_sound_envelope_setAttack(Emulator *emulator, PDSynthEnvelope_32 *env, float attack) {
-    // Todo
+    env->attack = attack;
 }
 
 void playdate_sound_envelope_setDecay(Emulator *emulator, PDSynthEnvelope_32 *env, float decay) {
-    // Todo
+    env->decay = decay;
 }
 
 void playdate_sound_envelope_setSustain(Emulator *emulator, PDSynthEnvelope_32 *env, float sustain) {
-    // Todo
+    env->sustain = sustain;
 }
 
 void playdate_sound_envelope_setRelease(Emulator *emulator, PDSynthEnvelope_32 *env, float release) {
-    // Todo
+    env->release = release;
 }
 
 void playdate_sound_envelope_setLegato(Emulator *emulator, PDSynthEnvelope_32 *env, int32_t flag) {
-    // Todo
+    env->legato = flag;
 }
 
-void playdate_sound_envelope_setRetrigger(Emulator *emulator, PDSynthEnvelope_32 *lfo, int32_t flag) {
-    // Todo
+void playdate_sound_envelope_setRetrigger(Emulator *emulator, PDSynthEnvelope_32 *env, int32_t flag) {
+    env->reTrigger = flag;
 }
 
 float playdate_sound_envelope_getValue(Emulator *emulator, PDSynthEnvelope_32 *env) {
@@ -1723,74 +2091,91 @@ float playdate_sound_envelope_getValue(Emulator *emulator, PDSynthEnvelope_32 *e
 }
 
 void playdate_sound_envelope_setCurvature(Emulator *emulator, PDSynthEnvelope_32 *env, float amount) {
-    // Todo
+    env->curvature = amount;
 }
 
 void playdate_sound_envelope_setVelocitySensitivity(Emulator *emulator, PDSynthEnvelope_32 *env, float velsens) {
-    // Todo
+    env->velocitySensitivity = velsens;
 }
 
 void playdate_sound_envelope_setRateScaling(Emulator *emulator, PDSynthEnvelope_32 *env, float scaling, float start, float end) {
-    // Todo
+    env->rateScaling = scaling;
+    env->rateStart = start;
+    env->rateEnd = end;
 }
 
 PDSynth_32 *playdate_sound_synth_newSynth(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<PDSynth_32>();
 }
 
 void playdate_sound_synth_freeSynth(Emulator *emulator, PDSynth_32 *synth) {
-    // Todo
+    emulator->audio.freeSoundSource(synth);
 }
 
 void playdate_sound_synth_setWaveform(Emulator *emulator, PDSynth_32 *synth, int32_t wave) {
-    // Todo
+    synth->waveform = (SoundWaveform)wave;
 }
 
-void playdate_sound_synth_setGenerator(Emulator *emulator, PDSynth_32 *synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void *userdata) {
-    // Todo
+void playdate_sound_synth_setGenerator(Emulator *emulator, PDSynth_32 *synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void *userdata) {
+    playdate_sound_synth_setGenerator_deprecated(emulator, synth, stereo, render, noteOn, release, setparam, dealloc, userdata);
+    synth->generatorCopyUserdataFunc = copyUserdata;
+}
+
+PDSynth_32 * playdate_sound_synth_copy(Emulator *emulator, PDSynth_32 * synth) {
+    return nullptr; // Todo
+}
+
+void playdate_sound_synth_setGenerator_deprecated(Emulator *emulator, PDSynth_32 *synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void *userdata) {
+    synth->generatorStereo = stereo;
+    synth->generatorRenderFunc = render;
+    synth->generatorNoteOnFunc = noteOn;
+    synth->generatorReleaseFunc = release;
+    synth->generatorSetParameterFunc = setparam;
+    synth->generatorDeallocFunc = dealloc;
+    synth->generatorUserdata = emulator->toVirtualAddress(userdata);
+    synth->generatorCopyUserdataFunc = 0;
 }
 
 void playdate_sound_synth_setSample(Emulator *emulator, PDSynth_32 *synth, AudioSample_32 *sample, uint32_t sustainStart, uint32_t sustainEnd) {
-    // Todo
+    synth->sample = sample;
+    synth->sampleSustainStart = sustainStart;
+    synth->sampleSustainEnd = sustainEnd;
 }
 
 void playdate_sound_synth_setAttackTime(Emulator *emulator, PDSynth_32 *synth, float attack) {
-    // Todo
+    synth->envelope.attack = attack;
 }
 
 void playdate_sound_synth_setDecayTime(Emulator *emulator, PDSynth_32 *synth, float decay) {
-    // Todo
+    synth->envelope.decay = decay;
 }
 
 void playdate_sound_synth_setSustainLevel(Emulator *emulator, PDSynth_32 *synth, float sustain) {
-    // Todo
+    synth->envelope.sustain = sustain;
 }
 
 void playdate_sound_synth_setReleaseTime(Emulator *emulator, PDSynth_32 *synth, float release) {
-    // Todo
+    synth->envelope.release = release;
 }
 
 void playdate_sound_synth_setTranspose(Emulator *emulator, PDSynth_32 *synth, float halfSteps) {
-    // Todo
+    synth->transposeHalfSteps = halfSteps;
 }
 
 void playdate_sound_synth_setFrequencyModulator(Emulator *emulator, PDSynth_32 *synth, PDSynthSignalValue_32 *mod) {
-    // Todo
+    synth->frequencyModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_synth_getFrequencyModulator(Emulator *emulator, PDSynth_32 *synth) {
-    // Todo
-    return nullptr;
+    return synth->frequencyModulator;
 }
 
 void playdate_sound_synth_setAmplitudeModulator(Emulator *emulator, PDSynth_32 *synth, PDSynthSignalValue_32 *mod) {
-    // Todo
+    synth->amplitudeModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_synth_getAmplitudeModulator(Emulator *emulator, PDSynth_32 *synth) {
-    // Todo
-    return nullptr;
+    return synth->amplitudeModulator;
 }
 
 int32_t playdate_sound_synth_getParameterCount(Emulator *emulator, PDSynth_32 *synth) {
@@ -1804,12 +2189,11 @@ int32_t playdate_sound_synth_setParameter(Emulator *emulator, PDSynth_32 *synth,
 }
 
 void playdate_sound_synth_setParameterModulator(Emulator *emulator, PDSynth_32 *synth, int32_t parameter, PDSynthSignalValue_32 *mod) {
-    // Todo
+    synth->parameterModulators[parameter] = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_synth_getParameterModulator(Emulator *emulator, PDSynth_32 *synth, int32_t parameter) {
-    // Todo
-    return nullptr;
+    return synth->parameterModulators[parameter];
 }
 
 void playdate_sound_synth_playNote(Emulator *emulator, PDSynth_32 *synth, float freq, float vel, float len, uint32_t when) {
@@ -1829,61 +2213,66 @@ void playdate_sound_synth_stop(Emulator *emulator, PDSynth_32 *synth) {
 }
 
 void playdate_sound_synth_setVolume(Emulator *emulator, PDSynth_32 *synth, float left, float right) {
-    // Todo
+    synth->leftVolume = left;
+    synth->rightVolume = right;
 }
 
 void playdate_sound_synth_getVolume(Emulator *emulator, PDSynth_32 *synth, float *left, float *right) {
-    // Todo
+    *left = synth->leftVolume;
+    *right = synth->rightVolume;
 }
 
 int32_t playdate_sound_synth_isPlaying(Emulator *emulator, PDSynth_32 *synth) {
-    // Todo
-    return 0;
+    return synth->playing;
 }
 
 PDSynthEnvelope_32 *playdate_sound_synth_getEnvelope(Emulator *emulator, PDSynth_32 *synth) {
-    // Todo
-    return nullptr;
+    return &synth->envelope;
+}
+
+int32_t playdate_sound_synth_setWavetable(Emulator *emulator, PDSynth_32 * synth, AudioSample_32 * sample, int32_t log2size, int32_t columns, int32_t rows) {
+    return 0; // Todo
 }
 
 ControlSignal_32 *playdate_control_signal_newSignal(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSynthSignal<ControlSignal_32>();
 }
 
 void playdate_control_signal_freeSignal(Emulator *emulator, ControlSignal_32 *signal) {
-    // Todo
+    emulator->audio.freeSynthSignal(signal);
 }
 
 void playdate_control_signal_clearEvents(Emulator *emulator, ControlSignal_32 *control) {
-    // Todo
+    control->events.clear();
 }
 
 void playdate_control_signal_addEvent(Emulator *emulator, ControlSignal_32 *control, int32_t step, float value, int32_t interpolate) {
-    // Todo
+    control->events.insert(std::pair(step, ControlSignal_32::Event{value, (bool)interpolate}));
 }
 
 void playdate_control_signal_removeEvent(Emulator *emulator, ControlSignal_32 *control, int32_t step) {
-    // Todo
+    control->events.erase(step);
 }
 
 int32_t playdate_control_signal_getMIDIControllerNumber(Emulator *emulator, ControlSignal_32 *control) {
-    // Todo
-    return 0;
+    return control->controllerNumber;
 }
 
 PDSynthInstrument_32 *playdate_sound_instrument_newInstrument(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<PDSynthInstrument_32>();
 }
 
 void playdate_sound_instrument_freeInstrument(Emulator *emulator, PDSynthInstrument_32 *inst) {
-    // Todo
+    emulator->audio.freeSoundSource(inst);
 }
 
 int32_t playdate_sound_instrument_addVoice(Emulator *emulator, PDSynthInstrument_32 *inst, PDSynth_32 *synth, float rangeStart, float rangeEnd, float transpose) {
-    // Todo
-    return 0;
+    // Todo: Check if already in an instrument or channel
+    inst->voices.push_back(synth);
+    synth->instrumentStartFrequency = rangeStart;
+    synth->instrumentEndFrequency = rangeEnd;
+    synth->instrumentTranspose = transpose;
+    return true;
 }
 
 PDSynth_32 *playdate_sound_instrument_playNote(Emulator *emulator, PDSynthInstrument_32 *inst, float frequency, float vel, float len, uint32_t when) {
@@ -1897,15 +2286,15 @@ PDSynth_32 *playdate_sound_instrument_playMIDINote(Emulator *emulator, PDSynthIn
 }
 
 void playdate_sound_instrument_setPitchBend(Emulator *emulator, PDSynthInstrument_32 *inst, float bend) {
-    // Todo
+    inst->pitchBend = bend;
 }
 
 void playdate_sound_instrument_setPitchBendRange(Emulator *emulator, PDSynthInstrument_32 *inst, float halfSteps) {
-    // Todo
+    inst->pitchBendRangeHalfSteps = halfSteps;
 }
 
 void playdate_sound_instrument_setTranspose(Emulator *emulator, PDSynthInstrument_32 *inst, float halfSteps) {
-    // Todo
+    inst->transposeHalfSteps = halfSteps;
 }
 
 void playdate_sound_instrument_noteOff(Emulator *emulator, PDSynthInstrument_32 *inst, float note, uint32_t when) {
@@ -1917,11 +2306,13 @@ void playdate_sound_instrument_allNotesOff(Emulator *emulator, PDSynthInstrument
 }
 
 void playdate_sound_instrument_setVolume(Emulator *emulator, PDSynthInstrument_32 *inst, float left, float right) {
-    // Todo
+    inst->leftVolume = left;
+    inst->rightVolume = right;
 }
 
 void playdate_sound_instrument_getVolume(Emulator *emulator, PDSynthInstrument_32 *inst, float *left, float *right) {
-    // Todo
+    *left = inst->leftVolume;
+    *right = inst->rightVolume;
 }
 
 int32_t playdate_sound_instrument_activeVoiceCount(Emulator *emulator, PDSynthInstrument_32 *inst) {
@@ -1930,21 +2321,19 @@ int32_t playdate_sound_instrument_activeVoiceCount(Emulator *emulator, PDSynthIn
 }
 
 SequenceTrack_32 *playdate_sound_track_newTrack(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<SequenceTrack_32>();
 }
 
 void playdate_sound_track_freeTrack(Emulator *emulator, SequenceTrack_32 *track) {
-    // Todo
+    emulator->audio.freeSoundSource(track);
 }
 
 void playdate_sound_track_setInstrument(Emulator *emulator, SequenceTrack_32 *track, PDSynthInstrument_32 *inst) {
-    // Todo
+    track->instrument = inst;
 }
 
 PDSynthInstrument_32 *playdate_sound_track_getInstrument(Emulator *emulator, SequenceTrack_32 *track) {
-    // Todo
-    return nullptr;
+    return track->instrument;
 }
 
 void playdate_sound_track_addNoteEvent(Emulator *emulator, SequenceTrack_32 *track, uint32_t step, uint32_t len, float note, float velocity) {
@@ -1984,7 +2373,7 @@ int32_t playdate_sound_track_activeVoiceCount(Emulator *emulator, SequenceTrack_
 }
 
 void playdate_sound_track_setMuted(Emulator *emulator, SequenceTrack_32 *track, int32_t mute) {
-    // Todo
+    track->muted = mute;
 }
 
 uint32_t playdate_sound_track_getLength(Emulator *emulator, SequenceTrack_32 *track) {
@@ -2008,26 +2397,23 @@ ControlSignal_32 *playdate_sound_track_getSignalForController(Emulator *emulator
 }
 
 SoundSequence_32 *playdate_sound_sequence_newSequence(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<SoundSequence_32>();
 }
 
 void playdate_sound_sequence_freeSequence(Emulator *emulator, SoundSequence_32 *sequence) {
-    // Todo
+    emulator->audio.freeSoundSource(sequence);
 }
-
-int32_t playdate_sound_sequence_loadMidiFile(Emulator *emulator, SoundSequence_32 *seq, uint8_t *path) {
+int32_t playdate_sound_sequence_loadMIDIFile(Emulator *emulator, SoundSequence_32 *seq, uint8_t *path) {
     // Todo
     return 0;
 }
 
 uint32_t playdate_sound_sequence_getTime(Emulator *emulator, SoundSequence_32 *seq) {
-    // Todo
-    return 0;
+    return seq->time;
 }
 
 void playdate_sound_sequence_setTime(Emulator *emulator, SoundSequence_32 *seq, uint32_t time) {
-    // Todo
+    seq->time = time;
 }
 
 void playdate_sound_sequence_setLoops(Emulator *emulator, SoundSequence_32 *seq, int32_t loopstart, int32_t loopend, int32_t loops) {
@@ -2039,7 +2425,11 @@ int32_t playdate_sound_sequence_getTempo(Emulator *emulator, SoundSequence_32 *s
     return 0;
 }
 
-void playdate_sound_sequence_setTempo(Emulator *emulator, SoundSequence_32 *seq, int32_t stepsPerSecond) {
+void playdate_sound_sequence_setTempo(Emulator *emulator, SoundSequence_32 * seq, float stepsPerSecond) {
+    // Todo
+}
+
+void playdate_sound_sequence_setTempo_int(Emulator *emulator, SoundSequence_32 * seq, int32_t stepsPerSecond) {
     // Todo
 }
 
@@ -2361,21 +2751,19 @@ void playdate_sound_channel_removeEffect(Emulator *emulator, SoundChannel_32 *ch
 }
 
 void playdate_sound_channel_setVolume(Emulator *emulator, SoundChannel_32 *channel, float volume) {
-    // Todo
+    channel->volume = volume;
 }
 
 float playdate_sound_channel_getVolume(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
-    return 0;
+    return channel->volume;
 }
 
 void playdate_sound_channel_setVolumeModulator(Emulator *emulator, SoundChannel_32 *channel, PDSynthSignalValue_32 *mod) {
-    // Todo
+    channel->volumeModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_channel_getVolumeModulator(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
-    return nullptr;
+    return channel->volumeModulator;
 }
 
 void playdate_sound_channel_setPan(Emulator *emulator, SoundChannel_32 *channel, float pan) {
@@ -2426,8 +2814,8 @@ int32_t playdate_sound_removeChannel(Emulator *emulator, SoundChannel_32 *channe
     return 0;
 }
 
-void playdate_sound_setMicCallback(Emulator *emulator, cref_t callback, void *context, int32_t forceInternal) {
-    // Todo
+int32_t playdate_sound_setMicCallback(Emulator *emulator, cref_t callback, void *context, int32_t forceInternal) {
+    return false; // Todo
 }
 
 void playdate_sound_getHeadphoneState(Emulator *emulator, int32_t *headphone, int32_t *headsetmic, cref_t changeCallback) {

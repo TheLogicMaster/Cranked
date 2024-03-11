@@ -15,8 +15,76 @@ enum class LogLevel {
     Error
 };
 
+inline std::vector<std::string> splitString(std::string string, const std::string &delimiter) {
+    std::vector<std::string> split;
+    size_t pos;
+    while ((pos = string.find(delimiter)) != std::string::npos) {
+        split.push_back(string.substr(0, pos));
+        string.erase(0, pos + delimiter.length());
+    }
+    split.push_back(string);
+    return split;
+}
+
+inline std::vector<std::string> splitString(std::string string, char delimiter) {
+    std::vector<std::string> split;
+    size_t pos;
+    while ((pos = string.find(delimiter)) != std::string::npos) {
+        split.push_back(string.substr(0, pos));
+        string.erase(0, pos + 1);
+    }
+    split.push_back(string);
+    return split;
+}
+
+class Version {
+public:
+    Version() : version(0) {}
+    explicit Version(const std::string &string) : version(parseVersion(string)) {}
+    explicit Version(int version) : version(version) {}
+
+    static int parseVersion(const std::string &string) {
+        auto split = splitString(string, '.');
+        if (split.size() != 3) throw std::runtime_error("Invalid version string");
+        return std::stoi(split[0]) * 10000 + std::stoi(split[1]) * 100 + std::stoi(split[2]);
+    }
+
+    std::strong_ordering operator<=>(Version rhs) const {
+        return version <=> rhs.version;
+    }
+
+    [[nodiscard]] int getMajor() const {
+        return version / 10000;
+    }
+
+    [[nodiscard]] int getMinor() const {
+        return (version / 100) % 100;
+    }
+
+    [[nodiscard]] int getPatch() const { // Todo: For some reason this is always zero
+        return version % 100;
+    }
+
+    [[nodiscard]] int getCode() const {
+        return version;
+    }
+
+    [[nodiscard]] bool isValid() const {
+        return version > 0;
+    }
+
+    [[nodiscard]] std::string toString() const {
+        return std::format("{}.{}.{}", getMajor(), getMinor(), getPatch());
+    }
+
+private:
+    int version;
+};
+
+inline static Version VERSION_2_4_1 {"2.4.1"};
+
 template <typename TP>
-std::time_t to_time_t(TP tp)
+inline std::time_t to_time_t(TP tp)
 {
     using namespace std::chrono;
 #if __ANDROID__

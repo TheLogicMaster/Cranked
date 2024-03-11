@@ -20,7 +20,7 @@ void *HeapAllocator::allocate(size_t size) {
     Node *node, *previous;
     find(blockSize, previous, node);
     if (!node)
-        throw std::runtime_error("Out of memory");
+        throw std::bad_alloc();
 
     auto remaining = node->size - blockSize;
 

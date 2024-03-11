@@ -7,6 +7,7 @@
 #include "gen/PlaydateAPI.hpp"
 #include "PlaydateTypes.hpp"
 #include "Graphics.hpp"
+#include "Audio.hpp"
 #include "File.hpp"
 #include "Menu.hpp"
 
@@ -33,6 +34,8 @@
 // Todo: A wrapper class to hide internals
 class Emulator {
 public:
+    static inline const Version version{PLAYDATE_SDK_VERSION};
+
     typedef void(* InternalUpdateCallback)(Emulator *emulator);
 
     typedef void(* LoggingCallback)(Emulator *emulator, LogLevel level, const char *format, va_list args);
@@ -108,7 +111,7 @@ public:
     template <typename S>
     inline S virtualRead(uint32_t address) {
         S value;
-        assertUC(uc_mem_read(nativeEngine, address, &value, sizeof(S)), "Mem write failed");
+        assertUC(uc_mem_read(nativeEngine, address, &value, sizeof(S)), "Mem read failed");
         return value;
     }
 
@@ -455,11 +458,12 @@ public:
         va_end(args);
     }
 
+    HeapAllocator heap = HeapAllocator(HEAP_SIZE);
     Graphics graphics = Graphics(this);
+    Audio audio = Audio(this);
     File files = File(this);
     Menu menu = Menu(this);
     std::unique_ptr<Rom> rom;
-    HeapAllocator heap = HeapAllocator(HEAP_SIZE);
     std::unordered_map<std::string, cref_t> emulatedStringLiterals;
     std::unordered_set<std::string> loadedLuaFiles;
 
