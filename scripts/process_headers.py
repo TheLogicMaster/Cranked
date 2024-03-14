@@ -370,10 +370,10 @@ def main():
                 return 'ArgType::ptr_t'
             elif c_type.wrapper_type == 'void':
                 return 'ArgType::void_t'
-            elif c_type.wrapper_type == '...':
-                return f'ArgType::varargs_t'
             elif c_type.emu_type == 'va_list':
                 return f'ArgType::va_list_t'
+            elif c_type.wrapper_type == '...':
+                return f'ArgType::varargs_t'
             elif re.fullmatch(r'u?int\d+_t|float|double', c_type.emu_type):
                 return f'ArgType::{c_type.emu_type}{"" if c_type.emu_type.endswith("_t") else "_t"}'
             for typename, native_type in CUSTOM_NATIVE_TYPES.items():

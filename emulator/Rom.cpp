@@ -45,7 +45,7 @@ void Rom::load() {
 
     std::vector<uint8_t> pdzData;
     try {
-        pdzData = readRomFile("main.pdz");
+        pdzData = readRomFile("main.pdz");  // Todo: Don't use exceptions if not needed here
     } catch (std::exception &ignored) {}
     if (!pdzData.empty())
         pdzFiles = loadPDZ(pdzData);

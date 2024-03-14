@@ -481,8 +481,16 @@ public:
     bool autoLockDisabled{};
     bool tryReduceFlashing{};
     float accelerometerX{}, accelerometerY{}, accelerometerZ{};
+    bool use24HourTime{};
+    int32_t timezoneOffset{};
+    float batteryVoltage = 4.2f;
+    float batteryPercentage = 100.0f;
     cref_t nativeUpdateCallback{};
     cref_t nativeUpdateUserdata{};
+    cref_t serialMessageCallback{};
+    cref_t buttonCallback{};
+    cref_t buttonCallbackUserdata{};
+    cref_t buttonCallbackQueueSize{};
     std::vector<cref_t> emulatedLuaFunctions;
     std::chrono::system_clock::time_point suspendUpdateLoopUntil;
     bool disableUpdateLoop{};

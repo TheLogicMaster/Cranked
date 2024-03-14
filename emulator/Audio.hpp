@@ -8,9 +8,26 @@
 #include <cstdint>
 #include <set>
 #include <vector>
+#include <cmath>
 
 class Emulator;
 class Audio;
+
+inline float noteToFrequency(MIDINote note) {
+    return NOTE_C4_FREQUENCY * (float)std::pow(2, (note - NOTE_C4_HALF_STEPS) / 12);
+}
+
+inline MIDINote noteFromFrequency(float frequency) {
+    return NOTE_C4_HALF_STEPS + std::log2(frequency / NOTE_C4_FREQUENCY) * 12;
+}
+
+inline float framesToSeconds(int frames) {
+    return (float) frames / AUDIO_SAMPLING_RATE;
+}
+
+inline int framesFromSeconds(float seconds) {
+    return (int) std::round(seconds * AUDIO_SAMPLING_RATE);
+}
 
 struct SoundSource_32 {
     explicit SoundSource_32(Audio *audio);
@@ -89,6 +106,7 @@ struct FilePlayer_32 : SoundSource_32 {
     SDFile_32 *file{};
     int sampleOffset{};
     float rate = 1.0f;
+    bool paused{};
     int repeat{};
     int loops{};
     int loopStart{}, loopEnd{};
@@ -107,6 +125,7 @@ struct SamplePlayer_32 : SoundSource_32 {
     AudioSample_32 *sample{};
     int sampleOffset{};
     float rate = 1.0f;
+    bool paused{};
     int repeat{};
     int loops{};
     int loopStart{}, loopEnd{};
@@ -116,6 +135,9 @@ struct SamplePlayer_32 : SoundSource_32 {
 
 struct PDSynthSignal_32 : PDSynthSignalValue_32 {
     explicit PDSynthSignal_32(Audio *audio);
+
+    int offset{};
+    float scale{};
 };
 
 struct PDSynthLFO_32 : PDSynthSignal_32 {
@@ -143,7 +165,7 @@ struct PDSynthEnvelope_32 : PDSynthSignal_32 {
     float curvature{};
     float velocitySensitivity{};
     float rateScaling{};
-    MIDINote rateStart{}, rateEnd{};
+    float rateStart{}, rateEnd{};
     bool legato{};
     bool reTrigger{};
 };
@@ -220,6 +242,10 @@ struct SoundSequence_32 : SoundSource_32 {
     explicit SoundSequence_32(Audio *audio);
 
     int time{};
+    float tempo{}; // Steps per second
+    int currentLoop{};
+    int loops{};
+    int loopStart{}, loopEnd{};
 };
 
 struct TwoPoleFilter_32 : SoundEffect_32 {
@@ -269,6 +295,8 @@ struct DelayLineTap_32 : SoundSource_32 {
 
     DelayLine_32 * const delayLine;
     int delayFrames{};
+    PDSynthSignalValue_32 *delayModulator{};
+    bool channelsFlipped{};
 };
 
 struct Overdrive_32 : SoundEffect_32 {
@@ -315,8 +343,15 @@ public:
     Emulator *emulator;
     HeapAllocator &heap;
     SoundChannel_32 *mainChannel;
+    std::set<SoundChannel_32 *> activeChannels{};
     int sampleTime{};
     cref_t lastError{};
+    cref_t micCallback{}; // Todo
+    cref_t micCallbackUserdata{};
+    MicSource micCallbackSource{};
+    cref_t headsetStateCallback{};
+    bool headphonesConnected{}, headsetMicConnected{};
+    bool headphoneOutputActive{}, speakerOutputActive{};
     std::set<SoundSource_32 *> soundSources{};
     std::set<SoundChannel_32 *> soundChannels{};
     std::set<SoundEffect_32 *> soundEffects{};

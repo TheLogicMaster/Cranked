@@ -223,7 +223,7 @@ LCDFont_32 *playdate_graphics_loadFont(Emulator *emulator, uint8_t *path, cref_t
 LCDFontPage_32 *playdate_graphics_getFontPage(Emulator *emulator, LCDFont_32 *font, uint32_t c) {
     try {
         return &font->pages.at(c / 256);
-    } catch (std::out_of_range &ex) {
+    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
@@ -236,7 +236,7 @@ LCDFontGlyph_32 *playdate_graphics_getPageGlyph(Emulator *emulator, LCDFontPage_
         if (advance)
             *advance = glyph->advance;
         return glyph;
-    } catch (std::out_of_range &ex) {
+    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
@@ -244,7 +244,7 @@ LCDFontGlyph_32 *playdate_graphics_getPageGlyph(Emulator *emulator, LCDFontPage_
 int32_t playdate_graphics_getGlyphKerning(Emulator *emulator, LCDFontGlyph_32 *glyph, uint32_t glyphcode, uint32_t nextcode) {
     try {
         return nextcode < 256 ? glyph->shortKerningTable.at(nextcode) : glyph->longKerningTable.at(nextcode);
-    } catch (std::out_of_range &ex) {
+    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return 0;
     }
 }
@@ -346,7 +346,7 @@ LCDFont_32 *playdate_graphics_makeFontFromData(Emulator *emulator, LCDFontData_3
 }
 
 int32_t playdate_graphics_getTextTracking(Emulator *emulator) {
-    return 0; // Todo
+    return emulator->graphics.getCurrentDisplayContext().textTracking;
 }
 
 void *playdate_sys_realloc(Emulator *emulator, void* ptr, uint32_t size) {
@@ -459,57 +459,54 @@ void playdate_sys_setAutoLockDisabled(Emulator *emulator, int32_t disable) {
 }
 
 void playdate_sys_setMenuImage(Emulator *emulator, LCDBitmap_32 *bitmap, int32_t xOffset) {
-    // Todo
+    emulator->menu.setImage(bitmap, xOffset);
 }
 
 PDMenuItem_32 *playdate_sys_addMenuItem(Emulator *emulator, uint8_t *title, cref_t callback, void *userdata) {
-    // Todo
-    return nullptr;
+    return emulator->menu.addItem((char *) title, PDMenuItem_32::Type::Button, {}, 0, callback, 0);
 }
 
 PDMenuItem_32 *playdate_sys_addCheckmarkMenuItem(Emulator *emulator, uint8_t *title, int32_t value, cref_t callback, void *userdata) {
-    // Todo
-    return nullptr;
+    return emulator->menu.addItem((char *) title, PDMenuItem_32::Type::Checkmark, {}, value, callback, 0);
 }
 
 PDMenuItem_32 *playdate_sys_addOptionsMenuItem(Emulator *emulator, uint8_t *title, cref_t *optionTitles, int32_t optionsCount, cref_t f, void *userdata) {
-    // Todo
-    return nullptr;
+    std::vector<std::string> options;
+    for (int i = 0; i < optionsCount; i++)
+        options.emplace_back((char *) emulator->fromVirtualAddress(optionTitles[i]));
+    return emulator->menu.addItem((char *) title, PDMenuItem_32::Type::Options, options, 0, f, 0);
 }
 
 void playdate_sys_removeAllMenuItems(Emulator *emulator) {
-    // Todo
+    emulator->menu.clearItems();
 }
 
 void playdate_sys_removeMenuItem(Emulator *emulator, PDMenuItem_32 *menuItem) {
-    // Todo
+    emulator->menu.removeItem(menuItem);
 }
 
 int32_t playdate_sys_getMenuItemValue(Emulator *emulator, PDMenuItem_32 *menuItem) {
-    // Todo
-    return 0;
+    return menuItem->value;
 }
 
 void playdate_sys_setMenuItemValue(Emulator *emulator, PDMenuItem_32 *menuItem, int32_t value) {
-    // Todo
+    menuItem->value = value;
 }
 
 uint8_t *playdate_sys_getMenuItemTitle(Emulator *emulator, PDMenuItem_32 *menuItem) {
-    // Todo
-    return nullptr;
+    return (uint8_t *) menuItem->title;
 }
 
 void playdate_sys_setMenuItemTitle(Emulator *emulator, PDMenuItem_32 *menuItem, uint8_t *title) {
-    // Todo
+    emulator->menu.setItemTitle(menuItem, (char *) title);
 }
 
 void *playdate_sys_getMenuItemUserdata(Emulator *emulator, PDMenuItem_32 *menuItem) {
-    // Todo
-    return nullptr;
+    return emulator->fromVirtualAddress(menuItem->userdata);
 }
 
 void playdate_sys_setMenuItemUserdata(Emulator *emulator, PDMenuItem_32 *menuItem, void *ud) {
-    // Todo
+    menuItem->userdata = emulator->toVirtualAddress(ud);
 }
 
 int32_t playdate_sys_getReduceFlashing(Emulator *emulator) {
@@ -525,19 +522,19 @@ void playdate_sys_resetElapsedTime(Emulator *emulator) {
 }
 
 float playdate_sys_getBatteryPercentage(Emulator *emulator) {
-    return 100;
+    return emulator->batteryPercentage;
 }
 
 float playdate_sys_getBatteryVoltage(Emulator *emulator) {
-    return 4.2f;
+    return emulator->batteryVoltage;
 }
 
 int32_t playdate_sys_getTimezoneOffset(Emulator *emulator) {
-    return 0; // Todo
+    return emulator->timezoneOffset;
 }
 
 int32_t playdate_sys_shouldDisplay24HourTime(Emulator *emulator) {
-    return 0; // Todo
+    return emulator->use24HourTime;
 }
 
 void playdate_sys_convertEpochToDateTime(Emulator *emulator, uint32_t epoch, PDDateTime_32 *datetime) {
@@ -552,11 +549,13 @@ uint32_t playdate_sys_convertDateTimeToEpoch(Emulator *emulator, PDDateTime_32 *
 void playdate_sys_clearICache(Emulator *emulator) {} // Not needed, probably
 
 void playdate_sys_setButtonCallback(Emulator *emulator, cref_t cb, void *buttonud, int32_t queuesize) {
-    // Todo
+    emulator->buttonCallback = cb;
+    emulator->buttonCallbackUserdata = emulator->toVirtualAddress(buttonud);
+    emulator->buttonCallbackQueueSize = queuesize;
 }
 
 void playdate_sys_setSerialMessageCallback(Emulator *emulator, cref_t callback) {
-    // Todo
+    emulator->serialMessageCallback = callback;
 }
 
 int32_t playdate_sys_vaFormatString(Emulator *emulator, cref_t *outstr, uint8_t *fmt, ...) {
@@ -1458,7 +1457,7 @@ int32_t playdate_file_seek(Emulator *emulator, SDFile_32 *file, int32_t pos, int
 }
 
 void playdate_sprite_setAlwaysRedraw(Emulator *emulator, int32_t flag) {
-    // Todo
+    emulator->graphics.alwaysRedrawSprites = flag;
 }
 
 void playdate_sprite_addDirtyRect(Emulator *emulator, LCDRect_32 dirtyRect) {
@@ -1505,8 +1504,7 @@ void playdate_sprite_removeAllSprites(Emulator *emulator) {
 }
 
 int32_t playdate_sprite_getSpriteCount(Emulator *emulator) {
-    // Todo
-    return 0;
+    return (int32_t ) emulator->graphics.spriteDrawList.size();
 }
 
 void playdate_sprite_setBounds(Emulator *emulator, LCDSprite_32 *sprite, PDRect_32 bounds) {
@@ -1536,29 +1534,27 @@ LCDBitmap_32 *playdate_sprite_getImage(Emulator *emulator, LCDSprite_32 *sprite)
 }
 
 void playdate_sprite_setSize(Emulator *emulator, LCDSprite_32 *s, float width, float height) {
-    // Todo
+    s->size = Vec2(width, height);
 }
 
 void playdate_sprite_setZIndex(Emulator *emulator, LCDSprite_32 *sprite, int16_t zIndex) {
-    // Todo
+    sprite->zIndex = zIndex;
 }
 
 int16_t playdate_sprite_getZIndex(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return sprite->zIndex;
 }
 
 void playdate_sprite_setDrawMode(Emulator *emulator, LCDSprite_32 *sprite, int32_t mode) {
-    // Todo
+    sprite->drawMode = (LCDBitmapDrawMode) mode;
 }
 
 void playdate_sprite_setImageFlip(Emulator *emulator, LCDSprite_32 *sprite, int32_t flip) {
-    // Todo
+    sprite->flip = (LCDBitmapFlip) flip;
 }
 
 int32_t playdate_sprite_getImageFlip(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return (int32_t)sprite->flip;
 }
 
 void playdate_sprite_setStencil(Emulator *emulator, LCDSprite_32 *sprite, LCDBitmap_32 *stencil) {
@@ -1582,63 +1578,60 @@ void playdate_sprite_clearClipRectsInRange(Emulator *emulator, int32_t startZ, i
 }
 
 void playdate_sprite_setUpdatesEnabled(Emulator *emulator, LCDSprite_32 *sprite, int32_t flag) {
-    // Todo
+    sprite->updatesEnabled = flag;
 }
 
 int32_t playdate_sprite_updatesEnabled(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return sprite->updatesEnabled;
 }
 
 void playdate_sprite_setCollisionsEnabled(Emulator *emulator, LCDSprite_32 *sprite, int32_t flag) {
-    // Todo
+    sprite->collisionsEnabled = flag;
 }
 
 int32_t playdate_sprite_collisionsEnabled(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return sprite->collisionsEnabled;
 }
 
 void playdate_sprite_setVisible(Emulator *emulator, LCDSprite_32 *sprite, int32_t flag) {
-    // Todo
+    sprite->visible = flag;
 }
 
 int32_t playdate_sprite_isVisible(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return sprite->visible;
 }
 
 void playdate_sprite_setOpaque(Emulator *emulator, LCDSprite_32 *sprite, int32_t flag) {
-    // Todo
+    sprite->opaque = flag;
 }
 
 void playdate_sprite_markDirty(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
+    sprite->dirty = true;
 }
 
 void playdate_sprite_setTag(Emulator *emulator, LCDSprite_32 *sprite, uint8_t tag) {
-    // Todo
+    sprite->tag = tag;
 }
 
 uint8_t playdate_sprite_getTag(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
+    return sprite->tag;
 }
 
 void playdate_sprite_setIgnoresDrawOffset(Emulator *emulator, LCDSprite_32 *sprite, int32_t flag) {
-    // Todo
+    sprite->ignoresDrawOffset = flag;
 }
 
 void playdate_sprite_setUpdateFunction(Emulator *emulator, LCDSprite_32 *sprite, cref_t func) {
-    // Todo
+    sprite->updateFunction = func;
 }
 
 void playdate_sprite_setDrawFunction(Emulator *emulator, LCDSprite_32 *sprite, cref_t func) {
-    // Todo
+    sprite->drawFunction = func;
 }
 
 void playdate_sprite_getPosition(Emulator *emulator, LCDSprite_32 *sprite, float *x, float *y) {
-    // Todo
+    *x = sprite->pos.x;
+    *y = sprite->pos.y;
 }
 
 void playdate_sprite_resetCollisionWorld(Emulator *emulator) {
@@ -1711,24 +1704,27 @@ void playdate_sprite_clearStencil(Emulator *emulator, LCDSprite_32 *sprite) {
 }
 
 void playdate_sprite_setUserdata(Emulator *emulator, LCDSprite_32 *sprite, void *userdata) {
-    // Todo
+    sprite->userdata = emulator->toVirtualAddress(userdata);
 }
 
 void *playdate_sprite_getUserdata(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return nullptr;
+    return emulator->fromVirtualAddress(sprite->userdata);
 }
 
 void playdate_sprite_setStencilImage(Emulator *emulator, LCDSprite_32 *sprite, LCDBitmap_32 *stencil, int32_t tile) {
     // Todo
 }
 
-void playdate_sprite_setCenter(Emulator *emulator, LCDSprite_32 * s, float x, float y) {
-    // Todo
+void playdate_sprite_setCenter(Emulator *emulator, LCDSprite_32 *s, float x, float y) {
+    s->centerX = x;
+    s->centerY = y;
 }
 
-void playdate_sprite_getCenter(Emulator *emulator, LCDSprite_32 * s, float * x, float * y) {
-    // Todo
+void playdate_sprite_getCenter(Emulator *emulator, LCDSprite_32 *s, float * x, float * y) {
+    if (x)
+        *x = s->centerX;
+    if (y)
+        *y = s->centerY;
 }
 
 void playdate_sound_source_setVolume(Emulator *emulator, SoundSource_32 *c, float lvol, float rvol) {
@@ -1773,15 +1769,16 @@ int32_t playdate_sound_fileplayer_play(Emulator *emulator, FilePlayer_32 *player
 }
 
 int32_t playdate_sound_fileplayer_isPlaying(Emulator *emulator, FilePlayer_32 *player) {
-    return player->playing;
+    return player->playing; // Todo: Does pausing affect this
 }
 
 void playdate_sound_fileplayer_pause(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
+    player->paused = true;
 }
 
 void playdate_sound_fileplayer_stop(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
+    player->playing = false;
+    player->sampleOffset = 0;
 }
 
 void playdate_sound_fileplayer_setVolume(Emulator *emulator, FilePlayer_32 *player, float left, float right) {
@@ -1795,8 +1792,7 @@ void playdate_sound_fileplayer_getVolume(Emulator *emulator, FilePlayer_32 *play
 }
 
 float playdate_sound_fileplayer_getLength(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->file ? framesToSeconds((int) player->file->romData->size()) : 0;
 }
 
 void playdate_sound_fileplayer_setOffset(Emulator *emulator, FilePlayer_32 *player, float offset) {
@@ -1808,7 +1804,8 @@ void playdate_sound_fileplayer_setRate(Emulator *emulator, FilePlayer_32 *player
 }
 
 void playdate_sound_fileplayer_setLoopRange(Emulator *emulator, FilePlayer_32 *player, float start, float end) {
-    // Todo
+    player->loopStart = framesFromSeconds(start);
+    player->loopEnd = framesFromSeconds(end);
 }
 
 int32_t playdate_sound_fileplayer_didUnderrun(Emulator *emulator, FilePlayer_32 *player) {
@@ -1826,8 +1823,7 @@ void playdate_sound_fileplayer_setLoopCallback(Emulator *emulator, FilePlayer_32
 }
 
 float playdate_sound_fileplayer_getOffset(Emulator *emulator, FilePlayer_32 *player) {
-    // Todo
-    return 0;
+    return framesToSeconds(player->sampleOffset);
 }
 
 float playdate_sound_fileplayer_getRate(Emulator *emulator, FilePlayer_32 *player) {
@@ -1880,8 +1876,7 @@ void playdate_sound_sample_freeSample(Emulator *emulator, AudioSample_32 *sample
 }
 
 float playdate_sound_sample_getLength(Emulator *emulator, AudioSample_32 *sample) {
-    // Todo
-    return 0;
+    return framesToSeconds((int) sample->data.size());
 }
 
 int32_t playdate_sound_sample_decompress(Emulator *emulator, AudioSample_32 *sample) {
@@ -1901,16 +1896,19 @@ void playdate_sound_sampleplayer_setSample(Emulator *emulator, SamplePlayer_32 *
 }
 
 int32_t playdate_sound_sampleplayer_play(Emulator *emulator, SamplePlayer_32 *player, int32_t repeat, float rate) {
-    // Todo
-    return 0;
+    player->playing = true;
+    player->repeat = repeat;
+    player->rate = rate;
+    return true;
 }
 
 int32_t playdate_sound_sampleplayer_isPlaying(Emulator *emulator, SamplePlayer_32 *player) {
-    return player->playing;
+    return player->playing; // Todo: Does pausing affect this?
 }
 
 void playdate_sound_sampleplayer_stop(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
+    player->playing = false;
+    player->sampleOffset = 0;
 }
 
 void playdate_sound_sampleplayer_setVolume(Emulator *emulator, SamplePlayer_32 *player, float left, float right) {
@@ -1924,12 +1922,11 @@ void playdate_sound_sampleplayer_getVolume(Emulator *emulator, SamplePlayer_32 *
 }
 
 float playdate_sound_sampleplayer_getLength(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
-    return 0;
+    return player->sample ? framesToSeconds((int) player->sample->data.size()) : 0;
 }
 
 void playdate_sound_sampleplayer_setOffset(Emulator *emulator, SamplePlayer_32 *player, float offset) {
-    // Todo
+    player->sampleOffset = framesFromSeconds(offset);
 }
 
 void playdate_sound_sampleplayer_setRate(Emulator *emulator, SamplePlayer_32 *player, float rate) {
@@ -1952,8 +1949,7 @@ void playdate_sound_sampleplayer_setLoopCallback(Emulator *emulator, SamplePlaye
 }
 
 float playdate_sound_sampleplayer_getOffset(Emulator *emulator, SamplePlayer_32 *player) {
-    // Todo
-    return 0;
+    return framesToSeconds(player->sampleOffset);
 }
 
 float playdate_sound_sampleplayer_getRate(Emulator *emulator, SamplePlayer_32 *player) {
@@ -1961,7 +1957,7 @@ float playdate_sound_sampleplayer_getRate(Emulator *emulator, SamplePlayer_32 *p
 }
 
 void playdate_sound_sampleplayer_setPaused(Emulator *emulator, SamplePlayer_32 *player, int32_t flag) {
-    // Todo
+    player->paused = flag;
 }
 
 PDSynthSignal_32 *playdate_sound_signal_newSignal(Emulator *emulator, cref_t step, cref_t noteOn, cref_t noteOff, cref_t dealloc, void *userdata) {
@@ -1979,11 +1975,11 @@ float playdate_sound_signal_getValue(Emulator *emulator, PDSynthSignal_32 *signa
 }
 
 void playdate_sound_signal_setValueScale(Emulator *emulator, PDSynthSignal_32 *signal, float scale) {
-    // Todo
+    signal->scale = scale;
 }
 
 void playdate_sound_signal_setValueOffset(Emulator *emulator, PDSynthSignal_32 *signal, float offset) {
-    // Todo
+    signal->offset = framesFromSeconds(offset);
 }
 
 uint8_t *playdate_sound_getError(Emulator *emulator) {
@@ -2033,7 +2029,8 @@ void playdate_sound_lfo_setFunction(Emulator *emulator, PDSynthLFO_32 *lfo, cref
 }
 
 void playdate_sound_lfo_setDelay(Emulator *emulator, PDSynthLFO_32 *lfo, float holdoff, float ramptime) {
-    // Todo
+    lfo->holdOffSamples = framesFromSeconds(holdoff);
+    lfo->rampTimeSamples = framesFromSeconds(ramptime);
 }
 
 void playdate_sound_lfo_setRetrigger(Emulator *emulator, PDSynthLFO_32 *lfo, int32_t flag) {
@@ -2417,20 +2414,22 @@ void playdate_sound_sequence_setTime(Emulator *emulator, SoundSequence_32 *seq, 
 }
 
 void playdate_sound_sequence_setLoops(Emulator *emulator, SoundSequence_32 *seq, int32_t loopstart, int32_t loopend, int32_t loops) {
-    // Todo
+    seq->currentLoop = 0;
+    seq->loopStart = loopstart;
+    seq->loopEnd = loopend;
+    seq->loops = loops;
 }
 
 int32_t playdate_sound_sequence_getTempo(Emulator *emulator, SoundSequence_32 *seq) {
-    // Todo
-    return 0;
+    return (int32_t) seq->tempo; // Why still an integer? Breaking ABI change?
 }
 
 void playdate_sound_sequence_setTempo(Emulator *emulator, SoundSequence_32 * seq, float stepsPerSecond) {
-    // Todo
+    seq->tempo = stepsPerSecond;
 }
 
 void playdate_sound_sequence_setTempo_int(Emulator *emulator, SoundSequence_32 * seq, int32_t stepsPerSecond) {
-    // Todo
+    seq->tempo = stepsPerSecond;
 }
 
 int32_t playdate_sound_sequence_getTrackCount(Emulator *emulator, SoundSequence_32 *seq) {
@@ -2457,8 +2456,7 @@ void playdate_sound_sequence_allNotesOff(Emulator *emulator, SoundSequence_32 *s
 }
 
 int32_t playdate_sound_sequence_isPlaying(Emulator *emulator, SoundSequence_32 *seq) {
-    // Todo
-    return 0;
+    return seq->playing;
 }
 
 uint32_t playdate_sound_sequence_getLength(Emulator *emulator, SoundSequence_32 *seq) {
@@ -2484,207 +2482,192 @@ void playdate_sound_sequence_setCurrentStep(Emulator *emulator, SoundSequence_32
 }
 
 TwoPoleFilter_32 *playdate_sound_effect_twopolefilter_newFilter(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<TwoPoleFilter_32>();
 }
 
 void playdate_sound_effect_twopolefilter_freeFilter(Emulator *emulator, TwoPoleFilter_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_twopolefilter_setType(Emulator *emulator, TwoPoleFilter_32 *filter, int32_t type) {
-    // Todo
+    filter->type = (TwoPoleFilterType) type;
 }
 
 void playdate_sound_effect_twopolefilter_setFrequency(Emulator *emulator, TwoPoleFilter_32 *filter, float frequency) {
-    // Todo
+    filter->frequency = frequency;
 }
 
 void playdate_sound_effect_twopolefilter_setFrequencyModulator(Emulator *emulator, TwoPoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->frequencyModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_twopolefilter_getFrequencyModulator(Emulator *emulator, TwoPoleFilter_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->frequencyModulator;
 }
 
 void playdate_sound_effect_twopolefilter_setGain(Emulator *emulator, TwoPoleFilter_32 *filter, float gain) {
-    // Todo
+    filter->gain = gain;
 }
 
 void playdate_sound_effect_twopolefilter_setResonance(Emulator *emulator, TwoPoleFilter_32 *filter, float resonance) {
-    // Todo
+    filter->resonance = resonance;
 }
 
 void playdate_sound_effect_twopolefilter_setResonanceModulator(Emulator *emulator, TwoPoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->resonanceModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_twopolefilter_getResonanceModulator(Emulator *emulator, TwoPoleFilter_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->resonanceModulator;
 }
 
 OnePoleFilter_32 *playdate_sound_effect_onepolefilter_newFilter(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<OnePoleFilter_32>();
 }
 
 void playdate_sound_effect_onepolefilter_freeFilter(Emulator *emulator, OnePoleFilter_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_onepolefilter_setParameter(Emulator *emulator, OnePoleFilter_32 *filter, float parameter) {
-    // Todo
+    filter->cutoffFrequency = parameter;
 }
 
 void playdate_sound_effect_onepolefilter_setParameterModulator(Emulator *emulator, OnePoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->cutoffFrequencyModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_onepolefilter_getParameterModulator(Emulator *emulator, OnePoleFilter_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->cutoffFrequencyModulator;
 }
 
 BitCrusher_32 *playdate_sound_effect_bitcrusher_newBitCrusher(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<BitCrusher_32>();
 }
 
 void playdate_sound_effect_bitcrusher_freeBitCrusher(Emulator *emulator, BitCrusher_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_bitcrusher_setAmount(Emulator *emulator, BitCrusher_32 *filter, float amount) {
-    // Todo
+    filter->amount = amount;
 }
 
 void playdate_sound_effect_bitcrusher_setAmountModulator(Emulator *emulator, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->amountModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_bitcrusher_getAmountModulator(Emulator *emulator, BitCrusher_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->amountModulator;
 }
 
 void playdate_sound_effect_bitcrusher_setUndersampling(Emulator *emulator, BitCrusher_32 *filter, float undersampling) {
-    // Todo
+    filter->undersampling = undersampling;
 }
 
 void playdate_sound_effect_bitcrusher_setUndersampleModulator(Emulator *emulator, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->undersamplingModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_bitcrusher_getUndersampleModulator(Emulator *emulator, BitCrusher_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->undersamplingModulator;
 }
 
 RingModulator_32 *playdate_sound_effect_ringmodulator_newRingmod(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<RingModulator_32>();
 }
 
 void playdate_sound_effect_ringmodulator_freeRingmod(Emulator *emulator, RingModulator_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_ringmodulator_setFrequency(Emulator *emulator, RingModulator_32 *filter, float frequency) {
-    // Todo
+    filter->frequency = frequency;
 }
 
 void playdate_sound_effect_ringmodulator_setFrequencyModulator(Emulator *emulator, RingModulator_32 *filter, PDSynthSignalValue_32 *signal) {
-    // Todo
+    filter->frequencyModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_ringmodulator_getFrequencyModulator(Emulator *emulator, RingModulator_32 *filter) {
-    // Todo
-    return nullptr;
+    return filter->frequencyModulator;
 }
 
 DelayLine_32 *playdate_sound_effect_delayline_newDelayLine(Emulator *emulator, int32_t length, int32_t stereo) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<DelayLine_32>((int) length, (bool) stereo);
 }
 
 void playdate_sound_effect_delayline_freeDelayLine(Emulator *emulator, DelayLine_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_delayline_setLength(Emulator *emulator, DelayLine_32 *d, int32_t frames) {
-    // Todo
+    d->data.clear();
+    d->data.resize((d->stereo ? 2 : 1) * frames);
 }
 
 void playdate_sound_effect_delayline_setFeedback(Emulator *emulator, DelayLine_32 *d, float fb) {
-    // Todo
+    d->feedback = fb;
 }
 
 DelayLineTap_32 *playdate_sound_effect_delayline_addTap(Emulator *emulator, DelayLine_32 *d, int32_t delay) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundSource<DelayLineTap_32>(d, (int) delay);
 }
 
 void playdate_sound_effect_delayline_freeTap(Emulator *emulator, DelayLineTap_32 *tap) {
-    // Todo
+    emulator->audio.freeSoundSource(tap);
 }
 
 void playdate_sound_effect_delayline_setTapDelay(Emulator *emulator, DelayLineTap_32 *t, int32_t frames) {
-    // Todo
+    t->delayFrames = frames;
 }
 
 void playdate_sound_effect_delayline_setTapDelayModulator(Emulator *emulator, DelayLineTap_32 *t, PDSynthSignalValue_32 *mod) {
-    // Todo
+    t->delayModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_delayline_getTapDelayModulator(Emulator *emulator, DelayLineTap_32 *t) {
-    // Todo
-    return nullptr;
+    return t->delayModulator;
 }
 
 void playdate_sound_effect_delayline_setTapChannelsFlipped(Emulator *emulator, DelayLineTap_32 *t, int32_t flip) {
-    // Todo
+    t->channelsFlipped = flip;
 }
 
 Overdrive_32 *playdate_sound_effect_overdrive_newOverdrive(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateSoundEffect<Overdrive_32>();
 }
 
 void playdate_sound_effect_overdrive_freeOverdrive(Emulator *emulator, Overdrive_32 *filter) {
-    // Todo
+    emulator->audio.freeSoundEffect(filter);
 }
 
 void playdate_sound_effect_overdrive_setGain(Emulator *emulator, Overdrive_32 *o, float gain) {
-    // Todo
+    o->gain = gain;
 }
 
 void playdate_sound_effect_overdrive_setLimit(Emulator *emulator, Overdrive_32 *o, float limit) {
-    // Todo
+    o->limit = limit;
 }
 
 void playdate_sound_effect_overdrive_setLimitModulator(Emulator *emulator, Overdrive_32 *o, PDSynthSignalValue_32 *mod) {
-    // Todo
+    o->limitModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_overdrive_getLimitModulator(Emulator *emulator, Overdrive_32 *o) {
-    // Todo
-    return nullptr;
+    return o->limitModulator;
 }
 
 void playdate_sound_effect_overdrive_setOffset(Emulator *emulator, Overdrive_32 *o, float offset) {
-    // Todo
+    o->offset = offset;
 }
 
 void playdate_sound_effect_overdrive_setOffsetModulator(Emulator *emulator, Overdrive_32 *o, PDSynthSignalValue_32 *mod) {
-    // Todo
+    o->offsetModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_overdrive_getOffsetModulator(Emulator *emulator, Overdrive_32 *o) {
-    // Todo
-    return nullptr;
+    return o->offsetModulator;
 }
 
 SoundEffect_32 *playdate_sound_effect_newEffect(Emulator *emulator, cref_t proc, void *userdata) {
@@ -2693,48 +2676,46 @@ SoundEffect_32 *playdate_sound_effect_newEffect(Emulator *emulator, cref_t proc,
 }
 
 void playdate_sound_effect_freeEffect(Emulator *emulator, SoundEffect_32 *effect) {
-    // Todo
+    emulator->audio.freeSoundEffect(effect);
 }
 
 void playdate_sound_effect_setMix(Emulator *emulator, SoundEffect_32 *effect, float level) {
-    // Todo
+    effect->mixLevel = level;
 }
 
 void playdate_sound_effect_setMixModulator(Emulator *emulator, SoundEffect_32 *effect, PDSynthSignalValue_32 *signal) {
-    // Todo
+    effect->mixModulator = signal;
 }
 
 PDSynthSignalValue_32 *playdate_sound_effect_getMixModulator(Emulator *emulator, SoundEffect_32 *effect) {
-    // Todo
-    return nullptr;
+    return effect->mixModulator;
 }
 
 void playdate_sound_effect_setUserdata(Emulator *emulator, SoundEffect_32 *effect, void *userdata) {
-    // Todo
+    effect->userdata = emulator->toVirtualAddress(userdata);
 }
 
 void *playdate_sound_effect_getUserdata(Emulator *emulator, SoundEffect_32 *effect) {
-    // Todo
-    return nullptr;
+    return emulator->fromVirtualAddress(effect->userdata);
 }
 
 SoundChannel_32 *playdate_sound_channel_newChannel(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.allocateChannel();
 }
 
 void playdate_sound_channel_freeChannel(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
+    emulator->audio.freeChannel(channel);
 }
 
 int32_t playdate_sound_channel_addSource(Emulator *emulator, SoundChannel_32 *channel, SoundSource_32 *source) {
-    // Todo
-    return 0;
+    if (std::find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
+        return false;
+    channel->sources.push_back(source);
+    return true;
 }
 
 int32_t playdate_sound_channel_removeSource(Emulator *emulator, SoundChannel_32 *channel, SoundSource_32 *source) {
-    // Todo
-    return 0;
+    return std::erase(channel->sources, source) > 0;
 }
 
 SoundSource_32 *playdate_sound_channel_addCallbackSource(Emulator *emulator, SoundChannel_32 *channel, cref_t callback, void *context, int32_t stereo) {
@@ -2743,11 +2724,11 @@ SoundSource_32 *playdate_sound_channel_addCallbackSource(Emulator *emulator, Sou
 }
 
 void playdate_sound_channel_addEffect(Emulator *emulator, SoundChannel_32 *channel, SoundEffect_32 *effect) {
-    // Todo
+    channel->effects.push_back(effect);
 }
 
 void playdate_sound_channel_removeEffect(Emulator *emulator, SoundChannel_32 *channel, SoundEffect_32 *effect) {
-    // Todo
+    std::erase(channel->effects, effect);
 }
 
 void playdate_sound_channel_setVolume(Emulator *emulator, SoundChannel_32 *channel, float volume) {
@@ -2767,16 +2748,15 @@ PDSynthSignalValue_32 *playdate_sound_channel_getVolumeModulator(Emulator *emula
 }
 
 void playdate_sound_channel_setPan(Emulator *emulator, SoundChannel_32 *channel, float pan) {
-    // Todo
+    channel->pan = pan;
 }
 
 void playdate_sound_channel_setPanModulator(Emulator *emulator, SoundChannel_32 *channel, PDSynthSignalValue_32 *mod) {
-    // Todo
+    channel->panModulator = mod;
 }
 
 PDSynthSignalValue_32 *playdate_sound_channel_getPanModulator(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
-    return nullptr;
+    return channel->panModulator;
 }
 
 PDSynthSignalValue_32 *playdate_sound_channel_getDryLevelSignal(Emulator *emulator, SoundChannel_32 *channel) {
@@ -2790,8 +2770,7 @@ PDSynthSignalValue_32 *playdate_sound_channel_getWetLevelSignal(Emulator *emulat
 }
 
 uint32_t playdate_sound_getCurrentTime(Emulator *emulator) {
-    // Todo
-    return 0;
+    return emulator->audio.sampleTime;
 }
 
 SoundSource_32 *playdate_sound_addSource(Emulator *emulator, cref_t callback, void *context, int32_t stereo) {
@@ -2800,35 +2779,48 @@ SoundSource_32 *playdate_sound_addSource(Emulator *emulator, cref_t callback, vo
 }
 
 SoundChannel_32 *playdate_sound_getDefaultChannel(Emulator *emulator) {
-    // Todo
-    return nullptr;
+    return emulator->audio.mainChannel;
 }
 
 int32_t playdate_sound_addChannel(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
-    return 0;
+    if (channel == emulator->audio.mainChannel)
+        return false;
+    bool success = !emulator->audio.activeChannels.contains(channel);
+    emulator->audio.activeChannels.emplace(channel);
+    return success;
 }
 
 int32_t playdate_sound_removeChannel(Emulator *emulator, SoundChannel_32 *channel) {
-    // Todo
-    return 0;
+    bool success = emulator->audio.activeChannels.contains(channel);
+    emulator->audio.activeChannels.erase(channel);
+    return success;
 }
 
 int32_t playdate_sound_setMicCallback(Emulator *emulator, cref_t callback, void *context, int32_t forceInternal) {
-    return false; // Todo
+    emulator->audio.micCallback = callback;
+    emulator->audio.micCallbackUserdata = emulator->toVirtualAddress(context);
+    emulator->audio.micCallbackSource = (MicSource)forceInternal;
+    return (int)MicSource::Autodetect; // Todo
 }
 
 void playdate_sound_getHeadphoneState(Emulator *emulator, int32_t *headphone, int32_t *headsetmic, cref_t changeCallback) {
-    // Todo
+    *headphone = emulator->audio.headphonesConnected;
+    *headsetmic = emulator->audio.headsetMicConnected;
+    emulator->audio.headsetStateCallback = changeCallback;
 }
 
 void playdate_sound_setOutputsActive(Emulator *emulator, int32_t headphone, int32_t speaker) {
-    // Todo
+    emulator->audio.headphoneOutputActive = headphone;
+    emulator->audio.speakerOutputActive = speaker;
 }
 
 int32_t playdate_sound_removeSource(Emulator *emulator, SoundSource_32 *source) {
-    // Todo
-    return 0;
+    if (std::erase(emulator->audio.mainChannel->sources, source))
+        return true;
+    for (auto channel : emulator->audio.activeChannels)
+        if (std::erase(channel->sources, source))
+            return true;
+    return false;
 }
 
 int32_t playdate_display_getWidth(Emulator *emulator) {

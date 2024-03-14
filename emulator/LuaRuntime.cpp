@@ -447,7 +447,7 @@ static LuaRet playdate_graphics_imageSizeAtPath_lua(Emulator *emulator, const ch
 static void playdate_graphics_image_draw_lua(Emulator *emulator, LCDBitmap_32 *image, LuaVal arg1) {
     int x, y;
     LCDBitmapFlip flip{};
-    std::optional<Rect> sourceRect;
+    std::optional<IntRect> sourceRect;
     LuaVal flipVal(emulator->getLuaContext(), arg1 + 1);
     if (arg1.isTable()) {
         x = arg1.getIntField("x");
@@ -461,9 +461,9 @@ static void playdate_graphics_image_draw_lua(Emulator *emulator, LCDBitmap_32 *i
         flip = flipVal.isString() ? bitmapFlipFromString(flipVal.asString()) : LCDBitmapFlip(flipVal.asInt());
         LuaVal rectVal = flipVal + 1;
         if (rectVal.isTable())
-            sourceRect = rectVal.asRect();
+            sourceRect = rectVal.asIntRect();
         else if (!rectVal.isNil())
-            sourceRect = Rect{ rectVal.asInt(), (rectVal + 1).asInt(), (rectVal + 2).asInt(), (rectVal + 3).asInt() };
+            sourceRect = IntRect{ rectVal.asInt(), (rectVal + 1).asInt(), (rectVal + 2).asInt(), (rectVal + 3).asInt() };
     }
     emulator->graphics.drawBitmap(image, x, y, flip, false, sourceRect);
 }
@@ -691,10 +691,10 @@ static void playdate_graphics_fillRoundRect_lua(Emulator *emulator, LuaVal x, in
 
 static void drawEllipse(Emulator *emulator, LuaVal arg1, bool filled) {
     auto &context = emulator->graphics.getCurrentDisplayContext();
-    Rect rect{};
+    IntRect rect{};
     LuaVal startAngleArg = arg1 + 4;
     if (arg1.isTable()) {
-        rect = arg1.asRect();
+        rect = arg1.asIntRect();
         startAngleArg = arg1 + 1;
     } else
         rect = {arg1.asInt(), (arg1 + 1).asInt(), (arg1 + 2).asInt(), (arg1 + 3).asInt()};
@@ -743,7 +743,7 @@ static LuaRet playdate_graphics_perlinArray_lua(Emulator *emulator, int count, f
 
 static void playdate_graphics_setClipRect_lua(Emulator *emulator, LuaVal arg1, int y, int width, int height) {
     if (arg1.isTable())
-        emulator->graphics.getCurrentDisplayContext().clipRect = arg1.asRect();
+        emulator->graphics.getCurrentDisplayContext().clipRect = arg1.asIntRect();
     else
         emulator->graphics.getCurrentDisplayContext().clipRect = {arg1.asInt(), y, width, height};
 }
@@ -755,7 +755,7 @@ static LuaRet playdate_graphics_getClipRect_lua(Emulator *emulator) {
 
 static void playdate_graphics_setScreenClipRect_lua(Emulator *emulator, LuaVal arg1, int y, int width, int height) {
     auto &displayContext = emulator->graphics.getCurrentDisplayContext();
-    Rect rect = arg1.isTable() ? arg1.asRect() : Rect{arg1.asInt(), y, width, height};
+    auto rect = arg1.isTable() ? arg1.asIntRect() : IntRect{arg1.asInt(), y, width, height};
     displayContext.clipRect = rect + displayContext.drawOffset; // Todo: Verify offset direction
 }
 
@@ -1085,7 +1085,7 @@ static LuaRet playdate_display_getSize_lua(Emulator *emulator) {
 }
 
 static LuaRet playdate_display_getRect_lua(Emulator *emulator) {
-    pushRect(emulator, {0, 0, DISPLAY_WIDTH / emulator->graphics.displayScale, DISPLAY_HEIGHT / emulator->graphics.displayScale}); // Todo: Includes offset?
+    pushRect(emulator, IntRect {0, 0, DISPLAY_WIDTH / emulator->graphics.displayScale, DISPLAY_HEIGHT / emulator->graphics.displayScale}); // Todo: Includes offset?
     return 1;
 }
 

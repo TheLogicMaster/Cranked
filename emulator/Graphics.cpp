@@ -176,7 +176,7 @@ void Graphics::popContext() {
 
 void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
     auto &context = getCurrentDisplayContext();
-    auto pos = ignoreOffset ? Vec2{x, y} : context.drawOffset + Vec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32_t>() + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
         return;
     context.bitmap->drawPixel(pos.x, pos.y, color);
@@ -184,14 +184,14 @@ void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
 
 LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
     auto &context = getCurrentDisplayContext();
-    auto pos = ignoreOffset ? Vec2{x, y} : context.drawOffset + Vec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32_t>() + IntVec2{x, y};
     return context.bitmap->getPixel(pos.x, pos.y);
 }
 
 void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, LCDColor color) {
     auto &context = getCurrentDisplayContext();
-    auto start = Vec2{x1, y1} + context.drawOffset;
-    auto end = Vec2{x2, y2} + context.drawOffset;
+    auto start = IntVec2{x1, y1} + context.drawOffset;
+    auto end = IntVec2{x2, y2} + context.drawOffset;
     // Todo: Clipping
     // Todo: Width
     // Todo: Line caps
@@ -230,13 +230,13 @@ void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
     drawLine(x2, y2, x3, y3, lineWidth, color);
 }
 
-void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, std::optional<Rect> sourceRect) {
+void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, std::optional<IntRect> sourceRect) {
     auto &context = getCurrentDisplayContext();
     auto mode = context.bitmapDrawMode;
     bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
     bool flipX = flip == LCDBitmapFlip::FlippedX or flip == LCDBitmapFlip::FlippedXY;
     if (sourceRect)
-        sourceRect = *sourceRect - Vec2{x, y};
+        sourceRect = *sourceRect - IntVec2{x, y};
     for (int i = 0; i < bitmap->height; i++)
         for (int j = 0; j < bitmap->width; j++) {
             auto pixel = bitmap->getPixel(j, i);
@@ -244,7 +244,7 @@ void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip
             int pixelY = y + (flipY ? bitmap->height - 1 - i : i);
             if (pixel == LCDSolidColor::Clear)
                 continue;
-            if (sourceRect and sourceRect->contains({pixelX, pixelY}))
+            if (sourceRect and sourceRect->contains(IntVec2{pixelX, pixelY}))
                 continue;
             switch (mode) {
                 case LCDBitmapDrawMode::Copy:

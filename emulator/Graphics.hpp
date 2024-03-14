@@ -13,57 +13,79 @@
 class Graphics;
 class Emulator;
 
-struct Vec2 {
-    int x, y;
+template<typename T>
+struct Vector2 {
+    T x, y;
 
-    inline Vec2 operator +(const Vec2 other) const {
+    template<typename S>
+    [[nodiscard]] inline Vector2<S> as() const {
+        return Vector2<S>((S)x, (S)y);
+    }
+
+    inline Vector2 operator +(const Vector2 other) const {
         return { x + other.x, y + other.y };
     }
 
-    inline Vec2 operator -(const Vec2 other) const {
+    inline Vector2 operator -(const Vector2 other) const {
         return { x - other.x, y - other.y };
     }
 
-    inline Vec2 operator -() const {
+    inline Vector2 operator -() const {
         return { -x, -y };
     }
 };
 
-struct Rect {
-    inline bool contains(Vec2 point) {
+typedef Vector2<int32_t> IntVec2;
+typedef Vector2<float> Vec2;
+
+template<typename T>
+struct Rectangle {
+    template<typename S>
+    [[nodiscard]] inline Rectangle<S> as() const {
+        return Rectangle<S>(pos.template as<S>(), size.template as<S>());
+    }
+
+    template<typename S>
+    [[nodiscard]] inline bool contains(Vector2<S> point) const {
         return point.x >= pos.x and point.x < pos.x + size.x and point.y >= pos.y and point.y < pos.y + size.y;
     }
 
-    inline Rect operator +(const Vec2 offset) const {
+    template<typename S>
+    inline Rectangle operator +(const Vector2<S> offset) const {
         return { pos.x + offset.x, pos.y + offset.y, size.x, size.y };
     }
 
-    inline Rect operator -(const Vec2 offset) const {
+    template<typename S>
+    inline Rectangle operator -(const Vector2<S> offset) const {
         return { pos.x - offset.x, pos.y - offset.y, size.x, size.y };
     }
 
-    inline Rect intersection(const Rect &other) {
-        Rect rect{};
+    template<typename S>
+    inline Rectangle intersection(const Rectangle<S> &other) {
+        Rectangle rect{};
         if (other.pos.x < pos.x) {
             rect.pos.x = other.pos.x;
-            rect.size.x = std::max(0, std::min(other.size.x, size.x - (pos.x - other.pos.x)));
+            rect.size.x = std::max(0.0f, std::min(other.size.x, size.x - (pos.x - other.pos.x)));
         } else {
             rect.pos.x = pos.x;
-            rect.size.x = std::max(0, std::min(size.x, other.size.x - (other.pos.x - pos.x)));
+            rect.size.x = std::max(0.0f, std::min(size.x, other.size.x - (other.pos.x - pos.x)));
         }
         if (other.pos.y < pos.y) {
             rect.pos.y = other.pos.y;
-            rect.size.y = std::max(0, std::min(other.size.y, size.y - (pos.y - other.pos.y)));
+            rect.size.y = std::max(0.0f, std::min(other.size.y, size.y - (pos.y - other.pos.y)));
         } else {
             rect.pos.y = pos.y;
-            rect.size.y = std::max(0, std::min(size.y, other.size.y - (other.pos.y - pos.y)));
+            rect.size.y = std::max(0.0f, std::min(size.y, other.size.y - (other.pos.y - pos.y)));
         }
         return rect;
     }
 
-    Vec2 pos;
-    Vec2 size;
+    Vector2<T> pos;
+    Vector2<T> size;
 };
+
+typedef Rectangle<int32_t> IntRect;
+typedef Rectangle<float> Rect;
 
 struct Transform {
     // Todo
@@ -134,8 +156,8 @@ struct LCDSprite_32 {
     bool collisionsEnabled{};
     PDRect_32 collideRect{};
     int16_t zIndex{};
-    Rect size{};
-    Rect pos{};
+    Vec2 size{};
+    Vec2 pos{};
     Rect scale{};
     Rect clipRect{};
     uint8_t tag{};
@@ -188,8 +210,8 @@ struct LCDFont_32 {
 
 struct DisplayContext { // Todo: Lua native resources used here should be saved into a `set` table to prevent garbage collection until popped/reset
     LCDBitmap_32 *bitmap;
-    Vec2 drawOffset;
-    Rect clipRect; // In world-space (Offset by drawOffset)
+    IntVec2 drawOffset;
+    IntRect clipRect; // In world-space (Offset by drawOffset)
     LCDSolidColor drawingColor;
     LCDSolidColor backgroundColor;
     int lineWidth;
@@ -249,7 +271,7 @@ public:
 
     void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
 
-    void drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false, std::optional<Rect> sourceRect = {});
+    void drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false, std::optional<IntRect> sourceRect = {});
 
     void drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, LCDFont_32 *font = nullptr);
 
@@ -317,11 +339,11 @@ public:
     LCDBitmap_32 *frameBuffer{}, *previousFrameBuffer{};
     DisplayContext frameBufferContext{};
     std::vector<DisplayContext> displayContextStack;
-    Vec2 displayOffset{};
-    int displayScale{};
+    IntVec2 displayOffset{};
+    int32_t displayScale{};
     bool displayInverted{};
     bool displayFlippedX{}, displayFlippedY{};
-    Vec2 displayMosaic{};
+    IntVec2 displayMosaic{};
     float framerate{};
     bool alwaysRedrawSprites{};
     std::unordered_set<LCDSprite_32 *> allocatedSprites;

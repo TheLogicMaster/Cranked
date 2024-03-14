@@ -46,7 +46,7 @@ NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_sys_clearICache", (void *) playdate_sys_clearICache, {  }, ArgType::void_t },
 	{ "playdate_sys_setButtonCallback", (void *) playdate_sys_setButtonCallback, { ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
 	{ "playdate_sys_setSerialMessageCallback", (void *) playdate_sys_setSerialMessageCallback, { ArgType::uint32_t }, ArgType::void_t },
-	{ "playdate_sys_vaFormatString", (void *) playdate_sys_vaFormatString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::varargs_t }, ArgType::int32_t },
+	{ "playdate_sys_vaFormatString", (void *) playdate_sys_vaFormatString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::va_list_t }, ArgType::int32_t },
 	{ "playdate_sys_parseString", (void *) playdate_sys_parseString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::varargs_t }, ArgType::int32_t },
 	{ "playdate_file_geterr", (void *) playdate_file_geterr, {  }, ArgType::ptr_t },
 	{ "playdate_file_listfiles", (void *) playdate_file_listfiles, { ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::int32_t },

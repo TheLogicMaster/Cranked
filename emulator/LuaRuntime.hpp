@@ -104,6 +104,10 @@ struct LuaVal {
     }
 
     inline Rect asRect() {
+        return { getFloatField("x"), getFloatField("y"), getFloatField("width"), getFloatField("height") };
+    }
+
+    inline IntRect asIntRect() {
         return { getIntField("x"), getIntField("y"), getIntField("width"), getIntField("height") };
     }
 
@@ -571,14 +575,16 @@ inline LuaVal pushSprite(Emulator *emulator, LCDSprite_32 *sprite, bool owner) {
     return pushOwnedUserdataObject(emulator, sprite, "playdate.graphics.sprite", owner);
 }
 
-inline LuaVal pushRect(Emulator *emulator, const Rect &rect) {
+template<typename T>
+inline LuaVal pushRect(Emulator *emulator, const Rectangle<T> &rect) {
     LuaVal val = pushTable(emulator);
     emulator->getQualifiedLuaGlobal("playdate.geometry.rect");
     lua_setmetatable(emulator->getLuaContext(), -2);
-    val.setIntField("x", rect.pos.x);
-    val.setIntField("y", rect.pos.y);
-    val.setIntField("width", rect.size.x);
-    val.setIntField("height", rect.size.y);
+    auto floatRect = rect.template as<float>();
+    val.setFloatField("x", floatRect.pos.x);
+    val.setFloatField("y", floatRect.pos.y);
+    val.setFloatField("width", floatRect.size.x);
+    val.setFloatField("height", floatRect.size.y);
     return val;
 }
 

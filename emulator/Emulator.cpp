@@ -613,28 +613,29 @@ void Emulator::nativeFunctionDispatch(int index) {
         for (int i = 0; i < (int)varargsTypes.size(); i++) {
             auto type = varargsTypes[i];
             ffiArgTypes[argTypes.size() + 1 + i] = argTypeToFFI(type);
+            int valueIndex = (int)argTypes.size() + i;
             switch (type) {
                 case ArgType::uint8_t:
                 case ArgType::int8_t:
-                    *(uint8_t *) &argValues[i] = virtualRead<uint8_t>(vaListPtr);
+                    *(uint8_t *) &argValues[valueIndex] = virtualRead<uint8_t>(vaListPtr);
                     vaListPtr += 1;
                     break;
                 case ArgType::uint16_t:
                 case ArgType::int16_t:
-                    *(uint16_t *) &argValues[i] = virtualRead<uint16_t>(vaListPtr);
+                    *(uint16_t *) &argValues[valueIndex] = virtualRead<uint16_t>(vaListPtr);
                     vaListPtr += 2;
                     break;
                 case ArgType::uint32_t:
                 case ArgType::int32_t:
                 case ArgType::float_t:
                 case ArgType::ptr_t:
-                    *(uint32_t *) &argValues[i] = virtualRead<uint32_t>(vaListPtr);
+                    *(uint32_t *) &argValues[valueIndex] = virtualRead<uint32_t>(vaListPtr);
                     vaListPtr += 4;
                     break;
                 case ArgType::uint64_t:
                 case ArgType::int64_t:
                 case ArgType::double_t:
-                    *(uint64_t *) &argValues[i] = virtualRead<uint64_t>(vaListPtr);
+                    *(uint64_t *) &argValues[valueIndex] = virtualRead<uint64_t>(vaListPtr);
                     vaListPtr += 8;
                     break;
                 default:

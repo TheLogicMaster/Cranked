@@ -31,7 +31,7 @@ BitCrusher_32::BitCrusher_32(Audio *audio) : SoundEffect_32(audio) {}
 
 RingModulator_32::RingModulator_32(Audio *audio) : SoundEffect_32(audio) {}
 
-DelayLine_32::DelayLine_32(Audio *audio, int length, bool stereo) : SoundEffect_32(audio), data(length), stereo(stereo) {}
+DelayLine_32::DelayLine_32(Audio *audio, int length, bool stereo) : SoundEffect_32(audio), data((stereo ? 2 : 1) * length), stereo(stereo) {}
 
 DelayLineTap_32::DelayLineTap_32(Audio *audio, DelayLine_32 *delayLine, int delay) : SoundSource_32(audio), delayLine(delayLine), delayFrames(delay) {}
 

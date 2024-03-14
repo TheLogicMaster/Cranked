@@ -205,6 +205,12 @@ enum class TwoPoleFilterType : int32_t {
     HighShelf,
 };
 
+enum class MicSource : int32_t {
+    Autodetect,
+    Internal,
+    Headset
+};
+
 struct LCDVideoPlayer_32;
 
 struct LCDBitmap_32;
