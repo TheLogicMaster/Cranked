@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 include(FindPkgConfig)
 
-add_subdirectory(emulator)
+add_subdirectory(core)
 
 if (NOT SKIP_JAVA)
     add_subdirectory(java)
