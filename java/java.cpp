@@ -1,6 +1,8 @@
 #include <cstdarg>
 #include "jni.h"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
+
+using namespace cranked;
 
 #if __ANDROID__
 #include <android/log.h>
@@ -42,68 +44,68 @@ JNIEXPORT jlong JNICALL Java_com_thelogicmaster_cranked_Cranked_initialize(JNIEn
         updateCallbackMethodId = env->GetMethodID(crankedClass, "updateCallback", "()V");
     }
 
-    auto emulator = new Emulator([](Emulator *emulator) {
-        environment->CallVoidMethod((jobject) emulator->internalUserdata, updateCallbackMethodId);
+    auto cranked = new Cranked([](Cranked *cranked) {
+        environment->CallVoidMethod((jobject) cranked->internalUserdata, updateCallbackMethodId);
     }, env->NewGlobalRef(object));
 
     auto dataPathChars = env->GetStringUTFChars(appDataPath, nullptr);
-    emulator->loggingCallback = [](Emulator *emulator, LogLevel logLevel, const char *format, va_list args){
+    cranked->loggingCallback = [](Cranked *emulator, LogLevel logLevel, const char *format, va_list args){
         logVA(logLevel, format, args);
     };
 
-    emulator->files.appDataPath = dataPathChars;
+    cranked->files.appDataPath = dataPathChars;
     env->ReleaseStringUTFChars(appDataPath, dataPathChars);
 
-    return (intptr_t) emulator;
+    return (intptr_t) cranked;
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_destroy(JNIEnv *env, jclass clazz, jlong ptr) {
-    auto emulator = (Emulator *) (intptr_t) ptr;
-    env->DeleteGlobalRef((jobject) emulator->internalUserdata);
-    delete emulator;
+    auto cranked = (Cranked *) (intptr_t) ptr;
+    env->DeleteGlobalRef((jobject) cranked->internalUserdata);
+    delete cranked;
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_load(JNIEnv *env, jclass clazz, jlong ptr, jstring path) {
-    auto emulator = (Emulator *) (intptr_t) ptr;
+    auto cranked = (Cranked *) (intptr_t) ptr;
     auto pathChars = env->GetStringUTFChars(path, nullptr);
-    emulator->load(pathChars);
+    cranked->load(pathChars);
     env->ReleaseStringUTFChars(path, pathChars);
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_unload(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->unload();
+    ((Cranked *) (intptr_t) ptr)->unload();
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_start(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->start();
+    ((Cranked *) (intptr_t) ptr)->start();
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_update(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->update();
+    ((Cranked *) (intptr_t) ptr)->update();
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_stop(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->stop();
+    ((Cranked *) (intptr_t) ptr)->stop();
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_terminate(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->terminate();
+    ((Cranked *) (intptr_t) ptr)->terminate();
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_reset(JNIEnv *env, jclass clazz, jlong ptr) {
-    ((Emulator *) (intptr_t) ptr)->reset();
+    ((Cranked *) (intptr_t) ptr)->reset();
 }
 
 JNIEXPORT jint JNICALL Java_com_thelogicmaster_cranked_Cranked_getState(JNIEnv *env, jclass clazz, jlong ptr) {
-    return (int)((Emulator *) (intptr_t) ptr)->state;
+    return (int)((Cranked *) (intptr_t) ptr)->state;
 }
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_copyDisplayBuffer(JNIEnv *env, jclass clazz, jlong ptr, jobject buffer) {
     constexpr int size = DISPLAY_HEIGHT * DISPLAY_WIDTH * sizeof(jint);
     void *bufferPtr = env->GetDirectBufferAddress(buffer);
     if (env->GetDirectBufferCapacity(buffer) < size) return;
-    auto emulator = (Emulator *) (intptr_t) ptr;
-    memcpy(bufferPtr, emulator->graphics.displayBufferRGBA, size);
+    auto cranked = (Cranked *) (intptr_t) ptr;
+    memcpy(bufferPtr, cranked->graphics.displayBufferRGBA, size);
 }
 
 }

@@ -1,4 +1,4 @@
-project(emulator)
+project(core)
 
 find_package(PythonInterp)
 
@@ -27,9 +27,9 @@ foreach(source IN LISTS lua_sources)
     set_source_files_properties(${source} PROPERTIES LANGUAGE CXX)
 endforeach()
 
-file(GLOB emulator_sources
+file(GLOB cranked_sources
         Audio.cpp
-        Emulator.cpp
+        Cranked.cpp
         File.cpp
         Graphics.cpp
         HeapAllocator.cpp
@@ -41,9 +41,9 @@ file(GLOB emulator_sources
         gen/PlaydateFunctionMappings.cpp
 )
 
-add_library(emulator STATIC ${emulator_sources} ${lua_sources})
-target_include_directories(emulator PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/capstone/include libs/zlib ${CMAKE_CURRENT_BINARY_DIR}/libs/ffi/include)
-target_link_libraries(emulator unicorn libzippp nlohmann_json::nlohmann_json capstone libffi ${ZLIB_LIBRARIES})
+add_library(cranked STATIC ${cranked_sources} ${lua_sources})
+target_include_directories(cranked PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/capstone/include libs/zlib ${CMAKE_CURRENT_BINARY_DIR}/libs/ffi/include)
+target_link_libraries(cranked unicorn libzippp nlohmann_json::nlohmann_json capstone libffi ${ZLIB_LIBRARIES})
 
 function(embed_resource resource_file header_file variable_name args)
     add_custom_command(

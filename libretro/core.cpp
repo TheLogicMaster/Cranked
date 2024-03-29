@@ -1,4 +1,4 @@
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 #include "libretro.h"
 
 #include <cstdio>
@@ -7,7 +7,9 @@
 #include <cstdarg>
 #include <cstring>
 
-static Emulator *emulator;
+using namespace cranked;
+
+static Cranked *instance;
 static std::shared_ptr<Rom> rom;
 
 static retro_log_callback logging;
@@ -26,23 +28,23 @@ static void fallback_log(retro_log_level level, const char *fmt, ...) {
     va_end(va);
 }
 
-static void emulatorCallback(Emulator *context) {
+static void emulatorCallback(Cranked *context) {
 
 }
 
 void retro_init() {
-    emulator = new Emulator(emulatorCallback);
-    emulator->graphics.displayBufferNativeEndian = true;
+    instance = new Cranked(emulatorCallback);
+    instance->graphics.displayBufferNativeEndian = true;
 }
 
 void retro_deinit() {
-    delete emulator;
-    emulator = nullptr;
+    delete instance;
+    instance = nullptr;
     rom.reset();
 }
 
 void retro_reset() {
-    emulator->reset();
+    instance->reset();
 }
 
 void retro_run() {
@@ -50,9 +52,9 @@ void retro_run() {
 
     audio_cb(0, 0);
 
-    emulator->update();
+    instance->update();
 
-    video_cb(emulator->graphics.displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_WIDTH * sizeof(uint32_t));
+    video_cb(instance->graphics.displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_WIDTH * sizeof(uint32_t));
 }
 
 bool retro_load_game(const retro_game_info *info) {
@@ -62,14 +64,14 @@ bool retro_load_game(const retro_game_info *info) {
         return false;
     }
 
-    emulator->load(info->path);
-    emulator->start();
+    instance->load(info->path);
+    instance->start();
 
     return true;
 }
 
 void retro_unload_game() {
-    emulator->unload();
+    instance->unload();
 }
 
 uint retro_api_version(void) {

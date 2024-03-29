@@ -1,4 +1,4 @@
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -9,6 +9,8 @@
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
+
+using namespace cranked;
 
 struct Userdata {
     SDL_AudioDeviceID audioDevice;
@@ -69,19 +71,19 @@ int main(int argc, const char *args[]) {
     Userdata userdata{
         .audioDevice = audioDevice
     };
-    auto callback = [](Emulator *emulator){
-        auto device = ((Userdata *)emulator->internalUserdata)->audioDevice;
+    auto callback = [](Cranked *cranked){
+        auto device = ((Userdata *)cranked->internalUserdata)->audioDevice;
         if (device) {
             int toQueue = 1024 - (int) SDL_GetQueuedAudioSize(device) / 4;
             int16_t buffer[1024 * 2];
-            emulator->audio.sampleAudio(buffer, toQueue);
+            cranked->audio.sampleAudio(buffer, toQueue);
             SDL_QueueAudio(device, buffer, toQueue * 4);
         }
     };
-    Emulator emulator(callback);
-    emulator.internalUserdata = &userdata;
-    emulator.load(args[1]);
-    emulator.start();
+    Cranked cranked(callback);
+    cranked.internalUserdata = &userdata;
+    cranked.load(args[1]);
+    cranked.start();
 
     SDL_Texture* displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
     if (!displayTexture)
@@ -98,18 +100,18 @@ int main(int argc, const char *args[]) {
         }
 
         constexpr int keys[] { SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_B, SDL_SCANCODE_D, SDL_SCANCODE_Z, SDL_SCANCODE_X };
-        emulator.currentInputs = 0;
+        cranked.currentInputs = 0;
         for (int i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
             if (keyboardState[keys[i]])
-                emulator.currentInputs |= (1 << i);
+                cranked.currentInputs |= (1 << i);
 
-        emulator.update();
+        cranked.update();
 
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        SDL_UpdateTexture(displayTexture, nullptr, emulator.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
+        SDL_UpdateTexture(displayTexture, nullptr, cranked.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
 
         ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize);
         ImGui::Image((ImTextureID) (intptr_t) displayTexture, ImVec2(DISPLAY_WIDTH, DISPLAY_HEIGHT));

@@ -1,9 +1,11 @@
 #include "Graphics.hpp"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 #include "gen/SystemFont.hpp"
 
-Graphics::Graphics(Emulator *emulator)
-        : emulator(emulator), heap(emulator->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
+using namespace cranked;
+
+Graphics::Graphics(Cranked *cranked)
+        : cranked(cranked), heap(cranked->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
 
 LCDBitmap_32::LCDBitmap_32(int width, int height, Graphics *graphics)
         : width(width), height(height), graphics(graphics), data(vheap_vector<uint8_t>(width * height, graphics->heap.allocator<uint8_t>())), mask(nullptr) {}
@@ -77,8 +79,8 @@ void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
     if (color.pattern >= 4) {
         auto row = y % 8;
         auto column = x % 8;
-        auto word = graphics->emulator->virtualRead<uint8_t>(color.pattern + row);
-        auto maskWord = graphics->emulator->virtualRead<uint8_t>(color.pattern + row + 8);
+        auto word = graphics->cranked->virtualRead<uint8_t>(color.pattern + row);
+        auto maskWord = graphics->cranked->virtualRead<uint8_t>(color.pattern + row + 8);
         if (maskWord & (0x80 >> column))
             c = word & (0x80 >> column) ? LCDSolidColor::White : LCDSolidColor::Black;
         else
@@ -166,11 +168,11 @@ void Graphics::popContext() {
         return;
     auto &context = displayContextStack.back();
     // Free any preserved Lua references (Safe for non-preserved values, as well)
-    emulator->releaseLuaReference(context.focusedImage);
-    emulator->releaseLuaReference(context.font);
-    emulator->releaseLuaReference(context.stencilImage);
+    cranked->releaseLuaReference(context.focusedImage);
+    cranked->releaseLuaReference(context.font);
+    cranked->releaseLuaReference(context.stencilImage);
     if (context.bitmap != frameBuffer)
-        emulator->releaseLuaReference(context.bitmap);
+        cranked->releaseLuaReference(context.bitmap);
     displayContextStack.pop_back();
 }
 
@@ -440,7 +442,7 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
 LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
     auto &bitmapTable = loadedBitmapTables[path];
     if (bitmapTable.cells.empty())
-        bitmapTable = emulator->rom->getImageTable(path);
+        bitmapTable = cranked->rom->getImageTable(path);
     auto table = heap.construct<LCDBitmapTable_32>(this, bitmapTable.cellsPerRow);
     allocatedBitmapTables.emplace(table);
     table->bitmaps.reserve(bitmapTable.cells.size());
@@ -452,7 +454,7 @@ LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
 LCDBitmap_32 *Graphics::getImage(const std::string &path) {
     auto &image = loadedImages[path];
     if (image.cell.data.empty())
-        image = emulator->rom->getImage(path);
+        image = cranked->rom->getImage(path);
     auto bitmap = getImage(image.cell);
     allocatedBitmaps.emplace(bitmap);
     return bitmap;
@@ -479,7 +481,7 @@ LCDFont_32 *Graphics::getFont(const std::string &path) {
     auto &font = loadedFonts[path];
     if (font)
         return font;
-    font = getFont(emulator->rom->getFont(path));
+    font = getFont(cranked->rom->getFont(path));
     return font;
 }
 
@@ -564,7 +566,7 @@ void Graphics::flushDisplayBuffer() {
 
     memcpy(previousFrameBuffer->data.data(), frameBuffer->data.data(), frameBuffer->data.size());
 
-    emulator->menu.render();
+    cranked->menu.render();
 }
 
 bool Graphics::handleFree(void *ptr) {

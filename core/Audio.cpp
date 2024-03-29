@@ -1,5 +1,7 @@
 #include "Audio.hpp"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
+
+using namespace cranked;
 
 SoundSource_32::SoundSource_32(Audio *audio) : audio(audio) {}
 
@@ -48,7 +50,7 @@ ControlSignal_32::ControlSignal_32(Audio *audio) : PDSynthSignal_32(audio) {}
 
 PDSynthInstrument_32::PDSynthInstrument_32(Audio *audio) : SoundSource_32(audio) {}
 
-Audio::Audio(Emulator *emulator) : emulator(emulator), heap(emulator->heap), mainChannel(heap.construct<SoundChannel_32>(this)) {}
+Audio::Audio(Cranked *cranked) : cranked(cranked), heap(cranked->heap), mainChannel(heap.construct<SoundChannel_32>(this)) {}
 
 void Audio::sampleAudio(int16_t *samples, int len) {
     // Todo

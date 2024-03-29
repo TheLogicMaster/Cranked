@@ -1,8 +1,8 @@
 project(java)
 
-add_library(emulator_java SHARED java.cpp)
-target_link_libraries(emulator_java emulator)
+add_library(cranked_java SHARED java.cpp)
+target_link_libraries(cranked_java cranked)
 
 if (ANDROID)
-    target_link_libraries(emulator_java log)
+    target_link_libraries(cranked_java log)
 endif ()

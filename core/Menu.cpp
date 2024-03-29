@@ -1,7 +1,9 @@
 #include "Menu.hpp"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 
-Menu::Menu(class Emulator *emulator) : emulator(emulator) {}
+using namespace cranked;
+
+Menu::Menu(Cranked *cranked) : cranked(cranked) {}
 
 void Menu::reset() {
     isOpen = false;
@@ -12,17 +14,17 @@ void Menu::reset() {
 }
 
 void Menu::update() {
-    if (emulator->pressedInputs & int(PDButtons::Menu)) {
+    if (cranked->pressedInputs & int(PDButtons::Menu)) {
         if (isOpen) {
-            emulator->invokeLuaCallback("gameWillResume");
-            if (emulator->nativeEventCallback)
-                emulator->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                        (emulator->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Resume, uint32_t(0));
+            cranked->invokeLuaCallback("gameWillResume");
+            if (cranked->nativeEventCallback)
+                cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
+                        (cranked->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Resume, uint32_t(0));
         } else {
-            emulator->invokeLuaCallback("gameWillPause");
-            if (emulator->nativeEventCallback)
-                emulator->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                        (emulator->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Pause, uint32_t(0));
+            cranked->invokeLuaCallback("gameWillPause");
+            if (cranked->nativeEventCallback)
+                cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
+                        (cranked->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Pause, uint32_t(0));
         }
         isOpen = not isOpen;
     }
@@ -36,12 +38,12 @@ void Menu::render() {
 void Menu::setImage(LCDBitmap_32 *bitmap, int xOffset) {
     this->imageXOffset = xOffset;
     if (image) {
-        emulator->releaseLuaReference(image);
-        emulator->heap.destruct(image);
+        cranked->releaseLuaReference(image);
+        cranked->heap.destruct(image);
         image = nullptr;
     }
     if (bitmap)
-        image = emulator->heap.construct<LCDBitmap_32>(*bitmap); // Todo: Is making a copy okay?
+        image = cranked->heap.construct<LCDBitmap_32>(*bitmap); // Todo: Is making a copy okay?
 }
 
 PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type, const std::vector<std::string> &options, int value, cref_t emulatedCallback, int luaCallback) {
@@ -54,18 +56,18 @@ PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type,
     if (index == -1)
         throw std::runtime_error("No free menu item slots");
 
-    auto item = emulator->heap.construct<PDMenuItem_32>();
+    auto item = cranked->heap.construct<PDMenuItem_32>();
     item->type = type;
-    item->title = emulator->heap.allocateString(title.c_str());
+    item->title = cranked->heap.allocateString(title.c_str());
     for (auto &option : options)
-        item->options.push_back(emulator->heap.allocateString(option.c_str()));
+        item->options.push_back(cranked->heap.allocateString(option.c_str()));
     item->value = value;
     item->emulatedCallback = emulatedCallback;
     if (luaCallback) {
-        emulator->getQualifiedLuaGlobal("cranked.menuCallbacks");
-        lua_pushvalue(emulator->getLuaContext(), luaCallback);
-        lua_seti(emulator->getLuaContext(), -2, index + 1);
-        lua_pop(emulator->getLuaContext(), 1);
+        cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+        lua_pushvalue(cranked->getLuaContext(), luaCallback);
+        lua_seti(cranked->getLuaContext(), -2, index + 1);
+        lua_pop(cranked->getLuaContext(), 1);
     }
     return item;
 }
@@ -76,15 +78,15 @@ void Menu::removeItem(PDMenuItem_32 *item) {
     for (int i = 0; i < MAX_ITEMS; i++) {
         auto &it = items[i];
         if (it == item) {
-            emulator->heap.free((void *) item->title);
+            cranked->heap.free((void *) item->title);
             for (auto option: item->options)
-                emulator->heap.free((void *) option);
-            emulator->heap.destruct(item);
-            if (emulator->hasLua) {
-                emulator->getQualifiedLuaGlobal("cranked.menuCallbacks");
-                lua_pushnil(emulator->getLuaContext());
-                lua_seti(emulator->getLuaContext(), -2, i + 1);
-                lua_pop(emulator->getLuaContext(), 1);
+                cranked->heap.free((void *) option);
+            cranked->heap.destruct(item);
+            if (cranked->hasLua) {
+                cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+                lua_pushnil(cranked->getLuaContext());
+                lua_seti(cranked->getLuaContext(), -2, i + 1);
+                lua_pop(cranked->getLuaContext(), 1);
             }
             it = nullptr;
             break;
@@ -98,8 +100,8 @@ void Menu::clearItems() {
 }
 
 void Menu::setItemTitle(PDMenuItem_32 *item, const char *title) {
-    emulator->heap.free((void *) item->title);
-    item->title = emulator->heap.allocateString(title);
+    cranked->heap.free((void *) item->title);
+    item->title = cranked->heap.allocateString(title);
 }
 
 void Menu::assertHasItem(PDMenuItem_32 *item) {

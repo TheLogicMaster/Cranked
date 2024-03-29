@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+using namespace cranked;
+
 HeapAllocator::HeapAllocator(size_t size) : totalSize(size), freeList(nullptr) {
     startPtr = std::aligned_alloc(4096, size);
     reset();

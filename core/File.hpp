@@ -6,56 +6,63 @@
 #include <unordered_set>
 #include <vector>
 
-struct SDFile_32 {
-    FILE *file;
-    std::vector<uint8_t> *romData;
-    int romFilePosition;
-};
+namespace cranked {
 
-class File {
-public:
+    class Cranked;
 
-    inline explicit File(class Emulator *emulator) : emulator(emulator) {}
+    struct SDFile_32 {
+        FILE *file;
+        std::vector<uint8_t> *romData;
+        int romFilePosition;
+    };
 
-    void init();
+    class File {
+    public:
 
-    void reset();
+        inline explicit File(Cranked *cranked) : cranked(cranked) {}
 
-    int listFiles(const char *path, bool showHidden, std::vector<std::string> &files);
+        void init();
 
-    bool exists(const std::string &path);
+        void reset();
 
-    int mkdir(const std::string &path);
+        int listFiles(const char *path, bool showHidden, std::vector<std::string> &files);
 
-    int rename(const std::string &path, const std::string &newPath);
+        bool exists(const std::string &path);
 
-    int unlink(const std::string &path, bool recursive);
+        int mkdir(const std::string &path);
 
-    const char *getType(const std::string &path);
+        int rename(const std::string &path, const std::string &newPath);
 
-    int stat(const std::string &path, FileStat_32 &stat);
+        int unlink(const std::string &path, bool recursive);
 
-    SDFile_32 *open(const char *path, FileOptions mode);
+        const char *getType(const std::string &path);
 
-    int close(SDFile_32 *file);
+        int stat(const std::string &path, FileStat_32 &stat);
 
-    int flush(SDFile_32 *file);
+        SDFile_32 *open(const char *path, FileOptions mode);
 
-    std::string readline(SDFile_32 *file);
+        int close(SDFile_32 *file);
 
-    int read(SDFile_32 *file, void *buf, int len);
+        int flush(SDFile_32 *file);
 
-    int write(SDFile_32 *file, void *buf, int len);
+        std::string readline(SDFile_32 *file);
 
-    int seek(SDFile_32 *file, int pos, int whence);
+        int read(SDFile_32 *file, void *buf, int len);
 
-    int tell(SDFile_32 *file);
+        int write(SDFile_32 *file, void *buf, int len);
 
-    class Emulator *emulator;
-    std::unordered_set<SDFile_32 *> openFiles;
-    std::filesystem::path appDataPath = "./appData/";
-    cref_t lastError{};
+        int seek(SDFile_32 *file, int pos, int whence);
 
-private:
-    std::filesystem::path romDataPath;
-};
+        int tell(SDFile_32 *file);
+
+        Cranked *cranked;
+
+        std::unordered_set<SDFile_32 *> openFiles;
+        std::filesystem::path appDataPath = "./appData/";
+        cref_t lastError{};
+
+    private:
+        std::filesystem::path romDataPath;
+    };
+
+}

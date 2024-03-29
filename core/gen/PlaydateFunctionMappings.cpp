@@ -1,9 +1,11 @@
 // Auto-generated Playdate native function mappings
 
 #include "PlaydateAPI.hpp"
-#include "../Emulator.hpp"
+#include "../Cranked.hpp"
 
-NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE] {
+using namespace cranked;
+
+NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_sys_realloc", (void *) playdate_sys_realloc, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::ptr_t },
 	{ "playdate_sys_formatString", (void *) playdate_sys_formatString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::varargs_t }, ArgType::int32_t },
 	{ "playdate_sys_logToConsole", (void *) playdate_sys_logToConsole, { ArgType::ptr_t, ArgType::varargs_t }, ArgType::void_t },
@@ -501,7 +503,7 @@ NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "json_encoder_writeString", (void *) json_encoder_writeString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
 };
 
-int populatePlaydateApiStruct(void *api, Version version) {
+int cranked::populatePlaydateApiStruct(void *api, Version version) {
 	int offset = 0;
 	auto PlaydateAPI = (PlaydateAPI_32 *) ((uintptr_t) api + offset);
 	offset += sizeof(PlaydateAPI_32);

@@ -1,11 +1,13 @@
 #include "File.hpp"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 
 #include <regex>
 #include <chrono>
 
+using namespace cranked;
+
 void File::init() {
-    romDataPath = appDataPath / emulator->rom->getBundleID();
+    romDataPath = appDataPath / cranked->rom->getBundleID();
     std::filesystem::create_directory(appDataPath);
     std::filesystem::create_directory(romDataPath);
 }
@@ -33,14 +35,14 @@ int File::listFiles(const char *path, bool showHidden, std::vector<std::string> 
                 if (showHidden or !entry.path().filename().string().starts_with("."))
                     files.emplace_back(std::string(std::filesystem::path(entry).lexically_relative(dataPath)) + (entry.is_directory() ? "/" : ""));
         } catch (std::exception &ex) {
-            lastError = emulator->getEmulatedStringLiteral(ex.what());
+            lastError = cranked->getEmulatedStringLiteral(ex.what());
             return -1;
         }
         exists = true;
     }
 
-    if (base.empty() or emulator->rom->findRomFile(base)) {
-        auto romFiles = emulator->rom->listRomFiles(base, false);
+    if (base.empty() or cranked->rom->findRomFile(base)) {
+        auto romFiles = cranked->rom->listRomFiles(base, false);
         for (auto &file : romFiles) {
             if (!showHidden and std::filesystem::path(file).filename().string().starts_with('.'))
                  continue;
@@ -55,7 +57,7 @@ int File::listFiles(const char *path, bool showHidden, std::vector<std::string> 
 bool File::exists(const std::string &path) {
     if (std::filesystem::exists(romDataPath / path))
         return true;
-    return emulator->rom->findRomFile(path) != nullptr;
+    return cranked->rom->findRomFile(path) != nullptr;
 }
 
 int File::mkdir(const std::string &path) {
@@ -63,7 +65,7 @@ int File::mkdir(const std::string &path) {
     try {
         std::filesystem::create_directories(romDataPath / sanitizePath(path));
     } catch (std::exception &ex) {
-        lastError = emulator->getEmulatedStringLiteral(ex.what());
+        lastError = cranked->getEmulatedStringLiteral(ex.what());
         return -1;
     }
     return 0;
@@ -73,7 +75,7 @@ int File::rename(const std::string &path, const std::string &newPath) {
     try {
         std::filesystem::rename(romDataPath / sanitizePath(path), romDataPath / sanitizePath(newPath));
     } catch (std::exception &ex) {
-        lastError = emulator->getEmulatedStringLiteral(ex.what());
+        lastError = cranked->getEmulatedStringLiteral(ex.what());
         return -1;
     }
     return 0;
@@ -87,20 +89,20 @@ int File::unlink(const std::string &path, bool recursive) {
         else
             std::filesystem::remove(romDataPath / sanitized);
     } catch (std::exception &ex) {
-        lastError = emulator->getEmulatedStringLiteral(ex.what());
+        lastError = cranked->getEmulatedStringLiteral(ex.what());
         return -1;
     }
     return 0;
 }
 
 const char *File::getType(const std::string &path) {
-    auto romFile = emulator->rom->findRomFile(path);
+    auto romFile = cranked->rom->findRomFile(path);
     return romFile ? Rom::FILE_TYPE_NAMES[(int) romFile->type] : nullptr;
 }
 
 int File::stat(const std::string &path, FileStat_32 &stat) {
     auto dataPath = romDataPath / sanitizePath(path);
-    auto romFile = emulator->rom->findRomFile(path);
+    auto romFile = cranked->rom->findRomFile(path);
     auto setTime = [&](const std::time_t &modTime){
         // Todo: Respect timezone offsets
         auto modTimePoint = std::chrono::system_clock::from_time_t(modTime);
@@ -130,7 +132,7 @@ int File::stat(const std::string &path, FileStat_32 &stat) {
 
 SDFile_32 *File::open(const char *path, FileOptions mode) {
     if (!path) {
-        lastError = emulator->getEmulatedStringLiteral("Invalid path");
+        lastError = cranked->getEmulatedStringLiteral("Invalid path");
         return nullptr;
     }
     auto normalized = std::filesystem::path(path).lexically_normal();
@@ -139,10 +141,10 @@ SDFile_32 *File::open(const char *path, FileOptions mode) {
     if (mode == FileOptions::Write or mode == FileOptions::Append) {
         auto fd = fopen(dataPath.c_str(), mode == FileOptions::Append ? "ab" : "wb");
         if (!fd) {
-            lastError = emulator->getEmulatedStringLiteral("Failed to open file");
+            lastError = cranked->getEmulatedStringLiteral("Failed to open file");
             return nullptr;
         }
-        auto file = emulator->heap.construct<SDFile_32>();
+        auto file = cranked->heap.construct<SDFile_32>();
         file->file = fd;
         openFiles.emplace(file);
         return file;
@@ -152,33 +154,33 @@ SDFile_32 *File::open(const char *path, FileOptions mode) {
         if (std::filesystem::exists(dataPath) and !std::filesystem::is_directory(dataPath)) {
             auto fd = fopen(dataPath.c_str(), "rb");
             if (!fd) {
-                lastError = emulator->getEmulatedStringLiteral("Failed to open file");
+                lastError = cranked->getEmulatedStringLiteral("Failed to open file");
                 return nullptr;
             }
-            auto file = emulator->heap.construct<SDFile_32>();
+            auto file = cranked->heap.construct<SDFile_32>();
             file->file = fd;
             openFiles.emplace(file);
             return file;
         }
         if (mode == FileOptions::ReadData) {
-            lastError = emulator->getEmulatedStringLiteral("File not found");
+            lastError = cranked->getEmulatedStringLiteral("File not found");
             return nullptr;
         }
     }
 
-    auto romFile = emulator->rom->findRomFile(normalized);
+    auto romFile = cranked->rom->findRomFile(normalized);
     if (romFile) {
         SDFile_32 *file;
         if (romFile->data.empty()) {
-            auto fd = fopen((emulator->rom->path / romFile->name).c_str(), "rb");
+            auto fd = fopen((cranked->rom->path / romFile->name).c_str(), "rb");
             if (!fd) {
-                lastError = emulator->getEmulatedStringLiteral("Failed to open file");
+                lastError = cranked->getEmulatedStringLiteral("Failed to open file");
                 return nullptr;
             }
-            file = emulator->heap.construct<SDFile_32>();
+            file = cranked->heap.construct<SDFile_32>();
             file->file = fd;
         } else {
-            file = emulator->heap.construct<SDFile_32>();
+            file = cranked->heap.construct<SDFile_32>();
             file->romData = &romFile->data;
             file->romFilePosition = 0;
         }
@@ -186,25 +188,25 @@ SDFile_32 *File::open(const char *path, FileOptions mode) {
         return file;
     }
 
-    lastError = emulator->getEmulatedStringLiteral("File not found");
+    lastError = cranked->getEmulatedStringLiteral("File not found");
     return nullptr;
 }
 
 int File::close(SDFile_32 *file) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file)
         fclose(file->file);
     openFiles.erase(file);
-    emulator->heap.destruct(file);
+    cranked->heap.destruct(file);
     return 0;
 }
 
 int File::flush(SDFile_32 *file) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file)
@@ -214,7 +216,7 @@ int File::flush(SDFile_32 *file) {
 
 std::string File::readline(SDFile_32 *file) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return "";
     }
     std::string line;
@@ -238,7 +240,7 @@ std::string File::readline(SDFile_32 *file) {
 
 int File::read(SDFile_32 *file, void *buf, int len) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file) {
@@ -246,7 +248,7 @@ int File::read(SDFile_32 *file, void *buf, int len) {
             auto c = fgetc(file->file);
             if (c < 0) {
                 if (ferror(file->file)) {
-                    lastError = emulator->getEmulatedStringLiteral("Error reading file");
+                    lastError = cranked->getEmulatedStringLiteral("Error reading file");
                     return -1;
                 }
                 return i;
@@ -267,12 +269,12 @@ int File::read(SDFile_32 *file, void *buf, int len) {
 
 int File::write(SDFile_32 *file, void *buf, int len) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     int result = (int) fwrite(buf, 1, len, file->file);
     if (result < 0) {
-        lastError = emulator->getEmulatedStringLiteral("Error writing to file");
+        lastError = cranked->getEmulatedStringLiteral("Error writing to file");
         return -1;
     }
     return result;
@@ -280,7 +282,7 @@ int File::write(SDFile_32 *file, void *buf, int len) {
 
 int File::seek(SDFile_32 *file, int pos, int whence) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file)
@@ -295,11 +297,11 @@ int File::seek(SDFile_32 *file, int pos, int whence) {
         else if (whence == SEEK_SET)
             target = pos;
         else {
-            lastError = emulator->getEmulatedStringLiteral("Invalid seek whence");
+            lastError = cranked->getEmulatedStringLiteral("Invalid seek whence");
             return -1;
         }
         if (target > romData->size()) {
-            lastError = emulator->getEmulatedStringLiteral("Invalid seek offset");
+            lastError = cranked->getEmulatedStringLiteral("Invalid seek offset");
             return -1;
         }
         file->romFilePosition = target;
@@ -309,7 +311,7 @@ int File::seek(SDFile_32 *file, int pos, int whence) {
 
 int File::tell(SDFile_32 *file) {
     if (!openFiles.contains(file)) {
-        lastError = emulator->getEmulatedStringLiteral("File closed");
+        lastError = cranked->getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file)

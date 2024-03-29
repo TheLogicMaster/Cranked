@@ -172,7 +172,7 @@ def main():
         raise Exception('PLAYDATE_SDK_PATH not set or passed in as an argument')
 
     project_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), os.pardir)
-    gen_path = os.path.join(project_path, 'emulator', 'gen')
+    gen_path = os.path.join(project_path, 'core', 'gen')
     base_path = os.path.join(sdk_path, 'C_API')
     subdir = os.path.join(base_path, 'pd_api')
     files = [os.path.join(base_path, 'pd_api.h')]
@@ -343,7 +343,9 @@ def main():
 
         f.write(f'constexpr int FUNCTION_TABLE_SIZE = {len(functions)};\n\n')
 
-        f.write('class Emulator;\n\n')
+        f.write('namespace cranked {\n\n')
+
+        f.write('class Cranked;\n\n')
 
         f.write('extern NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE];\n\n')
 
@@ -354,16 +356,19 @@ def main():
         f.write('\n')
 
         for func in functions:
-            f.write(f'{func.return_type.wrapper_type} {func.qualified_name}(Emulator *emulator')
+            f.write(f'{func.return_type.wrapper_type} {func.qualified_name}(Cranked *cranked')
             for param in func.params:
                 f.write(f', {param.c_type.wrapper_type} {param.field_name if param.field_name and param.c_type.wrapper_type != "..." else ""}')
             f.write(');\n')
         f.write('\n')
 
+        f.write('}\n')
+
     with open(os.path.join(gen_path, 'PlaydateFunctionMappings.cpp'), 'w') as f:
         f.write('// Auto-generated Playdate native function mappings\n\n')
         f.write('#include "PlaydateAPI.hpp"\n')
-        f.write('#include "../Emulator.hpp"\n\n')
+        f.write('#include "../Cranked.hpp"\n\n')
+        f.write('using namespace cranked;\n\n')
 
         def get_native_type(c_type: CType):
             if '*' in c_type.wrapper_type:
@@ -381,13 +386,13 @@ def main():
                     return native_type
             raise Exception(f'Unknown native type conversion for: `{c_type.c_type}`')
 
-        f.write('NativeFunctionMetadata playdateFunctionTable[FUNCTION_TABLE_SIZE] {\n')
+        f.write('NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {\n')
         for func in functions:
             param_types = [get_native_type(param.c_type) for param in func.params]
             f.write(f'\t{{ "{func.qualified_name}", (void *) {func.qualified_name}, {{ {", ".join(param_types)} }}, {get_native_type(func.return_type)} }},\n')
         f.write('};\n\n')
 
-        f.write('int populatePlaydateApiStruct(void *api, Version version) {\n')
+        f.write('int cranked::populatePlaydateApiStruct(void *api, Version version) {\n')
         f.write('\tint offset = 0;\n')
         for struct in api_structs:
             f.write(f'\tauto {struct.struct_name} = ({struct.struct_name}_32 *) ((uintptr_t) api + offset);\n')

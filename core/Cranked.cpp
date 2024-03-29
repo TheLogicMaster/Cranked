@@ -1,4 +1,6 @@
-#include "Emulator.hpp"
+#include "Cranked.hpp"
+
+using namespace cranked;
 
 //static bool hookUnmappedFetch(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data) {
 //    printf(">>> Unmapped fetch at 0x%" PRIx64 ", block size = 0x%x\n", address, size);
@@ -35,7 +37,7 @@
 //    return false;
 //}
 
-Emulator::Emulator(InternalUpdateCallback updateCallback, void *userdata) : internalUpdateCallback(updateCallback), internalUserdata(userdata) {
+Cranked::Cranked(InternalUpdateCallback updateCallback, void *userdata) : internalUpdateCallback(updateCallback), internalUserdata(userdata) {
     assertUC(uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &nativeEngine), "Failed to initialize native engine");
 
     // Enable VFP
@@ -68,7 +70,7 @@ Emulator::Emulator(InternalUpdateCallback updateCallback, void *userdata) : inte
 //    auto count = cs_disasm(capstone, platforms[i].code, platforms[i].size, address, 0, &insn);
 }
 
-Emulator::~Emulator() {
+Cranked::~Cranked() {
     if (nativeEngine)
         uc_close(nativeEngine);
     if (luaInterpreter)
@@ -77,7 +79,7 @@ Emulator::~Emulator() {
         cs_close(&capstone);
 }
 
-void Emulator::init() {
+void Cranked::init() {
     graphics.init();
     files.init();
 
@@ -138,7 +140,7 @@ void Emulator::init() {
     initialized = true;
 }
 
-void Emulator::load(const std::string &path) {
+void Cranked::load(const std::string &path) {
     reset();
 
     unload();
@@ -158,7 +160,7 @@ void Emulator::load(const std::string &path) {
     }
 }
 
-void Emulator::unload() {
+void Cranked::unload() {
     reset();
 
     if (rom)
@@ -171,7 +173,7 @@ void Emulator::unload() {
     hasNative = false;
 }
 
-void Emulator::reset() {
+void Cranked::reset() {
     state = State::Stopped;
     nativeUpdateCallback = 0;
     nativeUpdateUserdata = 0;
@@ -205,7 +207,7 @@ void Emulator::reset() {
     heap.reset(); // Reset heap only after objects are freed
 }
 
-void Emulator::update() {
+void Cranked::update() {
     // Todo: Handle `Stopping` state and call trigger corresponding events
 
     if (state != State::Running)
@@ -332,7 +334,7 @@ void Emulator::update() {
     currentMillis += duration_cast<std::chrono::milliseconds>((std::chrono::system_clock::now() - currentMillisStart)).count(); // Todo: Does this increase while locked/in-menu?
 }
 
-void Emulator::start() {
+void Cranked::start() {
     if (!rom)
         throw std::runtime_error("Rom not loaded");
     state = State::Running;
@@ -340,25 +342,25 @@ void Emulator::start() {
         init();
 }
 
-void Emulator::stop() {
+void Cranked::stop() {
     if (state != State::Running)
         return;
     state = State::Stopping;
     // Todo: Stop from UC and Lua hooks
 }
 
-void Emulator::terminate() {
+void Cranked::terminate() {
     state = State::Stopped; // Todo: Maybe a different flag
 }
 
-void Emulator::updateInternals() {
+void Cranked::updateInternals() {
     // Todo: Update audio
     if (internalUpdateCallback)
         internalUpdateCallback(this);
 }
 
-void *Emulator::luaAllocator(void *userData, void *ptr, [[maybe_unused]] size_t osize, size_t nsize) {
-    auto emulator = (Emulator *) userData;
+void *Cranked::luaAllocator(void *userData, void *ptr, [[maybe_unused]] size_t osize, size_t nsize) {
+    auto emulator = (Cranked *) userData;
     if (nsize == 0) {
         emulator->heap.free(ptr);
         return nullptr;
@@ -370,7 +372,7 @@ void *Emulator::luaAllocator(void *userData, void *ptr, [[maybe_unused]] size_t 
     }
 }
 
-void Emulator::luaHook(lua_State *luaState, [[maybe_unused]] lua_Debug *luaDebug) {
+void Cranked::luaHook(lua_State *luaState, [[maybe_unused]] lua_Debug *luaDebug) {
     // Todo: This hook may slow things down, so potentially set the hook with a count of 1 from a different thread (sethook is the only thread-safe Lua function)
     // Todo: Yielding is destructive if there's a native function in the call stack, so probably only do so if emulator is forcefully stopped
     // Todo: Nested hooks are disabled, so a Lua->Hook->...->Lua chain could block the entire program, but probably not a real concern
@@ -383,7 +385,7 @@ void Emulator::luaHook(lua_State *luaState, [[maybe_unused]] lua_Debug *luaDebug
         emulator->updateInternals();
 }
 
-void Emulator::nativeFunctionDispatch(int index) {
+void Cranked::nativeFunctionDispatch(int index) {
     struct ArgBuffer {
         uint32_t data[4]; // This must hold enough data to store any native argument
     };

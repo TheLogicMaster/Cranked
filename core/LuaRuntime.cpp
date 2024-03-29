@@ -2,19 +2,21 @@
 #include "gen/LuaRuntimeSource.hpp"
 #include "gen/LuaBumpSource.hpp"
 
-static LuaRet import_lua(Emulator *emulator, const char *name) {
-    if (emulator->loadedLuaFiles.contains(name))
+using namespace cranked;
+
+static LuaRet import_lua(Cranked *cranked, const char *name) {
+    if (cranked->loadedLuaFiles.contains(name))
         return 0;
-    for (auto &file: emulator->rom->pdzFiles)
+    for (auto &file: cranked->rom->pdzFiles)
         if (file.type == Rom::FileType::LUAC and file.name == name) { // Name gets extension removed at compile time
-            luaL_loadbuffer(emulator->getLuaContext(), (char *) file.data.data(), file.data.size(), file.name.c_str());
-            if (lua_pcall(emulator->getLuaContext(), 0, 0, 0) != LUA_OK) {
-                luaL_error(emulator->getLuaContext(), "Failed to load module `%s`: %s", name, lua_tostring(emulator->getLuaContext(), -1));
+            luaL_loadbuffer(cranked->getLuaContext(), (char *) file.data.data(), file.data.size(), file.name.c_str());
+            if (lua_pcall(cranked->getLuaContext(), 0, 0, 0) != LUA_OK) {
+                luaL_error(cranked->getLuaContext(), "Failed to load module `%s`: %s", name, lua_tostring(cranked->getLuaContext(), -1));
                 return 1;
             }
             return 0;
         }
-    luaL_error(emulator->getLuaContext(), "Failed to load module: %s", name);
+    luaL_error(cranked->getLuaContext(), "Failed to load module: %s", name);
     return 1;
 }
 
@@ -29,31 +31,31 @@ static int playdate_apiVersion_lua(lua_State *luaContext) {
     return 2;
 }
 
-static void playdate_wait_lua(Emulator *emulator, int millis) {
-    emulator->suspendUpdateLoopUntil = std::chrono::system_clock::now() + std::chrono::milliseconds(millis);
+static void playdate_wait_lua(Cranked *cranked, int millis) {
+    cranked->suspendUpdateLoopUntil = std::chrono::system_clock::now() + std::chrono::milliseconds(millis);
 }
 
-static void playdate_stop_lua(Emulator *emulator) {
-    emulator->disableUpdateLoop = true;
+static void playdate_stop_lua(Cranked *cranked) {
+    cranked->disableUpdateLoop = true;
 }
 
-static void playdate_start_lua(Emulator *emulator) {
-    emulator->disableUpdateLoop = false;
+static void playdate_start_lua(Cranked *cranked) {
+    cranked->disableUpdateLoop = false;
 }
 
-static int playdate_getSystemLanguage_lua(Emulator *emulator) {
-    return int(emulator->systemLanguage);
+static int playdate_getSystemLanguage_lua(Cranked *cranked) {
+    return int(cranked->systemLanguage);
 }
 
-static LuaRet playdate_getCrankChange_lua(Emulator *emulator) {
-    auto change = emulator->getCrankChange();
-    lua_pushnumber(emulator->getLuaContext(), change);
-    lua_pushnumber(emulator->getLuaContext(), change); // Todo: Apply `acceleration` scaling (Maybe scale up a bit after a certain threshold)
+static LuaRet playdate_getCrankChange_lua(Cranked *cranked) {
+    auto change = cranked->getCrankChange();
+    lua_pushnumber(cranked->getLuaContext(), change);
+    lua_pushnumber(cranked->getLuaContext(), change); // Todo: Apply `acceleration` scaling (Maybe scale up a bit after a certain threshold)
     return 2;
 }
 
-static void playdate_setCrankSoundsDisabled_lua(Emulator *emulator, bool disabled) {
-    emulator->crankSoundsEnabled = not disabled;
+static void playdate_setCrankSoundsDisabled_lua(Cranked *cranked, bool disabled) {
+    cranked->crankSoundsEnabled = not disabled;
 }
 
 static PDButtons buttonStringToEnum(const std::string &button) {
@@ -73,43 +75,43 @@ static PDButtons buttonStringToEnum(const std::string &button) {
         return PDButtons(0);
 }
 
-static bool playdate_buttonIsPressed_lua(Emulator *emulator, LuaVal button) {
+static bool playdate_buttonIsPressed_lua(Cranked *cranked, LuaVal button) {
     if (button.isInt())
-        return button.asInt() & emulator->currentInputs;
+        return button.asInt() & cranked->currentInputs;
     auto string = button.asString();
     if (!string)
         return false;
-    return emulator->currentInputs & int(buttonStringToEnum(string));
+    return cranked->currentInputs & int(buttonStringToEnum(string));
 }
 
-static bool playdate_buttonJustPressed_lua(Emulator *emulator, LuaVal button) {
+static bool playdate_buttonJustPressed_lua(Cranked *cranked, LuaVal button) {
     if (button.isInt())
-        return button.asInt() & emulator->pressedInputs;
+        return button.asInt() & cranked->pressedInputs;
     auto string = button.asString();
     if (!string)
         return false;
-    return emulator->pressedInputs & int(buttonStringToEnum(string));
+    return cranked->pressedInputs & int(buttonStringToEnum(string));
 }
 
-static bool playdate_buttonJustReleased_lua(Emulator *emulator, LuaVal button) {
+static bool playdate_buttonJustReleased_lua(Cranked *cranked, LuaVal button) {
     if (button.isInt())
-        return button.asInt() & emulator->releasedInputs;
+        return button.asInt() & cranked->releasedInputs;
     auto string = button.asString();
     if (!string)
         return false;
-    return emulator->releasedInputs & int(buttonStringToEnum(string));
+    return cranked->releasedInputs & int(buttonStringToEnum(string));
 }
 
-static LuaRet playdate_getButtonState_lua(Emulator *emulator) {
-    lua_pushinteger(emulator->getLuaContext(), emulator->currentInputs);
-    lua_pushinteger(emulator->getLuaContext(), emulator->pressedInputs);
-    lua_pushinteger(emulator->getLuaContext(), emulator->releasedInputs);
+static LuaRet playdate_getButtonState_lua(Cranked *cranked) {
+    lua_pushinteger(cranked->getLuaContext(), cranked->currentInputs);
+    lua_pushinteger(cranked->getLuaContext(), cranked->pressedInputs);
+    lua_pushinteger(cranked->getLuaContext(), cranked->releasedInputs);
     return 3;
 }
 
 static LuaRet playdate_file_modtime_lua(lua_State *context, const char *path) {
     FileStat_32 stat{}; // Official implementation returns garbage on non-existent file, so don't worry about error checking
-    Emulator::fromLuaContext(context)->files.stat(path, stat);
+    Cranked::fromLuaContext(context)->files.stat(path, stat);
     lua_createtable(context, 0, 6);
     LuaVal table(context, lua_gettop(context));
     table.setIntField("year", stat.m_year);
@@ -121,7 +123,7 @@ static LuaRet playdate_file_modtime_lua(lua_State *context, const char *path) {
     return 1;
 }
 
-static int playdate_file_getSize_lua(Emulator *context, const char *path) {
+static int playdate_file_getSize_lua(Cranked *context, const char *path) {
     FileStat_32 stat{};
     if (context->files.stat(path, stat))
         return -1;
@@ -129,7 +131,7 @@ static int playdate_file_getSize_lua(Emulator *context, const char *path) {
 }
 
 static LuaRet playdate_file_getType_lua(lua_State *context, const char *path) {
-    auto type = Emulator::fromLuaContext(context)->files.getType(path);
+    auto type = Cranked::fromLuaContext(context)->files.getType(path);
     if (type)
         lua_pushstring(context, type);
     else
@@ -137,7 +139,7 @@ static LuaRet playdate_file_getType_lua(lua_State *context, const char *path) {
     return 1;
 }
 
-static bool playdate_file_isdir_lua(Emulator *context, const char *path) {
+static bool playdate_file_isdir_lua(Cranked *context, const char *path) {
     FileStat_32 stat{};
     context->files.stat(path, stat);
     return stat.isdir;
@@ -145,7 +147,7 @@ static bool playdate_file_isdir_lua(Emulator *context, const char *path) {
 
 static LuaRet playdate_file_listFiles_lua(lua_State *context, const char *path, bool showHidden) {
     std::vector<std::string> files;
-    if (Emulator::fromLuaContext(context)->files.listFiles(path, showHidden, files)) {
+    if (Cranked::fromLuaContext(context)->files.listFiles(path, showHidden, files)) {
         lua_pushnil(context);
         return 1;
     }
@@ -156,11 +158,11 @@ static LuaRet playdate_file_listFiles_lua(lua_State *context, const char *path, 
     return 1;
 }
 
-static bool playdate_file_delete_lua(Emulator *context, const char *path, bool recursive) {
+static bool playdate_file_delete_lua(Cranked *context, const char *path, bool recursive) {
     return !context->files.unlink(path, recursive);
 }
 
-static bool playdate_file_exists_lua(Emulator *context, const char *path) {
+static bool playdate_file_exists_lua(Cranked *context, const char *path) {
     return context->files.exists(path);
 }
 
@@ -180,23 +182,23 @@ static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int m
         default:
             openMode = FileOptions::ReadDataFallback;
     }
-    auto emulator = Emulator::fromLuaContext(context);
-    auto file = emulator->files.open(path, openMode);
+    auto cranked = Cranked::fromLuaContext(context);
+    auto file = cranked->files.open(path, openMode);
     if (!file) {
         lua_pushnil(context);
-        lua_pushstring(context, emulator->fromVirtualAddress<const char>(emulator->files.lastError));
+        lua_pushstring(context, cranked->fromVirtualAddress<const char>(cranked->files.lastError));
         return 2;
     }
-    pushUserdataObject(emulator, file, "playdate.file.file");
+    pushUserdataObject(cranked, file, "playdate.file.file");
 
     return 1;
 }
 
 static void playdate_file_close_lua(lua_State *context, SDFile_32 *file) {
-    Emulator::fromLuaContext(context)->files.close(file);
+    Cranked::fromLuaContext(context)->files.close(file);
 }
 
-static LuaRet playdate_file_write_lua(Emulator *context, SDFile_32 *file, const char *string) {
+static LuaRet playdate_file_write_lua(Cranked *context, SDFile_32 *file, const char *string) {
     auto result = context->files.write(file, (void *) string, (int) strlen(string));
     if (result < 0) {
         lua_pushinteger(context->getLuaContext(), 0);
@@ -207,7 +209,7 @@ static LuaRet playdate_file_write_lua(Emulator *context, SDFile_32 *file, const 
     return 1;
 }
 
-static LuaRet playdate_file_read_lua(Emulator *context, SDFile_32 *file, int bytes) {
+static LuaRet playdate_file_read_lua(Cranked *context, SDFile_32 *file, int bytes) {
     std::vector<uint8_t> buffer(bytes);
     auto result = context->files.read(file, (void *) buffer.data(), bytes);
     if (result < 0) {
@@ -221,7 +223,7 @@ static LuaRet playdate_file_read_lua(Emulator *context, SDFile_32 *file, int byt
 }
 
 static LuaRet playdate_file_readline_lua(lua_State *context, SDFile_32 *file) {
-    auto result = Emulator::fromLuaContext(context)->files.readline(file);
+    auto result = Cranked::fromLuaContext(context)->files.readline(file);
     if (result.empty())
         lua_pushnil(context);
     else
@@ -229,11 +231,11 @@ static LuaRet playdate_file_readline_lua(lua_State *context, SDFile_32 *file) {
     return 1;
 }
 
-static int playdate_file_tell_lua(Emulator *context, SDFile_32 *file) {
+static int playdate_file_tell_lua(Cranked *context, SDFile_32 *file) {
     return context->files.tell(file); // Todo: Not sure about error handling
 }
 
-static void playdate_file_seek_lua(Emulator *context, SDFile_32 *file, int offset) {
+static void playdate_file_seek_lua(Cranked *context, SDFile_32 *file, int offset) {
     context->files.seek(file, offset, SEEK_SET);
 }
 
@@ -265,14 +267,14 @@ static LuaRet json_decode_lua(lua_State *context, const char *string) {
 }
 
 static LuaRet json_decodeFile_lua(lua_State *context, SDFile_32 *file) {
-    auto emulator = Emulator::fromLuaContext(context);
+    auto cranked = Cranked::fromLuaContext(context);
     int size = 0;
     constexpr int BUFFER_SEGMENT = 512;
     std::vector<char> buffer;
     while (true) {
-        auto returned = emulator->files.read(file, buffer.data() + size, (int) buffer.size() - size);
+        auto returned = cranked->files.read(file, buffer.data() + size, (int) buffer.size() - size);
         if (returned < 0)
-            return luaL_error(context, emulator->fromVirtualAddress<char>(emulator->files.lastError));
+            return luaL_error(context, cranked->fromVirtualAddress<char>(cranked->files.lastError));
         if (returned < BUFFER_SEGMENT)
             break;
         size += returned;
@@ -330,7 +332,7 @@ static void json_encodeToFile_lua(lua_State *context, SDFile_32 *file, LuaVal pr
         table = pretty;
     else
         isPretty = pretty.asBool();
-    playdate_file_write_lua(Emulator::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
+    playdate_file_write_lua(Cranked::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
 }
 
 static LuaRet json_null_tostring_lua(lua_State *context) {
@@ -347,13 +349,13 @@ static void playdate_datastore_write_lua(lua_State *context, LuaVal table, LuaVa
     } else
         isPretty = filename.asBool();
     name += ".json";
-    auto emulator = Emulator::fromLuaContext(context);
-    auto file = emulator->files.open(name.c_str(), FileOptions::Write);
-    playdate_file_write_lua(Emulator::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
-    emulator->files.close(file);
+    auto cranked = Cranked::fromLuaContext(context);
+    auto file = cranked->files.open(name.c_str(), FileOptions::Write);
+    playdate_file_write_lua(Cranked::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
+    cranked->files.close(file);
 }
 
-static LuaRet playdate_datastore_read_lua(Emulator *context, LuaVal filename) {
+static LuaRet playdate_datastore_read_lua(Cranked *context, LuaVal filename) {
     std::string name(filename.isString() ? filename.asString() : "data");
     name += ".json";
     if (!context->files.exists(name)) {
@@ -366,89 +368,89 @@ static LuaRet playdate_datastore_read_lua(Emulator *context, LuaVal filename) {
     return 1;
 }
 
-static bool playdate_datastore_delete_lua(Emulator *context, LuaVal filename) {
+static bool playdate_datastore_delete_lua(Cranked *context, LuaVal filename) {
     std::string name(filename.isString() ? filename.asString() : "data");
     name += ".json";
     return context->files.unlink(name, false) == 0;
 }
 
-static void playdate_datastore_writeImage_lua(Emulator *emulator, LuaVal image, const char *path) {
+static void playdate_datastore_writeImage_lua(Cranked *cranked, LuaVal image, const char *path) {
     // Todo
 }
 
-static LuaRet playdate_datastore_readImage_lua(Emulator *emulator, const char *path) {
+static LuaRet playdate_datastore_readImage_lua(Cranked *cranked, const char *path) {
     std::string stringPath(path);
     if (stringPath.find('/') == std::string::npos)
         stringPath = "images/" + stringPath;
     try {
-        pushImage(emulator, emulator->graphics.getImage(stringPath), true);
+        pushImage(cranked, cranked->graphics.getImage(stringPath), true);
     } catch (std::exception &ex) {
-        lua_pushnil(emulator->getLuaContext());
+        lua_pushnil(cranked->getLuaContext());
     }
     return 1;
 }
 
-static LuaRet playdate_graphics_image_new_lua(Emulator *emulator, LuaVal width, int height, int bgcolor) {
+static LuaRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width, int height, int bgcolor) {
     LCDBitmap_32 *image;
     if (width.isString()) {
         auto path = width.asString();
         try {
-            image = emulator->graphics.getImage(path);
+            image = cranked->graphics.getImage(path);
         } catch (std::exception &ex) {
-            lua_pushnil(emulator->getLuaContext());
+            lua_pushnil(cranked->getLuaContext());
             return 1;
         }
     } else {
-        image = emulator->graphics.allocateBitmap(width, height);
+        image = cranked->graphics.allocateBitmap(width, height);
         image->clear(bgcolor);
     }
-    pushImage(emulator, image, true);
+    pushImage(cranked, image, true);
     return 1;
 }
 
-static void playdate_graphics_image_gc_lua(Emulator *emulator, LuaVal image) {
-    if (releaseOwnedUserdataObject(emulator, image))
-        emulator->graphics.freeBitmap(image.asUserdataObject<LCDBitmap_32>());
+static void playdate_graphics_image_gc_lua(Cranked *cranked, LuaVal image) {
+    if (releaseOwnedUserdataObject(cranked, image))
+        cranked->graphics.freeBitmap(image.asUserdataObject<LCDBitmap_32>());
 }
 
-static LuaRet playdate_graphics_image_load_lua(Emulator *emulator, LCDBitmap_32 *image, const char *path) {
+static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, LCDBitmap_32 *image, const char *path) {
     try {
-        LCDBitmap_32 *loaded = emulator->graphics.getImage((const char *) path);
+        LCDBitmap_32 *loaded = cranked->graphics.getImage((const char *) path);
         *image = *loaded;
-        emulator->graphics.freeBitmap(loaded);
+        cranked->graphics.freeBitmap(loaded);
     } catch (std::exception &ex) {
-        lua_pushboolean(emulator->getLuaContext(), false);
-        lua_pushstring(emulator->getLuaContext(), ex.what());
+        lua_pushboolean(cranked->getLuaContext(), false);
+        lua_pushstring(cranked->getLuaContext(), ex.what());
         return 2;
     }
-    lua_pushboolean(emulator->getLuaContext(), true);
+    lua_pushboolean(cranked->getLuaContext(), true);
     return 1;
 }
 
-static LuaRet playdate_graphics_image_copy_lua(Emulator *emulator, LCDBitmap_32 *image) {
-    pushUserdataObject(emulator, emulator->heap.construct<LCDBitmap_32>(*image), "playdate.graphics.image");
+static LuaRet playdate_graphics_image_copy_lua(Cranked *cranked, LCDBitmap_32 *image) {
+    pushUserdataObject(cranked, cranked->heap.construct<LCDBitmap_32>(*image), "playdate.graphics.image");
     return 1;
 }
 
-static LuaRet playdate_graphics_image_getSize_lua(Emulator *emulator, LCDBitmap_32 *image) {
-    lua_pushinteger(emulator->getLuaContext(), image->width);
-    lua_pushinteger(emulator->getLuaContext(), image->height);
+static LuaRet playdate_graphics_image_getSize_lua(Cranked *cranked, LCDBitmap_32 *image) {
+    lua_pushinteger(cranked->getLuaContext(), image->width);
+    lua_pushinteger(cranked->getLuaContext(), image->height);
     return 2;
 }
 
-static LuaRet playdate_graphics_imageSizeAtPath_lua(Emulator *emulator, const char *path) {
+static LuaRet playdate_graphics_imageSizeAtPath_lua(Cranked *cranked, const char *path) {
     // Todo: Error handling? Data image files?
-    auto image = emulator->rom->getImage(path);
-    lua_pushinteger(emulator->getLuaContext(), image.width);
-    lua_pushinteger(emulator->getLuaContext(), image.height);
+    auto image = cranked->rom->getImage(path);
+    lua_pushinteger(cranked->getLuaContext(), image.width);
+    lua_pushinteger(cranked->getLuaContext(), image.height);
     return 2;
 }
 
-static void playdate_graphics_image_draw_lua(Emulator *emulator, LCDBitmap_32 *image, LuaVal arg1) {
+static void playdate_graphics_image_draw_lua(Cranked *cranked, LCDBitmap_32 *image, LuaVal arg1) {
     int x, y;
     LCDBitmapFlip flip{};
     std::optional<IntRect> sourceRect;
-    LuaVal flipVal(emulator->getLuaContext(), arg1 + 1);
+    LuaVal flipVal(cranked->getLuaContext(), arg1 + 1);
     if (arg1.isTable()) {
         x = arg1.getIntField("x");
         y = arg1.getIntField("y");
@@ -465,10 +467,10 @@ static void playdate_graphics_image_draw_lua(Emulator *emulator, LCDBitmap_32 *i
         else if (!rectVal.isNil())
             sourceRect = IntRect{ rectVal.asInt(), (rectVal + 1).asInt(), (rectVal + 2).asInt(), (rectVal + 3).asInt() };
     }
-    emulator->graphics.drawBitmap(image, x, y, flip, false, sourceRect);
+    cranked->graphics.drawBitmap(image, x, y, flip, false, sourceRect);
 }
 
-static void playdate_graphics_image_drawIgnoringOffset_lua(Emulator *emulator, LCDBitmap_32 *image, LuaVal x, LuaVal y, LuaVal flip) {
+static void playdate_graphics_image_drawIgnoringOffset_lua(Cranked *cranked, LCDBitmap_32 *image, LuaVal x, LuaVal y, LuaVal flip) {
     int drawX, drawY;
     LCDBitmapFlip flipped{};
     if (x.isTable()) {
@@ -481,7 +483,7 @@ static void playdate_graphics_image_drawIgnoringOffset_lua(Emulator *emulator, L
     }
     if (!flip.isNil())
         flipped = flip.isString() ? bitmapFlipFromString(flip.asString()) : LCDBitmapFlip(flip.asInt());
-    emulator->graphics.drawBitmap(image, x, y, flipped, true);
+    cranked->graphics.drawBitmap(image, x, y, flipped, true);
 }
 
 static void playdate_graphics_image_clear_lua(LCDBitmap_32 *image, int color) { // Todo: Verify parameter offsets are correct without context
@@ -492,205 +494,205 @@ static int playdate_graphics_image_sample_lua(LCDBitmap_32 *image, int x, int y)
     return (int) image->getPixel(x, y);
 }
 
-static void playdate_graphics_image_drawRotated_lua(Emulator *emulator, LCDBitmap_32 *image, int x, int y, float angle, LuaVal scale, LuaVal yScale) {
+static void playdate_graphics_image_drawRotated_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, float angle, LuaVal scale, LuaVal yScale) {
     // Coordinates are centered
     // Todo
 }
 
-static LuaRet playdate_graphics_image_rotatedImage_lua(Emulator *emulator, LCDBitmap_32 *image, float angle, LuaVal scale, LuaVal yScale) {
+static LuaRet playdate_graphics_image_rotatedImage_lua(Cranked *cranked, LCDBitmap_32 *image, float angle, LuaVal scale, LuaVal yScale) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_image_drawScaled_lua(Emulator *emulator, LCDBitmap_32 *image, int x, int y, float scale, LuaVal yScale) {
+static void playdate_graphics_image_drawScaled_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, float scale, LuaVal yScale) {
     // Todo
 }
 
-static LuaRet playdate_graphics_image_scaledImage_lua(Emulator *emulator, LCDBitmap_32 *image, float scale, LuaVal yScale) {
+static LuaRet playdate_graphics_image_scaledImage_lua(Cranked *cranked, LCDBitmap_32 *image, float scale, LuaVal yScale) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_image_drawWithTransform_lua(Emulator *emulator, LCDBitmap_32 *image, LuaVal xform, int x, int y) {
+static void playdate_graphics_image_drawWithTransform_lua(Cranked *cranked, LCDBitmap_32 *image, LuaVal xform, int x, int y) {
     // Coordinates are centered
     // Todo
 }
 
-static LuaRet playdate_graphics_image_transformedImage_lua(Emulator *emulator, LCDBitmap_32 *image) {
+static LuaRet playdate_graphics_image_transformedImage_lua(Cranked *cranked, LCDBitmap_32 *image) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_image_drawSampled_lua(Emulator *emulator, LCDBitmap_32 *image, int x, int y, int width, int height, float centerX, float centerY,
+static void playdate_graphics_image_drawSampled_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, int width, int height, float centerX, float centerY,
                                                     float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile) {
     // Basically `Mode 7`
     // Todo
 }
 
-static void playdate_graphics_image_setMaskImage_lua(Emulator *emulator, LCDBitmap_32 *image, LCDBitmap_32 *maskImage) {
+static void playdate_graphics_image_setMaskImage_lua(Cranked *cranked, LCDBitmap_32 *image, LCDBitmap_32 *maskImage) {
     if (image->mask)
-        emulator->heap.destruct(image->mask);
-    image->mask = emulator->heap.construct<LCDBitmap_32>(*maskImage);
+        cranked->heap.destruct(image->mask);
+    image->mask = cranked->heap.construct<LCDBitmap_32>(*maskImage);
 }
 
-static LuaRet playdate_graphics_image_getMaskImage_lua(Emulator *emulator, LCDBitmap_32 *image) {
-    pushImage(emulator, image, false); // Basically holds a weak reference to the image
+static LuaRet playdate_graphics_image_getMaskImage_lua(Cranked *cranked, LCDBitmap_32 *image) {
+    pushImage(cranked, image, false); // Basically holds a weak reference to the image
     return 1;
 }
 
-static void playdate_graphics_image_addMask_lua(Emulator *emulator, LCDBitmap_32 *image, bool opaque) {
+static void playdate_graphics_image_addMask_lua(Cranked *cranked, LCDBitmap_32 *image, bool opaque) {
     if (image->mask)
-        emulator->heap.destruct(image->mask);
-    image->mask = emulator->heap.construct<LCDBitmap_32>(image->width, image->height, &emulator->graphics);
+        cranked->heap.destruct(image->mask);
+    image->mask = cranked->heap.construct<LCDBitmap_32>(image->width, image->height, &cranked->graphics);
 }
 
-static void playdate_graphics_image_removeMask_lua(Emulator *emulator, LCDBitmap_32 *image) {
+static void playdate_graphics_image_removeMask_lua(Cranked *cranked, LCDBitmap_32 *image) {
     if (!image->mask)
         return;
-    emulator->heap.destruct(image->mask);
+    cranked->heap.destruct(image->mask);
     image->mask = nullptr;
 }
 
-static bool playdate_graphics_image_hasMask_lua(Emulator *emulator, LCDBitmap_32 *image) {
+static bool playdate_graphics_image_hasMask_lua(Cranked *cranked, LCDBitmap_32 *image) {
     return image->mask;
 }
 
-static void playdate_graphics_image_clearMask_lua(Emulator *emulator, LCDBitmap_32 *image, bool opaque) {
+static void playdate_graphics_image_clearMask_lua(Cranked *cranked, LCDBitmap_32 *image, bool opaque) {
     if (image->mask)
         image->mask->clear(opaque ? LCDSolidColor::White : LCDSolidColor::Black);
 }
 
-static void playdate_graphics_image_drawTiled_lua(Emulator *emulator, LCDBitmap_32 *image, LuaVal arg1) {
+static void playdate_graphics_image_drawTiled_lua(Cranked *cranked, LCDBitmap_32 *image, LuaVal arg1) {
     // Todo
 }
 
-static void playdate_graphics_image_drawBlurred_lua(Emulator *emulator, LCDBitmap_32 *image, int x, int y, float radius, int numPasses, DitherType ditherType, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
+static void playdate_graphics_image_drawBlurred_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, float radius, int numPasses, DitherType ditherType, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
     // Todo
 }
 
-static void playdate_graphics_image_drawFaded_lua(Emulator *emulator, LCDBitmap_32 *image, int x, int y, float alpha, DitherType ditherType) {
+static void playdate_graphics_image_drawFaded_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, float alpha, DitherType ditherType) {
     // Todo
 }
 
-static void playdate_graphics_image_setInverted_lua(Emulator *emulator, LCDBitmap_32 *image, bool flag) {
+static void playdate_graphics_image_setInverted_lua(Cranked *cranked, LCDBitmap_32 *image, bool flag) {
     image->inverted = flag;
 }
 
-static LuaRet playdate_graphics_image_invertedImage_lua(Emulator *emulator, LCDBitmap_32 *image) {
+static LuaRet playdate_graphics_image_invertedImage_lua(Cranked *cranked, LCDBitmap_32 *image) {
     // Todo: Does this modify the mask?
     return 0;
 }
 
-static LuaRet playdate_graphics_image_blendWithImage_lua(Emulator *emulator, LCDBitmap_32 *self, LCDBitmap_32 *image, float alpha, DitherType ditherType) {
+static LuaRet playdate_graphics_image_blendWithImage_lua(Cranked *cranked, LCDBitmap_32 *self, LCDBitmap_32 *image, float alpha, DitherType ditherType) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_image_blurredImage_lua(Emulator *emulator, LCDBitmap_32 *image, float radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
+static LuaRet playdate_graphics_image_blurredImage_lua(Cranked *cranked, LCDBitmap_32 *image, float radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_image_fadedImage_lua(Emulator *emulator, LCDBitmap_32 *image, float alpha, DitherType ditherType) {
+static LuaRet playdate_graphics_image_fadedImage_lua(Cranked *cranked, LCDBitmap_32 *image, float alpha, DitherType ditherType) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_image_vcrPauseFilterImage_lua(Emulator *emulator, LCDBitmap_32 *image) {
+static LuaRet playdate_graphics_image_vcrPauseFilterImage_lua(Cranked *cranked, LCDBitmap_32 *image) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_pushContext_lua(Emulator *emulator, LuaVal imageVal) {
+static void playdate_graphics_pushContext_lua(Cranked *cranked, LuaVal imageVal) {
     auto image = imageVal.isUserdataObject() ? imageVal.asUserdataObject<LCDBitmap_32>() : nullptr;
     if (image)
-        emulator->preserveLuaReference(image, imageVal);
-    emulator->graphics.pushContext(image);
+        cranked->preserveLuaReference(image, imageVal);
+    cranked->graphics.pushContext(image);
 }
 
-static void playdate_graphics_clear_lua(Emulator *emulator, LuaVal color) {
-    emulator->graphics.frameBuffer->clear(color.isNil() ? emulator->graphics.getCurrentDisplayContext().backgroundColor : (LCDSolidColor) color.asInt());
+static void playdate_graphics_clear_lua(Cranked *cranked, LuaVal color) {
+    cranked->graphics.frameBuffer->clear(color.isNil() ? cranked->graphics.getCurrentDisplayContext().backgroundColor : (LCDSolidColor) color.asInt());
 }
 
-static bool playdate_graphics_checkAlphaCollision_lua(Emulator *emulator, LCDBitmap_32 *image1, int x1, int y1, LuaVal flip1, LCDBitmap_32 *image2, int x2, int y2, LuaVal flip2) {
+static bool playdate_graphics_checkAlphaCollision_lua(Cranked *cranked, LCDBitmap_32 *image1, int x1, int y1, LuaVal flip1, LCDBitmap_32 *image2, int x2, int y2, LuaVal flip2) {
     // Todo
     return false;
 }
 
-static void playdate_graphics_setColor_lua(Emulator *emulator, LCDSolidColor color) {
+static void playdate_graphics_setColor_lua(Cranked *cranked, LCDSolidColor color) {
     // Todo: Disable pattern/stencil stuff
-    emulator->graphics.getCurrentDisplayContext().drawingColor = color;
+    cranked->graphics.getCurrentDisplayContext().drawingColor = color;
 }
 
-static LCDSolidColor playdate_graphics_getColor_lua(Emulator *emulator) {
-    return emulator->graphics.getCurrentDisplayContext().drawingColor;
+static LCDSolidColor playdate_graphics_getColor_lua(Cranked *cranked) {
+    return cranked->graphics.getCurrentDisplayContext().drawingColor;
 }
 
-static LCDSolidColor playdate_graphics_getBackgroundColor_lua(Emulator *emulator) {
-    return emulator->graphics.getCurrentDisplayContext().backgroundColor;
+static LCDSolidColor playdate_graphics_getBackgroundColor_lua(Cranked *cranked) {
+    return cranked->graphics.getCurrentDisplayContext().backgroundColor;
 }
 
-static void playdate_graphics_setPattern_lua(Emulator *emulator, LuaVal pattern, int x, int y) {
+static void playdate_graphics_setPattern_lua(Cranked *cranked, LuaVal pattern, int x, int y) {
     // Todo
 }
 
-static void playdate_graphics_setDitherPattern_lua(Emulator *emulator, float alpha, DitherType ditherType) {
+static void playdate_graphics_setDitherPattern_lua(Cranked *cranked, float alpha, DitherType ditherType) {
     // Todo
 }
 
-static void playdate_graphics_drawLine_lua(Emulator *emulator, LuaVal x1, int y1, int x2, int y2) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_drawLine_lua(Cranked *cranked, LuaVal x1, int y1, int x2, int y2) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x1.isTable())
-        emulator->graphics.drawLine(x1.getIntField("x1"), x1.getIntField("y1"), x1.getIntField("x2"), x1.getIntField("y2"), context.lineWidth, context.drawingColor);
+        cranked->graphics.drawLine(x1.getIntField("x1"), x1.getIntField("y1"), x1.getIntField("x2"), x1.getIntField("y2"), context.lineWidth, context.drawingColor);
     else
-        emulator->graphics.drawLine(x1.asInt(), y1, x2, y2, context.lineWidth, context.drawingColor);
+        cranked->graphics.drawLine(x1.asInt(), y1, x2, y2, context.lineWidth, context.drawingColor);
 }
 
-static void playdate_graphics_setLineCapStyle_lua(Emulator *emulator, LCDLineCapStyle style) {
-    emulator->graphics.getCurrentDisplayContext().lineEndCapStype = style;
+static void playdate_graphics_setLineCapStyle_lua(Cranked *cranked, LCDLineCapStyle style) {
+    cranked->graphics.getCurrentDisplayContext().lineEndCapStype = style;
 }
 
-static void playdate_graphics_drawPixel_lua(Emulator *emulator, LuaVal x, int y) {
+static void playdate_graphics_drawPixel_lua(Cranked *cranked, LuaVal x, int y) {
     if (x.isTable())
-        emulator->graphics.drawPixel(x.getIntField("x"), x.getIntField("y"), emulator->graphics.getCurrentDisplayContext().drawingColor);
+        cranked->graphics.drawPixel(x.getIntField("x"), x.getIntField("y"), cranked->graphics.getCurrentDisplayContext().drawingColor);
     else
-        emulator->graphics.drawPixel(x.asInt(), y, emulator->graphics.getCurrentDisplayContext().drawingColor);
+        cranked->graphics.drawPixel(x.asInt(), y, cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
-static void playdate_graphics_drawRect_lua(Emulator *emulator, LuaVal x, int y, int w, int h) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_drawRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        emulator->graphics.drawRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
+        cranked->graphics.drawRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
     else
-        emulator->graphics.drawRect(x.asInt(), y, w, h, context.drawingColor);
+        cranked->graphics.drawRect(x.asInt(), y, w, h, context.drawingColor);
 }
 
-static void playdate_graphics_fillRect_lua(Emulator *emulator, LuaVal x, int y, int w, int h) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_fillRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        emulator->graphics.fillRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
+        cranked->graphics.fillRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
     else
-        emulator->graphics.fillRect(x.asInt(), y, w, h, context.drawingColor);
+        cranked->graphics.fillRect(x.asInt(), y, w, h, context.drawingColor);
 }
 
-static void playdate_graphics_drawRoundRect_lua(Emulator *emulator, LuaVal x, int y, int w, int h, int radius) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_drawRoundRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h, int radius) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        emulator->graphics.drawRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
+        cranked->graphics.drawRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
     else
-        emulator->graphics.drawRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
+        cranked->graphics.drawRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
 }
 
-static void playdate_graphics_fillRoundRect_lua(Emulator *emulator, LuaVal x, int y, int w, int h, int radius) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_fillRoundRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h, int radius) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        emulator->graphics.fillRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
+        cranked->graphics.fillRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
     else
-        emulator->graphics.fillRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
+        cranked->graphics.fillRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
 }
 
-static void drawEllipse(Emulator *emulator, LuaVal arg1, bool filled) {
-    auto &context = emulator->graphics.getCurrentDisplayContext();
+static void drawEllipse(Cranked *cranked, LuaVal arg1, bool filled) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
     IntRect rect{};
     LuaVal startAngleArg = arg1 + 4;
     if (arg1.isTable()) {
@@ -700,128 +702,128 @@ static void drawEllipse(Emulator *emulator, LuaVal arg1, bool filled) {
         rect = {arg1.asInt(), (arg1 + 1).asInt(), (arg1 + 2).asInt(), (arg1 + 3).asInt()};
     float startAngle = startAngleArg.asFloat();
     float endAngle = (startAngleArg + 1).isNil() ? 360 : (startAngleArg + 1).asFloat();
-    emulator->graphics.drawEllipse(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, context.lineWidth, startAngle, endAngle, context.drawingColor, filled);
+    cranked->graphics.drawEllipse(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, context.lineWidth, startAngle, endAngle, context.drawingColor, filled);
 }
 
-static void playdate_graphics_drawEllipseInRect_lua(Emulator *emulator, LuaVal arg1) {
-    drawEllipse(emulator, arg1, false);
+static void playdate_graphics_drawEllipseInRect_lua(Cranked *cranked, LuaVal arg1) {
+    drawEllipse(cranked, arg1, false);
 }
 
-static void playdate_graphics_fillEllipseInRect_lua(Emulator *emulator, LuaVal arg1) {
-    drawEllipse(emulator, arg1, true);
+static void playdate_graphics_fillEllipseInRect_lua(Cranked *cranked, LuaVal arg1) {
+    drawEllipse(cranked, arg1, true);
 }
 
-static void playdate_graphics_drawPolygon_lua(Emulator *emulator, LuaVal arg1) {
+static void playdate_graphics_drawPolygon_lua(Cranked *cranked, LuaVal arg1) {
     // Todo
 }
 
-static void playdate_graphics_fillPolygon_lua(Emulator *emulator, LuaVal arg1) {
+static void playdate_graphics_fillPolygon_lua(Cranked *cranked, LuaVal arg1) {
     // Todo
 }
 
-static void playdate_graphics_setPolygonFillRule_lua(Emulator *emulator, LCDPolygonFillRule rule) {
-    emulator->graphics.getCurrentDisplayContext().polygonFillRule = rule;
+static void playdate_graphics_setPolygonFillRule_lua(Cranked *cranked, LCDPolygonFillRule rule) {
+    cranked->graphics.getCurrentDisplayContext().polygonFillRule = rule;
 }
 
-static void playdate_graphics_drawTriangle_lua(Emulator *emulator, int x1, int y1, int x2, int y2, int x3, int y3) {
-    emulator->graphics.drawTriangle(x1, y1, x2, y2, x3, y3, emulator->graphics.getCurrentDisplayContext().drawingColor);
+static void playdate_graphics_drawTriangle_lua(Cranked *cranked, int x1, int y1, int x2, int y2, int x3, int y3) {
+    cranked->graphics.drawTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
-static void playdate_graphics_fillTriangle_lua(Emulator *emulator, int x1, int y1, int x2, int y2, int x3, int y3) {
-    emulator->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, emulator->graphics.getCurrentDisplayContext().drawingColor);
+static void playdate_graphics_fillTriangle_lua(Cranked *cranked, int x1, int y1, int x2, int y2, int x3, int y3) {
+    cranked->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
-static LuaRet playdate_graphics_perlin_lua(Emulator *emulator, float x, float y, float z, float repeat, int octaves, float persistence) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_perlinArray_lua(Emulator *emulator, int count, float x, float dx, LuaVal next) {
+static LuaRet playdate_graphics_perlin_lua(Cranked *cranked, float x, float y, float z, float repeat, int octaves, float persistence) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_setClipRect_lua(Emulator *emulator, LuaVal arg1, int y, int width, int height) {
+static LuaRet playdate_graphics_perlinArray_lua(Cranked *cranked, int count, float x, float dx, LuaVal next) {
+    // Todo
+    return 0;
+}
+
+static void playdate_graphics_setClipRect_lua(Cranked *cranked, LuaVal arg1, int y, int width, int height) {
     if (arg1.isTable())
-        emulator->graphics.getCurrentDisplayContext().clipRect = arg1.asIntRect();
+        cranked->graphics.getCurrentDisplayContext().clipRect = arg1.asIntRect();
     else
-        emulator->graphics.getCurrentDisplayContext().clipRect = {arg1.asInt(), y, width, height};
+        cranked->graphics.getCurrentDisplayContext().clipRect = {arg1.asInt(), y, width, height};
 }
 
-static LuaRet playdate_graphics_getClipRect_lua(Emulator *emulator) {
-    pushRect(emulator, emulator->graphics.getCurrentDisplayContext().clipRect);
+static LuaRet playdate_graphics_getClipRect_lua(Cranked *cranked) {
+    pushRect(cranked, cranked->graphics.getCurrentDisplayContext().clipRect);
     return 1;
 }
 
-static void playdate_graphics_setScreenClipRect_lua(Emulator *emulator, LuaVal arg1, int y, int width, int height) {
-    auto &displayContext = emulator->graphics.getCurrentDisplayContext();
+static void playdate_graphics_setScreenClipRect_lua(Cranked *cranked, LuaVal arg1, int y, int width, int height) {
+    auto &displayContext = cranked->graphics.getCurrentDisplayContext();
     auto rect = arg1.isTable() ? arg1.asIntRect() : IntRect{arg1.asInt(), y, width, height};
     displayContext.clipRect = rect + displayContext.drawOffset; // Todo: Verify offset direction
 }
 
-static LuaRet playdate_graphics_getScreenClipRect_lua(Emulator *emulator) {
-    auto &displayContext = emulator->graphics.getCurrentDisplayContext();
-    pushRect(emulator, displayContext.clipRect - displayContext.drawOffset); // Todo: Verify offset direction
+static LuaRet playdate_graphics_getScreenClipRect_lua(Cranked *cranked) {
+    auto &displayContext = cranked->graphics.getCurrentDisplayContext();
+    pushRect(cranked, displayContext.clipRect - displayContext.drawOffset); // Todo: Verify offset direction
     return 1;
 }
 
-static void playdate_graphics_setStencilImage_lua(Emulator *emulator, LuaVal image, bool tile) {
+static void playdate_graphics_setStencilImage_lua(Cranked *cranked, LuaVal image, bool tile) {
     // Todo
 }
 
-static void playdate_graphics_setStencilPattern_lua(Emulator *emulator, LuaVal arg1) {
+static void playdate_graphics_setStencilPattern_lua(Cranked *cranked, LuaVal arg1) {
     // Todo
 }
 
-static void playdate_graphics_clearStencil_lua(Emulator *emulator) {
+static void playdate_graphics_clearStencil_lua(Cranked *cranked) {
     // Todo
 }
 
-static LCDBitmapDrawMode playdate_graphics_getImageDrawMode_lua(Emulator *emulator) {
-    return emulator->graphics.getCurrentDisplayContext().bitmapDrawMode;
+static LCDBitmapDrawMode playdate_graphics_getImageDrawMode_lua(Cranked *cranked) {
+    return cranked->graphics.getCurrentDisplayContext().bitmapDrawMode;
 }
 
-static void playdate_graphics_setLineWidth_lua(Emulator *emulator, int width) {
-    emulator->graphics.getCurrentDisplayContext().lineWidth = width;
+static void playdate_graphics_setLineWidth_lua(Cranked *cranked, int width) {
+    cranked->graphics.getCurrentDisplayContext().lineWidth = width;
 }
 
-static int playdate_graphics_getLineWidth_lua(Emulator *emulator) {
-    return emulator->graphics.getCurrentDisplayContext().lineWidth;
+static int playdate_graphics_getLineWidth_lua(Cranked *cranked) {
+    return cranked->graphics.getCurrentDisplayContext().lineWidth;
 }
 
-static void playdate_graphics_setStrokeLocation_lua(Emulator *emulator, StrokeLocation location) {
-    emulator->graphics.getCurrentDisplayContext().strokeLocation = location;
+static void playdate_graphics_setStrokeLocation_lua(Cranked *cranked, StrokeLocation location) {
+    cranked->graphics.getCurrentDisplayContext().strokeLocation = location;
 }
 
-static StrokeLocation playdate_graphics_getStrokeLocation_lua(Emulator *emulator) {
-    return emulator->graphics.getCurrentDisplayContext().strokeLocation;
+static StrokeLocation playdate_graphics_getStrokeLocation_lua(Cranked *cranked) {
+    return cranked->graphics.getCurrentDisplayContext().strokeLocation;
 }
 
-static void playdate_graphics_lockFocus_lua(Emulator *emulator, LuaVal imageVal) {
+static void playdate_graphics_lockFocus_lua(Cranked *cranked, LuaVal imageVal) {
     auto image = imageVal.asUserdataObject<LCDBitmap_32>();
-    emulator->preserveLuaReference(image, imageVal);
-    emulator->graphics.getCurrentDisplayContext().focusedImage = image;
+    cranked->preserveLuaReference(image, imageVal);
+    cranked->graphics.getCurrentDisplayContext().focusedImage = image;
 }
 
-static void playdate_graphics_unlockFocus_lua(Emulator *emulator) {
-    emulator->releaseLuaReference(emulator->graphics.getCurrentDisplayContext().focusedImage);
-    emulator->graphics.getCurrentDisplayContext().focusedImage = nullptr;
+static void playdate_graphics_unlockFocus_lua(Cranked *cranked) {
+    cranked->releaseLuaReference(cranked->graphics.getCurrentDisplayContext().focusedImage);
+    cranked->graphics.getCurrentDisplayContext().focusedImage = nullptr;
 }
 
-static LuaRet playdate_graphics_getDrawOffset_lua(Emulator *emulator) {
-    auto &offset = emulator->graphics.getCurrentDisplayContext().drawOffset;
-    lua_pushinteger(emulator->getLuaContext(), offset.x);
-    lua_pushinteger(emulator->getLuaContext(), offset.y);
+static LuaRet playdate_graphics_getDrawOffset_lua(Cranked *cranked) {
+    auto &offset = cranked->graphics.getCurrentDisplayContext().drawOffset;
+    lua_pushinteger(cranked->getLuaContext(), offset.x);
+    lua_pushinteger(cranked->getLuaContext(), offset.y);
     return 2;
 }
 
-static LuaRet playdate_graphics_getDisplayImage_lua(Emulator *emulator) {
-    pushImage(emulator, emulator->heap.construct<LCDBitmap_32>(*emulator->graphics.frameBuffer), true);
+static LuaRet playdate_graphics_getDisplayImage_lua(Cranked *cranked) {
+    pushImage(cranked, cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer), true);
     return 1;
 }
 
-static LuaRet playdate_graphics_getWorkingImage_lua(Emulator *emulator) {
-    pushImage(emulator, emulator->heap.construct<LCDBitmap_32>(*emulator->graphics.previousFrameBuffer), true);
+static LuaRet playdate_graphics_getWorkingImage_lua(Cranked *cranked) {
+    pushImage(cranked, cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.previousFrameBuffer), true);
     return 1;
 }
 
@@ -831,105 +833,105 @@ static LuaRet playdate_getSecondsSinceEpoch_lua(lua_State *context) {
     return 2;
 }
 
-static LuaRet playdate_getTime_lua(Emulator *emulator) {
+static LuaRet playdate_getTime_lua(Cranked *cranked) {
     // Todo: Timezone offset
-    pushTime(emulator, std::chrono::system_clock::now());
+    pushTime(cranked, std::chrono::system_clock::now());
     return 1;
 }
 
-static LuaRet playdate_getGMTTime_lua(Emulator *emulator) {
-    pushTime(emulator, std::chrono::system_clock::now());
+static LuaRet playdate_getGMTTime_lua(Cranked *cranked) {
+    pushTime(cranked, std::chrono::system_clock::now());
     return 1;
 }
 
-static LuaRet playdate_epochFromTime_lua(Emulator *emulator, LuaVal time) {
+static LuaRet playdate_epochFromTime_lua(Cranked *cranked, LuaVal time) {
     // Todo: Timezone offset
     auto point = time.asTime();
     auto secondsPoint = std::chrono::floor<std::chrono::seconds>(point);
     auto millis = point - secondsPoint;
-    lua_pushinteger(emulator->getLuaContext(), (int) duration_cast<std::chrono::seconds>(secondsPoint.time_since_epoch()).count());
-    lua_pushinteger(emulator->getLuaContext(), (int) duration_cast<std::chrono::milliseconds>(millis).count());
+    lua_pushinteger(cranked->getLuaContext(), (int) duration_cast<std::chrono::seconds>(secondsPoint.time_since_epoch()).count());
+    lua_pushinteger(cranked->getLuaContext(), (int) duration_cast<std::chrono::milliseconds>(millis).count());
     return 2;
 }
 
-static LuaRet playdate_epochFromGMTTime_lua(Emulator *emulator, LuaVal time) {
+static LuaRet playdate_epochFromGMTTime_lua(Cranked *cranked, LuaVal time) {
     auto point = time.asTime();
     auto secondsPoint = std::chrono::floor<std::chrono::seconds>(point);
     auto millis = point - secondsPoint;
-    lua_pushinteger(emulator->getLuaContext(), (int) duration_cast<std::chrono::seconds>(secondsPoint.time_since_epoch()).count());
-    lua_pushinteger(emulator->getLuaContext(), (int) duration_cast<std::chrono::milliseconds>(millis).count());
+    lua_pushinteger(cranked->getLuaContext(), (int) duration_cast<std::chrono::seconds>(secondsPoint.time_since_epoch()).count());
+    lua_pushinteger(cranked->getLuaContext(), (int) duration_cast<std::chrono::milliseconds>(millis).count());
     return 2;
 }
 
-static LuaRet playdate_timeFromEpoch_lua(Emulator *emulator, int seconds, int milliseconds) {
+static LuaRet playdate_timeFromEpoch_lua(Cranked *cranked, int seconds, int milliseconds) {
     // Todo: Timezone offset
     std::chrono::system_clock::time_point time;
     time += std::chrono::seconds(seconds);
     time += std::chrono::milliseconds(milliseconds);
-    pushTime(emulator, time);
+    pushTime(cranked, time);
     return 1;
 }
 
-static LuaRet playdate_GMTTimeFromEpoch_lua(Emulator *emulator, int seconds, int milliseconds) {
+static LuaRet playdate_GMTTimeFromEpoch_lua(Cranked *cranked, int seconds, int milliseconds) {
     std::chrono::system_clock::time_point time;
     time += std::chrono::seconds(seconds);
     time += std::chrono::milliseconds(milliseconds);
-    pushTime(emulator, time);
+    pushTime(cranked, time);
     return 1;
 }
 
-static int playdate_getFPS_lua(Emulator *emulator) {
-    auto delta = duration_cast<std::chrono::milliseconds>((std::chrono::system_clock::now() - emulator->lastFrameTime)).count();
+static int playdate_getFPS_lua(Cranked *cranked) {
+    auto delta = duration_cast<std::chrono::milliseconds>((std::chrono::system_clock::now() - cranked->lastFrameTime)).count();
     return int((float) delta / 1000);
 }
 
-static LuaRet playdate_getStats_lua(Emulator *emulator) {
+static LuaRet playdate_getStats_lua(Cranked *cranked) {
     // Todo
-    auto stats = pushTable(emulator);
+    auto stats = pushTable(cranked);
     stats.setFloatField("kernel", 0.f);
     stats.setFloatField("game", 0.f);
     stats.setFloatField("audio", 0.f);
     return 1;
 }
 
-static void playdate_setStatsInterval_lua(Emulator *emulator, int seconds) {
-    emulator->statsInterval = seconds;
+static void playdate_setStatsInterval_lua(Cranked *cranked, int seconds) {
+    cranked->statsInterval = seconds;
 }
 
-static LuaRet playdate_getPowerStatus_lua(Emulator *emulator) {
-    auto status = pushTable(emulator);
+static LuaRet playdate_getPowerStatus_lua(Cranked *cranked) {
+    auto status = pushTable(cranked);
     status.setBoolField("charging", false);
     status.setBoolField("USB", false);
     status.setBoolField("screws", false);
     return 1;
 }
 
-static LuaRet playdate_getSystemMenu_lua(Emulator *emulator) {
-    pushTable(emulator); // Just use an empty table
-    emulator->getQualifiedLuaGlobal("playdate.menu");
-    lua_setmetatable(emulator->getLuaContext(), -2);
+static LuaRet playdate_getSystemMenu_lua(Cranked *cranked) {
+    pushTable(cranked); // Just use an empty table
+    cranked->getQualifiedLuaGlobal("playdate.menu");
+    lua_setmetatable(cranked->getLuaContext(), -2);
     return 1;
 }
 
-static void playdate_setMenuImage_lua(Emulator *emulator, LuaVal image, int xOffset) {
+static void playdate_setMenuImage_lua(Cranked *cranked, LuaVal image, int xOffset) {
     auto bitmap = image.asUserdataObject<LCDBitmap_32>();
-    emulator->preserveLuaReference(bitmap, image);
-    emulator->menu.setImage(bitmap, xOffset);
+    cranked->preserveLuaReference(bitmap, image);
+    cranked->menu.setImage(bitmap, xOffset);
 }
 
-static LuaRet playdate_menu_addMenuItem_lua(Emulator *emulator, LuaVal menu, const char *title, LuaVal callback) {
+static LuaRet playdate_menu_addMenuItem_lua(Cranked *cranked, LuaVal menu, const char *title, LuaVal callback) {
     // Items are all owned by Menu, but assertions should mostly protect against memory corruption after removing items with dangling userdata pointers
     try {
-        pushUserdataObject(emulator, emulator->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback), "playdate.menu.item");
+        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback), "playdate.menu.item");
     } catch (std::exception &ex) {
-        lua_pushnil(emulator->getLuaContext());
-        lua_pushstring(emulator->getLuaContext(), ex.what());
+        lua_pushnil(cranked->getLuaContext());
+        lua_pushstring(cranked->getLuaContext(), ex.what());
         return 2;
     }
     return 1;
 }
 
-static LuaRet playdate_menu_addCheckmarkMenuItem_lua(Emulator *emulator, LuaVal menu, const char *title, LuaVal arg2, LuaVal arg3) {
+static LuaRet playdate_menu_addCheckmarkMenuItem_lua(Cranked *cranked, LuaVal menu, const char *title, LuaVal arg2, LuaVal arg3) {
     int initialValue{};
     int callback;
     if (arg2.isBool()) {
@@ -938,24 +940,24 @@ static LuaRet playdate_menu_addCheckmarkMenuItem_lua(Emulator *emulator, LuaVal 
     } else
         callback = arg2;
     try {
-        pushUserdataObject(emulator, emulator->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback), "playdate.menu.item");
+        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback), "playdate.menu.item");
     } catch (std::exception &ex) {
-        lua_pushnil(emulator->getLuaContext());
-        lua_pushstring(emulator->getLuaContext(), ex.what());
+        lua_pushnil(cranked->getLuaContext());
+        lua_pushstring(cranked->getLuaContext(), ex.what());
         return 2;
     }
     return 1;
 }
 
-static LuaRet playdate_menu_addOptionsMenuItem_lua(Emulator *emulator, LuaVal menu, const char *title, LuaVal optionsVal, LuaVal arg3, LuaVal arg4) {
+static LuaRet playdate_menu_addOptionsMenuItem_lua(Cranked *cranked, LuaVal menu, const char *title, LuaVal optionsVal, LuaVal arg3, LuaVal arg4) {
     int initialValue{};
     int callback;
-    auto count = lua_rawlen(emulator->getLuaContext(), optionsVal);
+    auto count = lua_rawlen(cranked->getLuaContext(), optionsVal);
     std::vector<std::string> options(count);
     for (int i = 0; i < count; i++) {
-        lua_geti(emulator->getLuaContext(), optionsVal, i + 1);
-        options[i] = lua_tostring(emulator->getLuaContext(), -1);
-        lua_pop(emulator->getLuaContext(), 1);
+        lua_geti(cranked->getLuaContext(), optionsVal, i + 1);
+        options[i] = lua_tostring(cranked->getLuaContext(), -1);
+        lua_pop(cranked->getLuaContext(), 1);
     }
     if (arg3.isString()) {
         auto value = arg3.asString();
@@ -968,57 +970,57 @@ static LuaRet playdate_menu_addOptionsMenuItem_lua(Emulator *emulator, LuaVal me
     } else
         callback = arg3;
     try {
-        pushUserdataObject(emulator, emulator->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback), "playdate.menu.item");
+        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback), "playdate.menu.item");
     } catch (std::exception &ex) {
-        lua_pushnil(emulator->getLuaContext());
-        lua_pushstring(emulator->getLuaContext(), ex.what());
+        lua_pushnil(cranked->getLuaContext());
+        lua_pushstring(cranked->getLuaContext(), ex.what());
         return 2;
     }
     return 1;
 }
 
-static LuaRet playdate_menu_getMenuItems_lua(Emulator *emulator, LuaVal menu) {
-    auto items = pushTable(emulator);
+static LuaRet playdate_menu_getMenuItems_lua(Cranked *cranked, LuaVal menu) {
+    auto items = pushTable(cranked);
     int i = 1;
-    for (auto item : emulator->menu.items) {
+    for (auto item : cranked->menu.items) {
         if (!item)
             continue;
-        pushUserdataObject(emulator, item, "playdate.menu.item");
-        lua_seti(emulator->getLuaContext(), -2, i);
+        pushUserdataObject(cranked, item, "playdate.menu.item");
+        lua_seti(cranked->getLuaContext(), -2, i);
         i++;
     }
     return 1;
 }
 
-static void playdate_menu_removeMenuItem_lua(Emulator *emulator, LuaVal menu, PDMenuItem_32 *item) {
-    emulator->menu.removeItem(item);
+static void playdate_menu_removeMenuItem_lua(Cranked *cranked, LuaVal menu, PDMenuItem_32 *item) {
+    cranked->menu.removeItem(item);
 }
 
-static void playdate_menu_removeAllMenuItems_lua(Emulator *emulator, LuaVal menu) {
-    emulator->menu.clearItems();
+static void playdate_menu_removeAllMenuItems_lua(Cranked *cranked, LuaVal menu) {
+    cranked->menu.clearItems();
 }
 
-static void playdate_menu_item_setCallback_lua(Emulator *emulator, PDMenuItem_32 *item, LuaVal callback) {
-    emulator->menu.assertHasItem(item);
-    emulator->getQualifiedLuaGlobal("cranked.menuCallbacks");
-    lua_pushvalue(emulator->getLuaContext(), callback);
-    lua_seti(emulator->getLuaContext(), -2, (int) (std::find(emulator->menu.items.begin(), emulator->menu.items.end(), item) - emulator->menu.items.begin()) + 1);
-    lua_pop(emulator->getLuaContext(), 1);
+static void playdate_menu_item_setCallback_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal callback) {
+    cranked->menu.assertHasItem(item);
+    cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+    lua_pushvalue(cranked->getLuaContext(), callback);
+    lua_seti(cranked->getLuaContext(), -2, (int) (std::find(cranked->menu.items.begin(), cranked->menu.items.end(), item) - cranked->menu.items.begin()) + 1);
+    lua_pop(cranked->getLuaContext(), 1);
 }
 
-static void playdate_menu_item_setTitle_lua(Emulator *emulator, PDMenuItem_32 *item, const char *title) {
-    emulator->menu.assertHasItem(item);
-    emulator->menu.setItemTitle(item, title);
+static void playdate_menu_item_setTitle_lua(Cranked *cranked, PDMenuItem_32 *item, const char *title) {
+    cranked->menu.assertHasItem(item);
+    cranked->menu.setItemTitle(item, title);
 }
 
-static LuaRet playdate_menu_item_getTitle_lua(Emulator *emulator, PDMenuItem_32 *item) {
-    emulator->menu.assertHasItem(item);
-    lua_pushstring(emulator->getLuaContext(), item->title);
+static LuaRet playdate_menu_item_getTitle_lua(Cranked *cranked, PDMenuItem_32 *item) {
+    cranked->menu.assertHasItem(item);
+    lua_pushstring(cranked->getLuaContext(), item->title);
     return 1;
 }
 
-static void playdate_menu_item_setValue_lua(Emulator *emulator, PDMenuItem_32 *item, LuaVal value) {
-    emulator->menu.assertHasItem(item);
+static void playdate_menu_item_setValue_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal value) {
+    cranked->menu.assertHasItem(item);
     if (value.isString()) {
         std::string string(value.asString());
         item->value = 0;
@@ -1033,1302 +1035,1302 @@ static void playdate_menu_item_setValue_lua(Emulator *emulator, PDMenuItem_32 *i
         item->value = value.asInt();
 }
 
-static LuaRet playdate_menu_item_getValue_lua(Emulator *emulator, PDMenuItem_32 *item) {
-    emulator->menu.assertHasItem(item);
+static LuaRet playdate_menu_item_getValue_lua(Cranked *cranked, PDMenuItem_32 *item) {
+    cranked->menu.assertHasItem(item);
     if (item->type == PDMenuItem_32::Type::Checkmark)
-        lua_pushboolean(emulator->getLuaContext(), item->value);
+        lua_pushboolean(cranked->getLuaContext(), item->value);
     else if (item->type == PDMenuItem_32::Type::Options) {
         if (item->value >= 0 and item->value < item->options.size())
-            lua_pushstring(emulator->getLuaContext(), item->options[item->value]);
+            lua_pushstring(cranked->getLuaContext(), item->options[item->value]);
         else
-            lua_pushnil(emulator->getLuaContext()); // Todo: Is this right for invalid values?
+            lua_pushnil(cranked->getLuaContext()); // Todo: Is this right for invalid values?
     } else
-        lua_pushnil(emulator->getLuaContext()); // Todo: Is this right for button items?
+        lua_pushnil(cranked->getLuaContext()); // Todo: Is this right for button items?
     return 1;
 }
 
-static void playdate_menu_item_newindex_lua(Emulator *emulator, PDMenuItem_32 *item, LuaVal keyArg, LuaVal value) {
+static void playdate_menu_item_newindex_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal keyArg, LuaVal value) {
     if (!keyArg.isString())
         return;
     std::string key(keyArg.asString());
     if (key == "value")
-        playdate_menu_item_setValue_lua(emulator, item, value);
+        playdate_menu_item_setValue_lua(cranked, item, value);
     else if (key == "title")
-        playdate_menu_item_setTitle_lua(emulator, item, value.asString());
+        playdate_menu_item_setTitle_lua(cranked, item, value.asString());
 }
 
-static LuaRet playdate_menu_item_index_lua(Emulator *emulator, PDMenuItem_32 *item, LuaVal keyArg) {
+static LuaRet playdate_menu_item_index_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal keyArg) {
     if (!keyArg.isString()) {
-        lua_pushnil(emulator->getLuaContext());
+        lua_pushnil(cranked->getLuaContext());
         return 1;
     }
     std::string key(keyArg.asString());
     if (key == "value")
-        return playdate_menu_item_getValue_lua(emulator, item);
+        return playdate_menu_item_getValue_lua(cranked, item);
     else if (key == "title")
-        return playdate_menu_item_getTitle_lua(emulator, item);
+        return playdate_menu_item_getTitle_lua(cranked, item);
     else {
-        emulator->getQualifiedLuaGlobal("playdate.menu.item");
-        lua_getfield(emulator->getLuaContext(), -1, key.c_str());
+        cranked->getQualifiedLuaGlobal("playdate.menu.item");
+        lua_getfield(cranked->getLuaContext(), -1, key.c_str());
         return 1;
     }
 }
 
-static float playdate_display_getRefreshRate_lua(Emulator *emulator) {
-    return emulator->graphics.framerate;
+static float playdate_display_getRefreshRate_lua(Cranked *cranked) {
+    return cranked->graphics.framerate;
 }
 
-static LuaRet playdate_display_getSize_lua(Emulator *emulator) {
-    lua_pushinteger(emulator->getLuaContext(), DISPLAY_WIDTH / emulator->graphics.displayScale);
-    lua_pushinteger(emulator->getLuaContext(), DISPLAY_HEIGHT / emulator->graphics.displayScale);
+static LuaRet playdate_display_getSize_lua(Cranked *cranked) {
+    lua_pushinteger(cranked->getLuaContext(), DISPLAY_WIDTH / cranked->graphics.displayScale);
+    lua_pushinteger(cranked->getLuaContext(), DISPLAY_HEIGHT / cranked->graphics.displayScale);
     return 2;
 }
 
-static LuaRet playdate_display_getRect_lua(Emulator *emulator) {
-    pushRect(emulator, IntRect {0, 0, DISPLAY_WIDTH / emulator->graphics.displayScale, DISPLAY_HEIGHT / emulator->graphics.displayScale}); // Todo: Includes offset?
+static LuaRet playdate_display_getRect_lua(Cranked *cranked) {
+    pushRect(cranked, IntRect {0, 0, DISPLAY_WIDTH / cranked->graphics.displayScale, DISPLAY_HEIGHT / cranked->graphics.displayScale}); // Todo: Includes offset?
     return 1;
 }
 
-static int playdate_display_getScale_lua(Emulator *emulator) {
-    return emulator->graphics.displayScale;
+static int playdate_display_getScale_lua(Cranked *cranked) {
+    return cranked->graphics.displayScale;
 }
 
-static bool playdate_display_getInverted_lua(Emulator *emulator) {
-    return emulator->graphics.displayInverted;
+static bool playdate_display_getInverted_lua(Cranked *cranked) {
+    return cranked->graphics.displayInverted;
 }
 
-static LuaRet playdate_display_getMosaic_lua(Emulator *emulator) {
-    lua_pushinteger(emulator->getLuaContext(), emulator->graphics.displayMosaic.x);
-    lua_pushinteger(emulator->getLuaContext(), emulator->graphics.displayMosaic.y);
+static LuaRet playdate_display_getMosaic_lua(Cranked *cranked) {
+    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayMosaic.x);
+    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayMosaic.y);
     return 2;
 }
 
-static LuaRet playdate_display_getOffset_lua(Emulator *emulator) {
-    lua_pushinteger(emulator->getLuaContext(), emulator->graphics.displayOffset.x);
-    lua_pushinteger(emulator->getLuaContext(), emulator->graphics.displayOffset.y);
+static LuaRet playdate_display_getOffset_lua(Cranked *cranked) {
+    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayOffset.x);
+    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayOffset.y);
     return 2;
 }
 
-static void playdate_display_loadImage_lua(Emulator *emulator, const char *path) {
+static void playdate_display_loadImage_lua(Cranked *cranked, const char *path) {
     // Ignores image size requirement
-    auto image = emulator->graphics.getImage(path);
+    auto image = cranked->graphics.getImage(path);
     for (int i = 0; i < image->height; i++)
         for (int j = 0; j < image->width; j++)
             image->graphics->frameBuffer->drawPixel(j, i, image->getPixel(j, i));
-    emulator->graphics.freeBitmap(image);
+    cranked->graphics.freeBitmap(image);
 }
 
-static LuaRet playdate_file_load_lua(Emulator *emulator, const char *path, LuaVal env) {
+static LuaRet playdate_file_load_lua(Cranked *cranked, const char *path, LuaVal env) {
     // Todo: Resolve data files?
     // Todo: Should be added to Rom pdz list for loading assets?
-    luaL_loadfile(emulator->getLuaContext(), path);
+    luaL_loadfile(cranked->getLuaContext(), path);
     if (!env.isNil()) {
-        lua_pushvalue(emulator->getLuaContext(), env);
-        lua_setupvalue(emulator->getLuaContext(), -2, 1);
+        lua_pushvalue(cranked->getLuaContext(), env);
+        lua_setupvalue(cranked->getLuaContext(), -2, 1);
     }
     return 1;
 }
 
-static LuaRet playdate_file_run_lua(Emulator *emulator, const char *path, LuaVal env) {
-    playdate_file_load_lua(emulator, path, env);
-    lua_call(emulator->getLuaContext(), 0, LUA_MULTRET);
-    return lua_gettop(emulator->getLuaContext());
+static LuaRet playdate_file_run_lua(Cranked *cranked, const char *path, LuaVal env) {
+    playdate_file_load_lua(cranked, path, env);
+    lua_call(cranked->getLuaContext(), 0, LUA_MULTRET);
+    return lua_gettop(cranked->getLuaContext());
 }
 
-static LuaRet playdate_graphics_imagetable_new_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
+static LuaRet playdate_graphics_imagetable_new_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_imagetable_getImage_lua(Emulator *emulator, LCDBitmapTable_32 *table, LuaVal arg1, LuaVal arg2) {
+static LuaRet playdate_graphics_imagetable_getImage_lua(Cranked *cranked, LCDBitmapTable_32 *table, LuaVal arg1, LuaVal arg2) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_imagetable_setImage_lua(Emulator *emulator, LCDBitmapTable_32 *table, int n, LuaVal image) {
+static void playdate_graphics_imagetable_setImage_lua(Cranked *cranked, LCDBitmapTable_32 *table, int n, LuaVal image) {
     // Todo
 }
 
-static LuaRet playdate_graphics_imagetable_load_lua(Emulator *emulator, LCDBitmapTable_32 *table, const char *path) {
-    // Todo
-    return 0;
-}
-
-static int playdate_graphics_imagetable_getLength_lua(Emulator *emulator, LCDBitmapTable_32 *table) {
+static LuaRet playdate_graphics_imagetable_load_lua(Cranked *cranked, LCDBitmapTable_32 *table, const char *path) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_imagetable_getSize_lua(Emulator *emulator, LCDBitmapTable_32 *table) {
+static int playdate_graphics_imagetable_getLength_lua(Cranked *cranked, LCDBitmapTable_32 *table) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_imagetable_drawImage_lua(Emulator *emulator, LCDBitmapTable_32 *table, int n, int x, int y, LuaVal flip) {
-    // Todo
-}
-
-static void playdate_graphics_imagetable_gc_lua(Emulator *emulator, LuaVal table) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_imagetable_index_lua(Emulator *emulator, LuaVal table, LuaVal key) {
+static LuaRet playdate_graphics_imagetable_getSize_lua(Cranked *cranked, LCDBitmapTable_32 *table) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_imagetable_newindex_lua(Emulator *emulator, LuaVal table, LuaVal key, LuaVal value) {
+static void playdate_graphics_imagetable_drawImage_lua(Cranked *cranked, LCDBitmapTable_32 *table, int n, int x, int y, LuaVal flip) {
     // Todo
 }
 
-static LuaRet playdate_graphics_tilemap_new_lua(Emulator *emulator) {
-    // Todo
-    return 0;
-}
-
-static void playdate_graphics_tilemap_gc_lua(Emulator *emulator, LuaVal tilemap) {
+static void playdate_graphics_imagetable_gc_lua(Cranked *cranked, LuaVal table) {
     // Todo
 }
 
-static void playdate_graphics_tilemap_setImageTable_lua(Emulator *emulator, LuaVal tilemap, LuaVal table) {
-    // Todo
-}
-
-static void playdate_graphics_tilemap_setTiles_lua(Emulator *emulator, LuaVal tilemap, LuaVal data, int width) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_tilemap_getTiles_lua(Emulator *emulator, LuaVal tilemap) {
+static LuaRet playdate_graphics_imagetable_index_lua(Cranked *cranked, LuaVal table, LuaVal key) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_tilemap_draw_lua(Emulator *emulator, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
+static void playdate_graphics_imagetable_newindex_lua(Cranked *cranked, LuaVal table, LuaVal key, LuaVal value) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_tilemap_new_lua(Cranked *cranked) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_tilemap_drawIgnoringOffset_lua(Emulator *emulator, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
+static void playdate_graphics_tilemap_gc_lua(Cranked *cranked, LuaVal tilemap) {
+    // Todo
+}
+
+static void playdate_graphics_tilemap_setImageTable_lua(Cranked *cranked, LuaVal tilemap, LuaVal table) {
+    // Todo
+}
+
+static void playdate_graphics_tilemap_setTiles_lua(Cranked *cranked, LuaVal tilemap, LuaVal data, int width) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_tilemap_getTiles_lua(Cranked *cranked, LuaVal tilemap) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_tilemap_setTileAtPosition_lua(Emulator *emulator, LuaVal tilemap, int x, int y, int index) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_tilemap_getTileAtPosition_lua(Emulator *emulator, LuaVal tilemap, int x, int y, int index) {
+static LuaRet playdate_graphics_tilemap_draw_lua(Cranked *cranked, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_tilemap_setSize_lua(Emulator *emulator, LuaVal tilemap, int width, int height) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_tilemap_getSize_lua(Emulator *emulator, LuaVal tilemap) {
+static LuaRet playdate_graphics_tilemap_drawIgnoringOffset_lua(Cranked *cranked, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_tilemap_getPixelSize_lua(Emulator *emulator, LuaVal tilemap) {
+static void playdate_graphics_tilemap_setTileAtPosition_lua(Cranked *cranked, LuaVal tilemap, int x, int y, int index) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_tilemap_getTileAtPosition_lua(Cranked *cranked, LuaVal tilemap, int x, int y, int index) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_tilemap_getTileSize_lua(Emulator *emulator, LuaVal tilemap) {
+static void playdate_graphics_tilemap_setSize_lua(Cranked *cranked, LuaVal tilemap, int width, int height) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_tilemap_getSize_lua(Cranked *cranked, LuaVal tilemap) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_tilemap_getCollisionRects_lua(Emulator *emulator, LuaVal tilemap, LuaVal emptyIDs) {
+static LuaRet playdate_graphics_tilemap_getPixelSize_lua(Cranked *cranked, LuaVal tilemap) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_setFont_lua(Emulator *emulator, LuaVal font, LuaVal variant) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_getFont_lua(Emulator *emulator, LuaVal variant) {
+static LuaRet playdate_graphics_tilemap_getTileSize_lua(Cranked *cranked, LuaVal tilemap) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_setFontFamily_lua(Emulator *emulator, LuaVal fontFamily) {
-    // Todo
-}
-
-static void playdate_graphics_setFontTracking_lua(Emulator *emulator, int pixels) {
-    // Todo
-}
-
-static int playdate_graphics_getFontTracking_lua(Emulator *emulator) {
+static LuaRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranked, LuaVal tilemap, LuaVal emptyIDs) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_getSystemFont_lua(Emulator *emulator, LuaVal variant) {
+static void playdate_graphics_setFont_lua(Cranked *cranked, LuaVal font, LuaVal variant) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_getFont_lua(Cranked *cranked, LuaVal variant) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_drawText_lua(Emulator *emulator, const char *text, int x, int y, int leadingAdjustment) {
+static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFamily) {
+    // Todo
+}
+
+static void playdate_graphics_setFontTracking_lua(Cranked *cranked, int pixels) {
+    // Todo
+}
+
+static int playdate_graphics_getFontTracking_lua(Cranked *cranked) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_graphics_getSystemFont_lua(Cranked *cranked, LuaVal variant) {
+    // Todo
+    return 0;
+}
+
+static void playdate_graphics_drawText_lua(Cranked *cranked, const char *text, int x, int y, int leadingAdjustment) {
     // Todo: Encoding, leading adjustment
-    emulator->graphics.drawText(text, (int) strlen(text), PDStringEncoding::ASCII, x, y);
+    cranked->graphics.drawText(text, (int) strlen(text), PDStringEncoding::ASCII, x, y);
 }
 
-static void playdate_graphics_drawLocalizedText_lua(Emulator *emulator, const char *key, int x, int y, LuaVal language, int leadingAdjustment) {
+static void playdate_graphics_drawLocalizedText_lua(Cranked *cranked, const char *key, int x, int y, LuaVal language, int leadingAdjustment) {
     // Todo
 }
 
-static LuaRet playdate_graphics_getLocalizedText_lua(Emulator *emulator, const char *key, LuaVal language) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_getTextSize_lua(Emulator *emulator, const char *str, LuaVal fontFamily, int leadingAdjustment) {
+static LuaRet playdate_graphics_getLocalizedText_lua(Cranked *cranked, const char *key, LuaVal language) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_font_new_lua(Emulator *emulator, const char *path) {
+static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *str, LuaVal fontFamily, int leadingAdjustment) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_font_newFamily_lua(Emulator *emulator, LuaVal fontPaths) {
+static LuaRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_font_drawText_lua(Emulator *emulator, LCDFont_32 *font, int x, int y, int loadingAdjustment) {
-    // Todo
-}
-
-static int playdate_graphics_font_getHeight_lua(Emulator *emulator, LCDFont_32 *font) {
+static LuaRet playdate_graphics_font_newFamily_lua(Cranked *cranked, LuaVal fontPaths) {
     // Todo
     return 0;
 }
 
-static int playdate_graphics_font_getTextWidth_lua(Emulator *emulator, LCDFont_32 *font, const char *text) {
+static void playdate_graphics_font_drawText_lua(Cranked *cranked, LCDFont_32 *font, int x, int y, int loadingAdjustment) {
+    // Todo
+}
+
+static int playdate_graphics_font_getHeight_lua(Cranked *cranked, LCDFont_32 *font) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_font_setTracking_lua(Emulator *emulator, LCDFont_32 *font, int pixels) {
-    // Todo
-}
-
-static int playdate_graphics_font_getTracking_lua(Emulator *emulator, LCDFont_32 *font) {
+static int playdate_graphics_font_getTextWidth_lua(Cranked *cranked, LCDFont_32 *font, const char *text) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_font_setLeading_lua(Emulator *emulator, LCDFont_32 *font, int pixels) {
+static void playdate_graphics_font_setTracking_lua(Cranked *cranked, LCDFont_32 *font, int pixels) {
     // Todo
 }
 
-static int playdate_graphics_font_getLeading_lua(Emulator *emulator, LCDFont_32 *font) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_font_getGlyph_lua(Emulator *emulator, LCDFont_32 *font, LuaVal character) {
+static int playdate_graphics_font_getTracking_lua(Cranked *cranked, LCDFont_32 *font) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_new_lua(Emulator *context) {
+static void playdate_graphics_font_setLeading_lua(Cranked *cranked, LCDFont_32 *font, int pixels) {
+    // Todo
+}
+
+static int playdate_graphics_font_getLeading_lua(Cranked *cranked, LCDFont_32 *font) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, LCDFont_32 *font, LuaVal character) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_graphics_sprite_new_lua(Cranked *context) {
     pushSprite(context, context->graphics.allocateSprite(), true);
     return 1;
 }
 
-static void playdate_graphics_sprite_gc_lua(Emulator *emulator, LuaVal sprite) {
-    if (releaseOwnedUserdataObject(emulator, sprite))
-        emulator->graphics.freeSprite(sprite.asUserdataObject<LCDSprite_32>());
+static void playdate_graphics_sprite_gc_lua(Cranked *cranked, LuaVal sprite) {
+    if (releaseOwnedUserdataObject(cranked, sprite))
+        cranked->graphics.freeSprite(sprite.asUserdataObject<LCDSprite_32>());
 }
 
-static LuaRet playdate_graphics_sprite_index_lua(Emulator *emulator, LuaVal sprite) {
+static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, LuaVal sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_update_lua(Emulator *emulator, LuaVal sprite) {
+static LuaRet playdate_graphics_sprite_update_lua(Cranked *cranked, LuaVal sprite) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_setImage_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal image, LuaVal flip, float scale, LuaVal yScale) {
+static void playdate_graphics_sprite_setImage_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal image, LuaVal flip, float scale, LuaVal yScale) {
     // Todo
 }
 
-static LuaRet playdate_graphics_sprite_getImage_lua(Emulator *emulator, LuaVal sprite) {
+static LuaRet playdate_graphics_sprite_getImage_lua(Cranked *cranked, LuaVal sprite) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_add_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static void playdate_graphics_sprite_add_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
 }
 
-static void playdate_graphics_sprite_remove_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static void playdate_graphics_sprite_remove_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
 }
 
-static LuaRet playdate_graphics_sprite_getPosition_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getPosition_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_setCenter_lua(Emulator *emulator, LCDSprite_32 *sprite, float x, float y) {
+static void playdate_graphics_sprite_setCenter_lua(Cranked *cranked, LCDSprite_32 *sprite, float x, float y) {
     // Todo
 }
 
-static LuaRet playdate_graphics_sprite_getCenter_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getCenter_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_getCenterPoint_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getCenterPoint_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
-static LuaRet playdate_graphics_sprite_getSize_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static void playdate_graphics_sprite_setScale_lua(Emulator *emulator, LCDSprite_32 *sprite, float scale, LuaVal yScale) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_sprite_getScale_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getSize_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_setRotation_lua(Emulator *emulator, LCDSprite_32 *sprite, float angle, LuaVal scale, LuaVal yScale) {
+static void playdate_graphics_sprite_setScale_lua(Cranked *cranked, LCDSprite_32 *sprite, float scale, LuaVal yScale) {
     // Todo
 }
 
-static LuaRet playdate_graphics_sprite_getRotation_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_sprite_copy_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getScale_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_setImageFlip_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal flip, LuaVal flipCollideRect) {
+static void playdate_graphics_sprite_setRotation_lua(Cranked *cranked, LCDSprite_32 *sprite, float angle, LuaVal scale, LuaVal yScale) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setBounds_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_sprite_getBounds_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getRotation_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_getBoundsRect_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_copy_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static bool playdate_graphics_sprite_isOpaque_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static void playdate_graphics_sprite_setImageFlip_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal flip, LuaVal flipCollideRect) {
+    // Todo
+}
+
+static void playdate_graphics_sprite_setBounds_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_sprite_getBounds_lua(Cranked *cranked, LCDSprite_32 *sprite) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_graphics_sprite_getBoundsRect_lua(Cranked *cranked, LCDSprite_32 *sprite) {
+    // Todo
+    return 0;
+}
+
+static bool playdate_graphics_sprite_isOpaque_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return false;
 }
 
-static void playdate_graphics_sprite_setTilemap_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal tilemap) {
+static void playdate_graphics_sprite_setTilemap_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal tilemap) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setClipRect_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
+static void playdate_graphics_sprite_setClipRect_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setClipRectsInRange_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4, LuaVal arg5, LuaVal arg6) {
+static void playdate_graphics_sprite_setClipRectsInRange_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4, LuaVal arg5, LuaVal arg6) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setStencilImage_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal stencil, bool tile) {
+static void playdate_graphics_sprite_setStencilImage_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal stencil, bool tile) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setStencilPattern_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
+static void playdate_graphics_sprite_setStencilPattern_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
     // Todo
 }
 
-static bool playdate_graphics_sprite_getAlwaysRedraw_lua(Emulator *emulator) {
-    // Todo
-    return false;
-}
-
-void playdate_sprite_addDirtyRect_lua(Emulator *emulator, LCDSprite_32 *sprite, int x, int y, int width, int height) {
-    // Todo
-}
-
-static void playdate_graphics_sprite_setRedrawsOnImageChange_lua(Emulator *emulator, LCDSprite_32 *sprite, bool flag) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_sprite_getAllSprites_lua(Emulator *emulator) {
-    // Todo
-    return 0;
-}
-
-static void playdate_graphics_sprite_removeSprites_lua(Emulator *emulator, LuaVal spriteArray) {
-    // Todo
-}
-
-static void playdate_graphics_sprite_setCollideRect_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_sprite_getCollideRect_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_sprite_getCollideBounds_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_sprite_overlappingSprites_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_graphics_sprite_allOverlappingSprites_lua(Emulator *emulator) {
-    // Todo
-    return 0;
-}
-
-static bool playdate_graphics_sprite_alphaCollision_lua(Emulator *emulator, LCDSprite_32 *sprite, LCDSprite_32 *anotherSprite) {
+static bool playdate_graphics_sprite_getAlwaysRedraw_lua(Cranked *cranked) {
     // Todo
     return false;
 }
 
-static void playdate_graphics_sprite_setGroups_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal groups) {
+void playdate_sprite_addDirtyRect_lua(Cranked *cranked, LCDSprite_32 *sprite, int x, int y, int width, int height) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setCollidesWithGroups_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal groups) {
+static void playdate_graphics_sprite_setRedrawsOnImageChange_lua(Cranked *cranked, LCDSprite_32 *sprite, bool flag) {
     // Todo
 }
 
-static void playdate_graphics_sprite_setGroupMask_lua(Emulator *emulator, LCDSprite_32 *sprite, uint32_t mask) {
-    // Todo
-}
-
-static uint32_t playdate_graphics_sprite_getGroupMask_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static LuaRet playdate_graphics_sprite_getAllSprites_lua(Cranked *cranked) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_sprite_setCollidesWithGroupsMask_lua(Emulator *emulator, LCDSprite_32 *sprite, uint32_t mask) {
+static void playdate_graphics_sprite_removeSprites_lua(Cranked *cranked, LuaVal spriteArray) {
     // Todo
 }
 
-static uint32_t playdate_graphics_sprite_getCollidesWithGroupsMask_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-    return 0;
-}
-
-static void playdate_graphics_sprite_resetGroupMask_lua(Emulator *emulator, LCDSprite_32 *sprite) {
+static void playdate_graphics_sprite_setCollideRect_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
     // Todo
 }
 
-static void playdate_graphics_sprite_resetCollidesWithGroupsMask_lua(Emulator *emulator, LCDSprite_32 *sprite) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_sprite_moveWithCollisions_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
+static LuaRet playdate_graphics_sprite_getCollideRect_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_checkCollisions_lua(Emulator *emulator, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
+static LuaRet playdate_graphics_sprite_getCollideBounds_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_querySpritesAtPoint_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2) {
+static LuaRet playdate_graphics_sprite_overlappingSprites_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_querySpritesInRect_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
+static LuaRet playdate_graphics_sprite_allOverlappingSprites_lua(Cranked *cranked) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_querySpritesAlongLine_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
+static bool playdate_graphics_sprite_alphaCollision_lua(Cranked *cranked, LCDSprite_32 *sprite, LCDSprite_32 *anotherSprite) {
+    // Todo
+    return false;
+}
+
+static void playdate_graphics_sprite_setGroups_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal groups) {
+    // Todo
+}
+
+static void playdate_graphics_sprite_setCollidesWithGroups_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal groups) {
+    // Todo
+}
+
+static void playdate_graphics_sprite_setGroupMask_lua(Cranked *cranked, LCDSprite_32 *sprite, uint32_t mask) {
+    // Todo
+}
+
+static uint32_t playdate_graphics_sprite_getGroupMask_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_querySpriteInfoAlongLine_lua(Emulator *emulator, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
+static void playdate_graphics_sprite_setCollidesWithGroupsMask_lua(Cranked *cranked, LCDSprite_32 *sprite, uint32_t mask) {
+    // Todo
+}
+
+static uint32_t playdate_graphics_sprite_getCollidesWithGroupsMask_lua(Cranked *cranked, LCDSprite_32 *sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_video_new_lua(Emulator *emulator, const char *path) {
+static void playdate_graphics_sprite_resetGroupMask_lua(Cranked *cranked, LCDSprite_32 *sprite) {
+    // Todo
+}
+
+static void playdate_graphics_sprite_resetCollidesWithGroupsMask_lua(Cranked *cranked, LCDSprite_32 *sprite) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_sprite_moveWithCollisions_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_video_gc_lua(Emulator *emulator, LuaVal video) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_video_getSize_lua(Emulator *emulator, LCDVideoPlayer_32 *video) {
+static LuaRet playdate_graphics_sprite_checkCollisions_lua(Cranked *cranked, LCDSprite_32 *sprite, LuaVal arg1, LuaVal arg2) {
     // Todo
     return 0;
 }
 
-static int playdate_graphics_video_getFrameCount_lua(Emulator *emulator, LCDVideoPlayer_32 *video) {
+static LuaRet playdate_graphics_sprite_querySpritesAtPoint_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2) {
     // Todo
     return 0;
 }
 
-static int playdate_graphics_video_getFrameRate_lua(Emulator *emulator, LCDVideoPlayer_32 *video) {
+static LuaRet playdate_graphics_sprite_querySpritesInRect_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_video_setContext_lua(Emulator *emulator, LCDVideoPlayer_32 *video, LuaVal image) {
-    // Todo
-}
-
-static LuaRet playdate_graphics_video_getContext_lua(Emulator *emulator, LCDVideoPlayer_32 *video) {
+static LuaRet playdate_graphics_sprite_querySpritesAlongLine_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
     // Todo
     return 0;
 }
 
-static void playdate_graphics_video_useScreenContext_lua(Emulator *emulator, LCDVideoPlayer_32 *video) {
-    // Todo
-}
-
-static void playdate_graphics_video_renderFrame_lua(Emulator *emulator, LCDVideoPlayer_32 *video, int number) {
-    // Todo
-}
-
-static LuaRet playdate_pathfinder_graph_new_lua(Emulator *emulator, LuaVal nodeCount, LuaVal coordinates) {
+static LuaRet playdate_graphics_sprite_querySpriteInfoAlongLine_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_graph_gc_lua(Emulator *emulator, LuaVal graph) {
-    // Todo
-}
-
-static LuaRet playdate_pathfinder_graph_new2DGrid_lua(Emulator *emulator, LuaVal graph, int width, int height, bool allowDiagonals, LuaVal includedNodes) {
+static LuaRet playdate_graphics_video_new_lua(Cranked *cranked, const char *path) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_pathfinder_graph_addNewNode_lua(Emulator *emulator, LuaVal graph, int id, LuaVal x, LuaVal y, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
+static void playdate_graphics_video_gc_lua(Cranked *cranked, LuaVal video) {
+    // Todo
+}
+
+static LuaRet playdate_graphics_video_getSize_lua(Cranked *cranked, LCDVideoPlayer_32 *video) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_pathfinder_graph_addNewNodes_lua(Emulator *emulator, LuaVal graph, int count) {
+static int playdate_graphics_video_getFrameCount_lua(Cranked *cranked, LCDVideoPlayer_32 *video) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_graph_addNode_lua(Emulator *emulator, LuaVal graph, LuaVal node, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
-    // Todo
-}
-
-static void playdate_pathfinder_graph_addNodes_lua(Emulator *emulator, LuaVal graph, LuaVal nodes) {
-    // Todo
-}
-
-static LuaRet playdate_pathfinder_graph_allNodes_lua(Emulator *emulator, LuaVal graph) {
+static int playdate_graphics_video_getFrameRate_lua(Cranked *cranked, LCDVideoPlayer_32 *video) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_graph_removeNode_lua(Emulator *emulator, LuaVal graph, LuaVal node) {
+static void playdate_graphics_video_setContext_lua(Cranked *cranked, LCDVideoPlayer_32 *video, LuaVal image) {
     // Todo
 }
 
-static LuaRet playdate_pathfinder_graph_removeNodeWithXY_lua(Emulator *emulator, LuaVal graph, int x, int y) {
-    // Todo
-    return 0;
-}
-
-static LuaRet playdate_pathfinder_graph_removeNodeWithID_lua(Emulator *emulator, LuaVal graph, LuaVal id) {
+static LuaRet playdate_graphics_video_getContext_lua(Cranked *cranked, LCDVideoPlayer_32 *video) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_pathfinder_graph_nodeWithID_lua(Emulator *emulator, LuaVal graph, LuaVal id) {
+static void playdate_graphics_video_useScreenContext_lua(Cranked *cranked, LCDVideoPlayer_32 *video) {
+    // Todo
+}
+
+static void playdate_graphics_video_renderFrame_lua(Cranked *cranked, LCDVideoPlayer_32 *video, int number) {
+    // Todo
+}
+
+static LuaRet playdate_pathfinder_graph_new_lua(Cranked *cranked, LuaVal nodeCount, LuaVal coordinates) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_pathfinder_graph_nodeWithXY_lua(Emulator *emulator, LuaVal graph, int x, int y) {
+static void playdate_pathfinder_graph_gc_lua(Cranked *cranked, LuaVal graph) {
+    // Todo
+}
+
+static LuaRet playdate_pathfinder_graph_new2DGrid_lua(Cranked *cranked, LuaVal graph, int width, int height, bool allowDiagonals, LuaVal includedNodes) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_graph_addConnections_lua(Emulator *emulator, LuaVal graph, LuaVal connections) {
-    // Todo
-}
-
-static void playdate_pathfinder_graph_addConnectionToNodeWithID_lua(Emulator *emulator, LuaVal graph, LuaVal from, LuaVal to, LuaVal weights, bool addReciprocalConnections) {
-    // Todo
-}
-
-static void playdate_pathfinder_graph_removeAllConnections_lua(Emulator *emulator, LuaVal graph) {
-    // Todo
-}
-
-static void playdate_pathfinder_graph_removeAllConnectionsFromNodeWithID_lua(Emulator *emulator, LuaVal graph, LuaVal id, bool removeIncoming) {
-    // Todo
-}
-
-static LuaRet playdate_pathfinder_graph_findPath_lua(Emulator *emulator, LuaVal graph, LuaVal startNode, LuaVal goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+static LuaRet playdate_pathfinder_graph_addNewNode_lua(Cranked *cranked, LuaVal graph, int id, LuaVal x, LuaVal y, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_pathfinder_graph_findPathWithIDs_lua(Emulator *emulator, LuaVal graph, LuaVal startID, LuaVal goalID, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+static LuaRet playdate_pathfinder_graph_addNewNodes_lua(Cranked *cranked, LuaVal graph, int count) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_graph_setXYForNodeWithID_lua(Emulator *emulator, LuaVal graph, LuaVal id, int x, int y) {
+static void playdate_pathfinder_graph_addNode_lua(Cranked *cranked, LuaVal graph, LuaVal node, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
     // Todo
 }
 
-static void playdate_pathfinder_node_gc_lua(Emulator *emulator, LuaVal self) {
+static void playdate_pathfinder_graph_addNodes_lua(Cranked *cranked, LuaVal graph, LuaVal nodes) {
     // Todo
 }
 
-static LuaRet playdate_pathfinder_node_index_lua(Emulator *emulator, LuaVal self, LuaVal key) {
-    // Todo
-    return 0;
-}
-
-static void playdate_pathfinder_node_newindex_lua(Emulator *emulator, LuaVal self, LuaVal key, LuaVal value) {
-    // Todo
-}
-
-static void playdate_pathfinder_node_addConnection_lua(Emulator *emulator, LuaVal self, LuaVal node, LuaVal weight, bool addReciprocalConnection) {
-    // Todo
-}
-
-static void playdate_pathfinder_node_addConnections_lua(Emulator *emulator, LuaVal self, LuaVal nodes, LuaVal weights, bool addReciprocalConnection) {
-    // Todo
-}
-
-static void playdate_pathfinder_node_addConnectionToNodeWithXY_lua(Emulator *emulator, LuaVal self, int x, int y, LuaVal weight, bool addReciprocalConnection) {
-    // Todo
-}
-
-static LuaRet playdate_pathfinder_node_connectedNodes_lua(Emulator *emulator, LuaVal self) {
+static LuaRet playdate_pathfinder_graph_allNodes_lua(Cranked *cranked, LuaVal graph) {
     // Todo
     return 0;
 }
 
-static void playdate_pathfinder_node_removeConnection_lua(Emulator *emulator, LuaVal self, LuaVal node, bool removeReciprocal) {
+static void playdate_pathfinder_graph_removeNode_lua(Cranked *cranked, LuaVal graph, LuaVal node) {
     // Todo
 }
 
-static void playdate_pathfinder_node_removeAllConnections_lua(Emulator *emulator, LuaVal self, bool removeIncoming) {
+static LuaRet playdate_pathfinder_graph_removeNodeWithXY_lua(Cranked *cranked, LuaVal graph, int x, int y) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_pathfinder_graph_removeNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_pathfinder_graph_nodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_pathfinder_graph_nodeWithXY_lua(Cranked *cranked, LuaVal graph, int x, int y) {
+    // Todo
+    return 0;
+}
+
+static void playdate_pathfinder_graph_addConnections_lua(Cranked *cranked, LuaVal graph, LuaVal connections) {
     // Todo
 }
 
-static void playdate_pathfinder_node_setXY_lua(Emulator *emulator, LuaVal self, int x, int y) {
+static void playdate_pathfinder_graph_addConnectionToNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal from, LuaVal to, LuaVal weights, bool addReciprocalConnections) {
     // Todo
 }
 
-static int playdate_sound_getSampleRate_lua(Emulator *emulator) {
+static void playdate_pathfinder_graph_removeAllConnections_lua(Cranked *cranked, LuaVal graph) {
+    // Todo
+}
+
+static void playdate_pathfinder_graph_removeAllConnectionsFromNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id, bool removeIncoming) {
+    // Todo
+}
+
+static LuaRet playdate_pathfinder_graph_findPath_lua(Cranked *cranked, LuaVal graph, LuaVal startNode, LuaVal goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_pathfinder_graph_findPathWithIDs_lua(Cranked *cranked, LuaVal graph, LuaVal startID, LuaVal goalID, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+    // Todo
+    return 0;
+}
+
+static void playdate_pathfinder_graph_setXYForNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id, int x, int y) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_gc_lua(Cranked *cranked, LuaVal self) {
+    // Todo
+}
+
+static LuaRet playdate_pathfinder_node_index_lua(Cranked *cranked, LuaVal self, LuaVal key) {
+    // Todo
+    return 0;
+}
+
+static void playdate_pathfinder_node_newindex_lua(Cranked *cranked, LuaVal self, LuaVal key, LuaVal value) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_addConnection_lua(Cranked *cranked, LuaVal self, LuaVal node, LuaVal weight, bool addReciprocalConnection) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_addConnections_lua(Cranked *cranked, LuaVal self, LuaVal nodes, LuaVal weights, bool addReciprocalConnection) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_addConnectionToNodeWithXY_lua(Cranked *cranked, LuaVal self, int x, int y, LuaVal weight, bool addReciprocalConnection) {
+    // Todo
+}
+
+static LuaRet playdate_pathfinder_node_connectedNodes_lua(Cranked *cranked, LuaVal self) {
+    // Todo
+    return 0;
+}
+
+static void playdate_pathfinder_node_removeConnection_lua(Cranked *cranked, LuaVal self, LuaVal node, bool removeReciprocal) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_removeAllConnections_lua(Cranked *cranked, LuaVal self, bool removeIncoming) {
+    // Todo
+}
+
+static void playdate_pathfinder_node_setXY_lua(Cranked *cranked, LuaVal self, int x, int y) {
+    // Todo
+}
+
+static int playdate_sound_getSampleRate_lua(Cranked *cranked) {
     return 44100;
 }
 
-static LuaRet playdate_sound_playingSources_lua(Emulator *emulator) {
+static LuaRet playdate_sound_playingSources_lua(Cranked *cranked) {
     // Todo
     return 0;
 }
 
-static void playdate_sound_addEffect_lua(Emulator *emulator) {
+static void playdate_sound_addEffect_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_removeEffect_lua(Emulator *emulator) {
+static void playdate_sound_removeEffect_lua(Cranked *cranked) {
     // Todo
 }
 
-static bool playdate_sound_getHeadphoneState_lua(Emulator *emulator) {
+static bool playdate_sound_getHeadphoneState_lua(Cranked *cranked) {
     // Todo
     return false;
 }
 
-static void playdate_sound_resetTime_lua(Emulator *emulator) {
+static void playdate_sound_resetTime_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_new_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_gc_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_copy_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_copy_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_play_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_play_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_playAt_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_playAt_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_setLoopCallback_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_setLoopCallback_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_setFinishCallback_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_setFinishCallback_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_getSample_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_getSample_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_setRateMod_lua(Emulator *emulator) {
+static void playdate_sound_sampleplayer_setRateMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_new_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_gc_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_load_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_load_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_play_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_play_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setFinishCallback_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setFinishCallback_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setLoopRange_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setLoopRange_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setLoopCallback_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setLoopCallback_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setBufferSize_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setBufferSize_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setRateMod_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setRateMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_fileplayer_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_new_lua(Emulator *emulator) {
+static void playdate_sound_sample_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_gc_lua(Emulator *emulator) {
+static void playdate_sound_sample_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_getSubsample_lua(Emulator *emulator) {
+static void playdate_sound_sample_getSubsample_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_load_lua(Emulator *emulator) {
+static void playdate_sound_sample_load_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_getSampleRate_lua(Emulator *emulator) {
+static void playdate_sound_sample_getSampleRate_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_getFormat_lua(Emulator *emulator) {
+static void playdate_sound_sample_getFormat_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_play_lua(Emulator *emulator) {
+static void playdate_sound_sample_play_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_playAt_lua(Emulator *emulator) {
+static void playdate_sound_sample_playAt_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sample_save_lua(Emulator *emulator) {
+static void playdate_sound_sample_save_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_channel_new_lua(Emulator *emulator) {
+static void playdate_sound_channel_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_channel_gc_lua(Emulator *emulator) {
+static void playdate_sound_channel_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_channel_remove_lua(Emulator *emulator) {
+static void playdate_sound_channel_remove_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_channel_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_channel_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_channel_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_channel_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_new_lua(Emulator *emulator) {
+static void playdate_sound_synth_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_gc_lua(Emulator *emulator) {
+static void playdate_sound_synth_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_copy_lua(Emulator *emulator) {
+static void playdate_sound_synth_copy_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_playNote_lua(Emulator *emulator) {
+static void playdate_sound_synth_playNote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_playMIDINote_lua(Emulator *emulator) {
+static void playdate_sound_synth_playMIDINote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setADSR_lua(Emulator *emulator) {
+static void playdate_sound_synth_setADSR_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setEnvelopeCurvature_lua(Emulator *emulator) {
+static void playdate_sound_synth_setEnvelopeCurvature_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_getEnvelope_lua(Emulator *emulator) {
+static void playdate_sound_synth_getEnvelope_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setFinishCallback_lua(Emulator *emulator) {
+static void playdate_sound_synth_setFinishCallback_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setLegato_lua(Emulator *emulator) {
+static void playdate_sound_synth_setLegato_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_synth_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_synth_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_setWaveform_lua(Emulator *emulator) {
+static void playdate_sound_synth_setWaveform_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_signal_setOffset_lua(Emulator *emulator) {
+static void playdate_sound_signal_setOffset_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_signal_setScale_lua(Emulator *emulator) {
+static void playdate_sound_signal_setScale_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_lfo_new_lua(Emulator *emulator) {
+static void playdate_sound_lfo_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_lfo_gc_lua(Emulator *emulator) {
+static void playdate_sound_lfo_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_lfo_setArpeggio_lua(Emulator *emulator) {
+static void playdate_sound_lfo_setArpeggio_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_new_lua(Emulator *emulator) {
+static void playdate_sound_envelope_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_gc_lua(Emulator *emulator) {
+static void playdate_sound_envelope_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_setScale_lua(Emulator *emulator) {
+static void playdate_sound_envelope_setScale_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_setOffset_lua(Emulator *emulator) {
+static void playdate_sound_envelope_setOffset_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_trigger_lua(Emulator *emulator) {
+static void playdate_sound_envelope_trigger_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_envelope_setGlobal_lua(Emulator *emulator) {
+static void playdate_sound_envelope_setGlobal_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_new_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_gc_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_setMix_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_setAmountModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_setAmountModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_bitcrusher_setUndersampleModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_bitcrusher_setUndersampleModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_ringmodulator_new_lua(Emulator *emulator) {
+static void playdate_sound_effect_ringmodulator_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_ringmodulator_gc_lua(Emulator *emulator) {
+static void playdate_sound_effect_ringmodulator_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_ringmodulator_setMix_lua(Emulator *emulator) {
+static void playdate_sound_effect_ringmodulator_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_ringmodulator_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_effect_ringmodulator_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_ringmodulator_setFrequencyModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_ringmodulator_setFrequencyModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_new_lua(Emulator *emulator) {
+static void playdate_sound_effect_onepolefilter_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_gc_lua(Emulator *emulator) {
+static void playdate_sound_effect_onepolefilter_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_setMix_lua(Emulator *emulator) {
+static void playdate_sound_effect_onepolefilter_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_effect_onepolefilter_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_setParameterModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_onepolefilter_setParameterModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_new_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_gc_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setMix_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setFrequencyModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_setFrequencyModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setResonanceModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_twopolefilter_setResonanceModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_new_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_gc_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_setMix_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_setLimitModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_setLimitModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_effect_overdrive_setOffsetModulator_lua(Emulator *emulator) {
+static void playdate_sound_effect_overdrive_setOffsetModulator_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delayline_new_lua(Emulator *emulator) {
+static void playdate_sound_delayline_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delayline_gc_lua(Emulator *emulator) {
+static void playdate_sound_delayline_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delayline_setMix_lua(Emulator *emulator) {
+static void playdate_sound_delayline_setMix_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delayline_setMixMod_lua(Emulator *emulator) {
+static void playdate_sound_delayline_setMixMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delayline_addTap_lua(Emulator *emulator) {
+static void playdate_sound_delayline_addTap_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delaylinetap_gc_lua(Emulator *emulator) {
+static void playdate_sound_delaylinetap_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delaylinetap_setDelayMod_lua(Emulator *emulator) {
+static void playdate_sound_delaylinetap_setDelayMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delaylinetap_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_delaylinetap_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_delaylinetap_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_delaylinetap_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_new_lua(Emulator *emulator) {
+static void playdate_sound_sequence_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_gc_lua(Emulator *emulator) {
+static void playdate_sound_sequence_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_play_lua(Emulator *emulator) {
+static void playdate_sound_sequence_play_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_goToStep_lua(Emulator *emulator) {
+static void playdate_sound_sequence_goToStep_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_getCurrentStep_lua(Emulator *emulator) {
+static void playdate_sound_sequence_getCurrentStep_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_setLoops_lua(Emulator *emulator) {
+static void playdate_sound_sequence_setLoops_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_addTrack_lua(Emulator *emulator) {
+static void playdate_sound_sequence_addTrack_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_setTrackAtIndex_lua(Emulator *emulator) {
+static void playdate_sound_sequence_setTrackAtIndex_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sequence_getTrackAtIndex_lua(Emulator *emulator) {
+static void playdate_sound_sequence_getTrackAtIndex_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_new_lua(Emulator *emulator) {
+static void playdate_sound_track_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_gc_lua(Emulator *emulator) {
+static void playdate_sound_track_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_addNote_lua(Emulator *emulator) {
+static void playdate_sound_track_addNote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_setNotes_lua(Emulator *emulator) {
+static void playdate_sound_track_setNotes_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_getNotes_lua(Emulator *emulator) {
+static void playdate_sound_track_getNotes_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_getNotesActive_lua(Emulator *emulator) {
+static void playdate_sound_track_getNotesActive_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_setInstrument_lua(Emulator *emulator) {
+static void playdate_sound_track_setInstrument_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_getInstrument_lua(Emulator *emulator) {
+static void playdate_sound_track_getInstrument_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_removeNote_lua(Emulator *emulator) {
+static void playdate_sound_track_removeNote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_addControlSignal_lua(Emulator *emulator) {
+static void playdate_sound_track_addControlSignal_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_track_getControlSignals_lua(Emulator *emulator) {
+static void playdate_sound_track_getControlSignals_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_new_lua(Emulator *emulator) {
+static void playdate_sound_instrument_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_gc_lua(Emulator *emulator) {
+static void playdate_sound_instrument_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_addVoice_lua(Emulator *emulator) {
+static void playdate_sound_instrument_addVoice_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_playNote_lua(Emulator *emulator) {
+static void playdate_sound_instrument_playNote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_playMIDINote_lua(Emulator *emulator) {
+static void playdate_sound_instrument_playMIDINote_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_noteOff_lua(Emulator *emulator) {
+static void playdate_sound_instrument_noteOff_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_setVolume_lua(Emulator *emulator) {
+static void playdate_sound_instrument_setVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_instrument_getVolume_lua(Emulator *emulator) {
+static void playdate_sound_instrument_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_new_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_new_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_gc_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_gc_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_addEvent_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_addEvent_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_clearEvents_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_clearEvents_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_setControllerType_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_setControllerType_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_getControllerType_lua(Emulator *emulator) {
+static void playdate_sound_controlsignal_getControllerType_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_recordToSample_lua(Emulator *emulator) {
+static void playdate_sound_micinput_recordToSample_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_stopRecording_lua(Emulator *emulator) {
+static void playdate_sound_micinput_stopRecording_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_startListening_lua(Emulator *emulator) {
+static void playdate_sound_micinput_startListening_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_stopListening_lua(Emulator *emulator) {
+static void playdate_sound_micinput_stopListening_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_getLevel_lua(Emulator *emulator) {
+static void playdate_sound_micinput_getLevel_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_micinput_getSource_lua(Emulator *emulator) {
+static void playdate_sound_micinput_getSource_lua(Cranked *cranked) {
     // Todo
 }
 
-void Emulator::registerLuaGlobals() {
+void Cranked::registerLuaGlobals() {
     // Global import function for loading modules
     lua_pushcfunction(getLuaContext(), luaNativeWrapper<import_lua>);
     lua_setglobal(getLuaContext(), "import");

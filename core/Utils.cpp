@@ -3,7 +3,9 @@
 #include <zlib.h>
 #include <stdexcept>
 
-std::vector<uint8_t> decompressData(const uint8_t *data, size_t length, size_t expectedSize) {
+using namespace cranked;
+
+std::vector<uint8_t> cranked::decompressData(const uint8_t *data, size_t length, size_t expectedSize) {
     static constexpr auto CHUNK_SIZE = 0x1000;
     std::vector<uint8_t> buffer(expectedSize > 0 ? expectedSize : CHUNK_SIZE);
     z_stream inflater{};

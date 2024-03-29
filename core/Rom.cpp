@@ -1,12 +1,14 @@
 #include "Rom.hpp"
 #include "Utils.hpp"
-#include "Emulator.hpp"
+#include "Cranked.hpp"
 
 #include <fstream>
 #include <cstring>
 #include <filesystem>
 
-Rom::Rom(const std::string &path, Emulator *emulator) : emulator(emulator), path(path) {
+using namespace cranked;
+
+Rom::Rom(const std::string &path, Cranked *cranked) : cranked(cranked), path(path) {
     if (!std::filesystem::is_directory(path)) {
         zip = std::make_unique<libzippp::ZipArchive>(path);
         zip->open(libzippp::ZipArchive::ReadOnly);
@@ -624,10 +626,10 @@ Rom::FileType Rom::getFileType(const uint8_t *header) {
 }
 
 void Rom::logMessage(LogLevel level, const char *format, ...) const {
-    if (!emulator)
+    if (!cranked)
         return;
     va_list args;
     va_start(args, format);
-    emulator->logMessageVA(level, format, args);
+    cranked->logMessageVA(level, format, args);
     va_end(args);
 }
