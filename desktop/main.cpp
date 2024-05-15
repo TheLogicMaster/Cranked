@@ -3,6 +3,11 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include "imgui_stdlib.h"
+#include "imgui_internal.h"
+#include "magic_enum_all.hpp"
+#include "imgui_memory_editor.h"
+#include "ImGuiFileDialog.h"
 
 #include <SDL.h>
 
@@ -12,8 +17,29 @@
 
 using namespace cranked;
 
+typedef std::variant<std::string, int, float, bool> setting_type;
+
+enum class Windows {
+    Debug, Registers, HeapMemory, CodeMemory, Disassembly
+};
+
 struct Userdata {
-    SDL_AudioDeviceID audioDevice;
+    Cranked &cranked;
+    SDL_Window* window;
+    std::map<std::string, setting_type> settings;
+
+#ifndef __CLION_IDE__ // Todo: Remove when fixed
+    magic_enum::containers::array<Windows, bool> windowStates{};
+#endif
+
+    template<typename T>
+    bool tryGetSetting(const std::string &name, T &out) {
+        if (T *value = std::get_if<T>(&settings[name])) {
+            out = *value;
+            return true;
+        }
+        return false;
+    }
 };
 
 int main(int argc, const char *args[]) {
@@ -48,9 +74,9 @@ int main(int argc, const char *args[]) {
         throw std::runtime_error(std::string("Failed to create SDL renderer: ") + SDL_GetError());
 
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    auto imguiContext = ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
 
     ImGui::StyleColorsLight();
 
@@ -58,45 +84,145 @@ int main(int argc, const char *args[]) {
     auto highlightColor = ImVec4(1.0f, 0.788f, 0.416f, 1.0f);
     auto accentColor = ImVec4(1.0f, 1.0, 1.0f, 1.0f);
     auto bezelColor = ImVec4(0.145f, 0.141f, 0.118f, 1.0f);
+    auto selectedColor = ImVec4(1.0f, 0.7f, 0.35f, 0.9f);
+    auto activeColor = ImVec4(1.0f, 0.773f, 0.0f, 1.0f);
 
     auto &style = ImGui::GetStyle();
-    style.Colors[ImGuiCol_WindowBg] = bezelColor;
+    style.Colors[ImGuiCol_WindowBg] = backgroundColor;
     style.Colors[ImGuiCol_TitleBg] = backgroundColor;
     style.Colors[ImGuiCol_TitleBgActive] = highlightColor;
     style.Colors[ImGuiCol_TitleBgCollapsed] = backgroundColor;
+    style.Colors[ImGuiCol_MenuBarBg] = backgroundColor;
+    style.Colors[ImGuiCol_PopupBg] = highlightColor;
+    style.Colors[ImGuiCol_Button] = highlightColor;
+    style.Colors[ImGuiCol_ButtonActive] = activeColor;
+    style.Colors[ImGuiCol_ButtonHovered] = selectedColor;
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
-    Userdata userdata{
-        .audioDevice = audioDevice
-    };
-    auto callback = [](Cranked *cranked){
-        auto device = ((Userdata *)cranked->internalUserdata)->audioDevice;
-        if (device) {
-            int toQueue = 1024 - (int) SDL_GetQueuedAudioSize(device) / 4;
-            int16_t buffer[1024 * 2];
-            cranked->audio.sampleAudio(buffer, toQueue);
-            SDL_QueueAudio(device, buffer, toQueue * 4);
-        }
-    };
-    Cranked cranked(callback);
-    cranked.internalUserdata = &userdata;
-    cranked.load(args[1]);
-    cranked.start();
+    Cranked cranked;
+    Userdata userdata { .cranked = cranked, .window = window };
+    cranked.config.userdata = &userdata;
+
+    { // Todo: This would be good to extract to a header and make more generic
+        ImGuiSettingsHandler settingsHandler;
+        settingsHandler.TypeName = "Cranked";
+        settingsHandler.UserData = &userdata;
+        settingsHandler.TypeHash = ImHashStr("Cranked");
+        settingsHandler.ClearAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler) {};
+        settingsHandler.ReadOpenFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, const char *name) {
+            return (void *)name; // Just use name as entry value
+        };
+        settingsHandler.ReadLineFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, void *entry, const char *line) {
+            auto userdata = (Userdata *)handler->UserData;
+            std::string lineStr(line);
+            size_t typeSeparatorIndex = lineStr.find('@');
+            size_t valueSeparatorIndex = lineStr.find('=');
+            if (typeSeparatorIndex == std::string::npos or valueSeparatorIndex == std::string::npos)
+                throw std::runtime_error(std::format("Bad settings item in line: `{}`", line));
+            auto type = lineStr.substr(0, typeSeparatorIndex);
+            auto name = lineStr.substr(typeSeparatorIndex + 1, valueSeparatorIndex - typeSeparatorIndex - 1);
+            auto value = lineStr.substr(valueSeparatorIndex + 1);
+            try {
+                if (type == "String")
+                    userdata->settings[name] = value;
+                else if (type == "Int")
+                    userdata->settings[name] = std::stoi(value);
+                else if (type == "Float")
+                    userdata->settings[name] = std::stof(value);
+                else if (type == "Bool")
+                    userdata->settings[name] = (bool) std::stoi(value);
+                else
+                    throw std::runtime_error(std::format("Bad settings item type in line: `{}`", line));
+            } catch (std::logic_error &ex) {
+                throw std::runtime_error(std::format("Bad settings item value in line: `{}` ({})", line, ex.what()));
+            }
+        };
+        settingsHandler.ApplyAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler) {
+            auto userdata = (Userdata *)handler->UserData;
+            int width, height;
+            if (userdata->tryGetSetting("WindowWidth", width) && userdata->tryGetSetting("WindowHeight", height))
+                SDL_SetWindowSize(userdata->window, width, height);
+
+#ifndef __CLION_IDE__ // Todo: Remove when fixed
+            for (size_t i = 0; i < userdata->windowStates.size(); i++) {
+                auto value = magic_enum::enum_value<Windows>(i);
+                bool shown{};
+                userdata->tryGetSetting("ShowWindow" + std::string(magic_enum::enum_name(value)), shown);
+                userdata->windowStates[value] = shown;
+            }
+#endif
+        };
+        settingsHandler.WriteAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf) {
+            auto userdata = (Userdata *)handler->UserData;
+
+            int width, height;
+            SDL_GetWindowSize(userdata->window, &width, &height);
+            userdata->settings["WindowWidth"] = width;
+            userdata->settings["WindowHeight"] = height;
+
+#ifndef __CLION_IDE__ // Todo: Remove when fixed
+            for (size_t i = 0; i < userdata->windowStates.size(); i++) {
+                auto value = magic_enum::enum_value<Windows>(i);
+                userdata->settings["ShowWindow" + std::string(magic_enum::enum_name(value))] = userdata->windowStates[value];
+            }
+#endif
+
+            buf->append("[Cranked][Settings]\n");
+            for (const auto &entry : userdata->settings) {
+                if (std::holds_alternative<std::string>(entry.second))
+                    buf->appendf("String@%s=%s\n", entry.first.c_str(), std::get<std::string>(entry.second).c_str());
+                else if (std::holds_alternative<int>(entry.second))
+                    buf->appendf("Int@%s=%d\n", entry.first.c_str(), std::get<int>(entry.second));
+                else if (std::holds_alternative<float>(entry.second))
+                    buf->appendf("Float@%s=%f\n", entry.first.c_str(), std::get<float>(entry.second));
+                else if (std::holds_alternative<bool>(entry.second))
+                    buf->appendf("Bool@%s=%d\n", entry.first.c_str(), std::get<bool>(entry.second));
+                else
+                    throw std::runtime_error("Unexpected settings type variant");
+            }
+        };
+        imguiContext->SettingsHandlers.push_back(settingsHandler);
+    }
 
     SDL_Texture* displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
     if (!displayTexture)
         throw std::runtime_error(std::string("Failed to create SDL display texture: ") + SDL_GetError());
 
+    auto getWindowOpen = [&](Windows window) -> bool & {
+#ifdef __CLION_IDE__ // Todo: Remove when fixed
+        bool _; return *&_;
+#else
+        return userdata.windowStates[window];
+#endif
+    };
+
+    MemoryEditor codeMemoryEditor;
+    MemoryEditor heapMemoryEditor;
+
+    std::string newBreakpointText;
+    bool disassemblyFollowPc = true;
+
     auto keyboardState = SDL_GetKeyboardState(nullptr);
-    bool done = false;
-    while (!done) {
+    bool exited = false;
+
+    // Todo: Extract the following disaster to separate functions
+    auto callback = [&](Cranked &cranked){
+        if (audioDevice) {
+            int toQueue = 1024 - (int) SDL_GetQueuedAudioSize(audioDevice) / 4;
+            int16_t buffer[1024 * 2];
+            cranked.audio.sampleAudio(buffer, toQueue);
+            SDL_QueueAudio(audioDevice, buffer, toQueue * 4);
+        }
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT or (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)))
-                done = true;
+            if (event.type == SDL_QUIT or (event.type == SDL_WINDOWEVENT and event.window.event == SDL_WINDOWEVENT_CLOSE and event.window.windowID == SDL_GetWindowID(window))) {
+                exited = true;
+                cranked.terminate();
+            }
         }
 
         constexpr int keys[] { SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_B, SDL_SCANCODE_D, SDL_SCANCODE_Z, SDL_SCANCODE_X };
@@ -105,17 +231,204 @@ int main(int argc, const char *args[]) {
             if (keyboardState[keys[i]])
                 cranked.currentInputs |= (1 << i);
 
-        cranked.update();
-
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        SDL_UpdateTexture(displayTexture, nullptr, cranked.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
 
-        ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize);
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View")) {
+                ImGui::MenuItem("Show Debug", nullptr, &getWindowOpen(Windows::Debug));
+                ImGui::MenuItem("Show Registers", nullptr, &getWindowOpen(Windows::Registers));
+                ImGui::MenuItem("Show Code Memory", nullptr, &getWindowOpen(Windows::CodeMemory));
+                ImGui::MenuItem("Show Heap Memory", nullptr, &getWindowOpen(Windows::HeapMemory));
+                ImGui::MenuItem("Show Disassembly", nullptr, &getWindowOpen(Windows::Disassembly));
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        //ImGui::ShowDemoWindow();
+
+        // Todo: Capture logToConsole/print and write to a "Log" window
+
+        // Todo: Performance/stats window (Heap usage, frame times, program size), or just throw them around
+
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, bezelColor);
+        ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoDocking);
+        SDL_UpdateTexture(displayTexture, nullptr, cranked.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
         ImGui::Image((ImTextureID) (intptr_t) displayTexture, ImVec2(DISPLAY_WIDTH, DISPLAY_HEIGHT));
         ImGui::End();
+        ImGui::PopStyleColor();
+
+        if (getWindowOpen(Windows::Debug)) {
+            ImGui::Begin("Debug", &getWindowOpen(Windows::Debug), ImGuiWindowFlags_None);
+
+            ImGui::Checkbox("Enabled", &cranked.debugger.isEnabled());
+
+            if (ImGui::Button("Halt"))
+                cranked.debugger.halt();
+            ImGui::SameLine();
+            if (ImGui::Button("Continue"))
+                cranked.debugger.resume();
+            ImGui::SameLine();
+            if (ImGui::Button("Step"))
+                cranked.debugger.step();
+
+            ImGui::SeparatorText("Breakpoints");
+
+            ImGui::BeginChild("BreakpointList", ImVec2(ImGui::GetWindowWidth() - 10, ImGui::GetWindowHeight() - 130));
+            bool oddBreakpoint = false;
+            for (cref_t breakpoint: cranked.debugger.getBreakpoints()) {
+                ImGui::PushID((int) breakpoint);
+                if (oddBreakpoint)
+                    ImGui::SameLine();
+                if (ImGui::Button("X")) {
+                    cranked.debugger.removeBreakpoint(breakpoint);
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::PopID();
+                ImGui::SameLine();
+                ImGui::TextColored(accentColor, "%08X", breakpoint);
+                oddBreakpoint = !oddBreakpoint;
+            }
+            ImGui::EndChild();
+
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputText("##", &newBreakpointText, ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_AlwaysOverwrite | ImGuiInputTextFlags_AutoSelectAll);
+            ImGui::SameLine();
+            if (ImGui::Button("Add") && !newBreakpointText.empty()) {
+                try {
+                    cranked.debugger.addBreakpoint((cref_t)std::stol(newBreakpointText, nullptr, 16));
+                    newBreakpointText.clear();
+                } catch (std::exception &ex) {}
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Clear"))
+                cranked.debugger.clearBreakpoints();
+
+            ImGui::End();
+        }
+
+        if (getWindowOpen(Windows::Registers)) {
+            ImGui::Begin("Registers", &getWindowOpen(Windows::Registers), ImGuiWindowFlags_None);
+
+            ImGui::TextColored(bezelColor, "PC ");
+            ImGui::SameLine();
+            ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_PC));
+
+            ImGui::SameLine(0.0, 20);
+            ImGui::TextColored(bezelColor, "SP ");
+            ImGui::SameLine();
+            ImGui::TextColored(bezelColor, "%08x", cranked.nativeEngine.readRegister(UC_ARM_REG_SP));
+
+            ImGui::TextColored(bezelColor, "LR ");
+            ImGui::SameLine();
+            ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_LR));
+
+            ImGui::SameLine(0.0, 20);
+            ImGui::TextColored(bezelColor, "SR ");
+            ImGui::SameLine();
+            ImGui::TextColored(bezelColor, "%08x", cranked.nativeEngine.readRegister(UC_ARM_REG_XPSR));
+
+            if (ImGui::TreeNodeEx("General Registers", ImGuiTreeNodeFlags_DefaultOpen)) {
+                bool oddRegister = false;
+                for (int i = 0; i < 13; i++) {
+                    if (oddRegister)
+                        ImGui::SameLine(0.0, 20);
+                    ImGui::TextColored(bezelColor, i < 10 ? "R%d " : "R%d", i);
+                    ImGui::SameLine();
+                    ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_R0 + i));
+                    oddRegister = !oddRegister;
+                }
+
+                ImGui::TreePop();
+            }
+
+            if (ImGui::TreeNode("Float Registers")) {
+                ImGui::TextColored(bezelColor, "SR ");
+                ImGui::SameLine();
+                ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_FPSCR));
+
+                bool oddRegister = false;
+                for (int i = 0; i < 32; i++) {
+                    if (oddRegister)
+                        ImGui::SameLine(0.0, 20);
+                    ImGui::TextColored(bezelColor, i < 10 ? "S%d " : "S%d", i);
+                    ImGui::SameLine();
+                    ImGui::TextColored(bezelColor, "%08f", bit_cast<float>(cranked.nativeEngine.readRegister(UC_ARM_REG_S0 + i)));
+                    oddRegister = !oddRegister;
+                }
+
+                ImGui::TreePop();
+            }
+
+            if (ImGui::TreeNode("Double Registers")) {
+                bool oddRegister = false;
+                for (int i = 0; i < 16; i++) {
+                    if (oddRegister)
+                        ImGui::SameLine(0.0, 20);
+                    ImGui::TextColored(bezelColor, i < 10 ? "D%d " : "D%d", i);
+                    ImGui::SameLine();
+                    ImGui::TextColored(bezelColor, "%08f", bit_cast<double>(cranked.nativeEngine.readRegister64(UC_ARM_REG_D0 + i)));
+                    oddRegister = !oddRegister;
+                }
+                ImGui::TreePop();
+            }
+
+            ImGui::End();
+        }
+
+        auto drawMemoryWindow = [&](Windows windowVal, const char *name, MemoryEditor &editor, void *data, size_t size, size_t base){
+            if (!getWindowOpen(windowVal))
+                return;
+            MemoryEditor::Sizes s;
+            editor.CalcSizes(s, size, base);
+            ImGui::SetNextWindowSize(ImVec2(s.WindowWidth, s.WindowWidth * 0.60f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(s.WindowWidth, FLT_MAX));
+            ImGui::Begin(name, &getWindowOpen(windowVal), ImGuiWindowFlags_NoScrollbar);
+            // Todo: Ensure this is safe when code memory is empty...
+            editor.DrawContents(data, size, base);
+            if (editor.ContentsWidthChanged)
+            {
+                editor.CalcSizes(s, size, base);
+                ImGui::SetWindowSize(ImVec2(s.WindowWidth, ImGui::GetWindowSize().y));
+            }
+            ImGui::End();
+        };
+
+        drawMemoryWindow(Windows::CodeMemory, "Code Memory", codeMemoryEditor, cranked.nativeEngine.getCodeMemory().data(), cranked.nativeEngine.getCodeMemory().size(), CODE_PAGE_ADDRESS);
+        drawMemoryWindow(Windows::HeapMemory, "Heap Memory", heapMemoryEditor, cranked.heap.baseAddress(), HEAP_SIZE, HEAP_ADDRESS);
+
+        if (getWindowOpen(Windows::Disassembly)) {
+            ImGui::SetNextWindowSize(ImVec2(250, 400), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Disassembly", &getWindowOpen(Windows::Disassembly), ImGuiWindowFlags_NoScrollbar);
+            ImGui::Checkbox("Follow PC", &disassemblyFollowPc);
+            ImGui::BeginChild("DisassemblyView", ImVec2(ImGui::GetWindowWidth() - 10, ImGui::GetWindowHeight() - 55));
+            auto disassembly = cranked.debugger.getDisassembly();
+            int size = cranked.debugger.getDisassemblySize();
+            cref_t pc = cranked.nativeEngine.readRegister(UC_ARM_REG_PC) & ~0x1;
+            for (int i = 0; i < size; i++) {
+                auto &instruction = disassembly[i];
+                auto address = (cref_t)instruction.address;
+                ImGui::TextColored(address == pc ? accentColor : bezelColor, "%08X  %s %s", address, instruction.mnemonic, instruction.op_str);
+                if (disassemblyFollowPc and address == pc)
+                    ImGui::SetScrollHereY();
+                if (ImGui::IsItemHovered() and ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+                    if (cranked.debugger.hasBreakpoint(address))
+                        cranked.debugger.removeBreakpoint(address);
+                    else
+                        cranked.debugger.addBreakpoint(address);
+                }
+            }
+            ImGui::EndChild();
+            ImGui::End();
+        }
 
         ImGui::Render();
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
@@ -123,6 +436,20 @@ int main(int argc, const char *args[]) {
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
+    };
+    cranked.config.updateCallback = callback;
+    cranked.config.debugPort = 1337;
+    cranked.load(args[1]); // Todo: Actual arg parsing with cxxopts
+    cranked.start();
+
+    while (!exited) {
+        try {
+            cranked.update();
+            // Todo: Sleep for the rest of the frame
+        } catch (NativeEngine::NativeExecutionError &ex) {
+            printf("Uncaught native execution error: %s\n%s", ex.what(), ex.getDump().c_str());
+            exited = true;
+        }
     }
 
     if (audioDevice)

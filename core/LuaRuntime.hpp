@@ -556,7 +556,7 @@ namespace cranked {
     inline LuaVal pushUserdataObject(Cranked *cranked, void *value, const char *metatable) {
         auto object = pushTable(cranked);
         object.setLightUserdataField("userdata", value);
-        cranked->getQualifiedLuaGlobal(metatable);
+        cranked->luaEngine.getQualifiedLuaGlobal(metatable);
         lua_setmetatable(cranked->getLuaContext(), -2);
         return object;
     }
@@ -568,14 +568,14 @@ namespace cranked {
         auto object = pushUserdataObject(cranked, value, metatable);
         object.setBoolField("owner", owner);
         if (owner)
-            cranked->preserveLuaReference(value, object);
+            cranked->luaEngine.preserveLuaReference(value, object);
         return object;
     }
 
     inline bool releaseOwnedUserdataObject(Cranked *cranked, LuaVal value) {
         if (!value.getBoolField("owner"))
             return false;
-        return cranked->releaseLuaReference(value.getLightUserdataField("userdata"));
+        return cranked->luaEngine.releaseLuaReference(value.getLightUserdataField("userdata"));
     }
 
     inline LuaVal pushImage(Cranked *cranked, LCDBitmap_32 *image, bool owner) {
@@ -589,7 +589,7 @@ namespace cranked {
     template<typename T>
     inline LuaVal pushRect(Cranked *cranked, const Rectangle<T> &rect) {
         LuaVal val = pushTable(cranked);
-        cranked->getQualifiedLuaGlobal("playdate.geometry.rect");
+        cranked->luaEngine.getQualifiedLuaGlobal("playdate.geometry.rect");
         lua_setmetatable(cranked->getLuaContext(), -2);
         auto floatRect = rect.template as<float>();
         val.setFloatField("x", floatRect.pos.x);

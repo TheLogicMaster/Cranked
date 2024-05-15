@@ -168,11 +168,11 @@ void Graphics::popContext() {
         return;
     auto &context = displayContextStack.back();
     // Free any preserved Lua references (Safe for non-preserved values, as well)
-    cranked->releaseLuaReference(context.focusedImage);
-    cranked->releaseLuaReference(context.font);
-    cranked->releaseLuaReference(context.stencilImage);
+    cranked->luaEngine.releaseLuaReference(context.focusedImage);
+    cranked->luaEngine.releaseLuaReference(context.font);
+    cranked->luaEngine.releaseLuaReference(context.stencilImage);
     if (context.bitmap != frameBuffer)
-        cranked->releaseLuaReference(context.bitmap);
+        cranked->luaEngine.releaseLuaReference(context.bitmap);
     displayContextStack.pop_back();
 }
 

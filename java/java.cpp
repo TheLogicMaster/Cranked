@@ -44,15 +44,16 @@ JNIEXPORT jlong JNICALL Java_com_thelogicmaster_cranked_Cranked_initialize(JNIEn
         updateCallbackMethodId = env->GetMethodID(crankedClass, "updateCallback", "()V");
     }
 
-    auto cranked = new Cranked([](Cranked *cranked) {
-        environment->CallVoidMethod((jobject) cranked->internalUserdata, updateCallbackMethodId);
-    }, env->NewGlobalRef(object));
-
-    auto dataPathChars = env->GetStringUTFChars(appDataPath, nullptr);
-    cranked->loggingCallback = [](Cranked *emulator, LogLevel logLevel, const char *format, va_list args){
+    auto cranked = new Cranked;
+    cranked->config.userdata = env->NewGlobalRef(object);
+    cranked->config.updateCallback = [](Cranked &cranked) {
+        environment->CallVoidMethod((jobject) cranked.config.userdata, updateCallbackMethodId);
+    };
+    cranked->config.loggingCallback = [](Cranked &emulator, LogLevel logLevel, const char *format, va_list args){
         logVA(logLevel, format, args);
     };
 
+    auto dataPathChars = env->GetStringUTFChars(appDataPath, nullptr);
     cranked->files.appDataPath = dataPathChars;
     env->ReleaseStringUTFChars(appDataPath, dataPathChars);
 
@@ -61,7 +62,7 @@ JNIEXPORT jlong JNICALL Java_com_thelogicmaster_cranked_Cranked_initialize(JNIEn
 
 JNIEXPORT void JNICALL Java_com_thelogicmaster_cranked_Cranked_destroy(JNIEnv *env, jclass clazz, jlong ptr) {
     auto cranked = (Cranked *) (intptr_t) ptr;
-    env->DeleteGlobalRef((jobject) cranked->internalUserdata);
+    env->DeleteGlobalRef((jobject) cranked->config.userdata);
     delete cranked;
 }
 

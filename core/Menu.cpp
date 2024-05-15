@@ -16,15 +16,13 @@ void Menu::reset() {
 void Menu::update() {
     if (cranked->pressedInputs & int(PDButtons::Menu)) {
         if (isOpen) {
-            cranked->invokeLuaCallback("gameWillResume");
-            if (cranked->nativeEventCallback)
-                cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                        (cranked->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Resume, uint32_t(0));
+            cranked->luaEngine.invokeLuaCallback("gameWillResume");
+            if (cranked->nativeEngine.isLoaded())
+                cranked->nativeEngine.invokeEventCallback(PDSystemEvent::Resume, 0);
         } else {
-            cranked->invokeLuaCallback("gameWillPause");
-            if (cranked->nativeEventCallback)
-                cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                        (cranked->nativeEventCallback, API_ADDRESS, (int32_t) PDSystemEvent::Pause, uint32_t(0));
+            cranked->luaEngine.invokeLuaCallback("gameWillPause");
+            if (cranked->nativeEngine.isLoaded())
+                cranked->nativeEngine.invokeEventCallback(PDSystemEvent::Pause, 0);
         }
         isOpen = not isOpen;
     }
@@ -38,7 +36,7 @@ void Menu::render() {
 void Menu::setImage(LCDBitmap_32 *bitmap, int xOffset) {
     this->imageXOffset = xOffset;
     if (image) {
-        cranked->releaseLuaReference(image);
+        cranked->luaEngine.releaseLuaReference(image);
         cranked->heap.destruct(image);
         image = nullptr;
     }
@@ -64,7 +62,7 @@ PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type,
     item->value = value;
     item->emulatedCallback = emulatedCallback;
     if (luaCallback) {
-        cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+        cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
         lua_pushvalue(cranked->getLuaContext(), luaCallback);
         lua_seti(cranked->getLuaContext(), -2, index + 1);
         lua_pop(cranked->getLuaContext(), 1);
@@ -82,8 +80,8 @@ void Menu::removeItem(PDMenuItem_32 *item) {
             for (auto option: item->options)
                 cranked->heap.free((void *) option);
             cranked->heap.destruct(item);
-            if (cranked->hasLua) {
-                cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+            if (cranked->luaEngine.isLoaded()) {
+                cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
                 lua_pushnil(cranked->getLuaContext());
                 lua_seti(cranked->getLuaContext(), -2, i + 1);
                 lua_pop(cranked->getLuaContext(), 1);

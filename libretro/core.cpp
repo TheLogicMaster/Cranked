@@ -28,12 +28,13 @@ static void fallback_log(retro_log_level level, const char *fmt, ...) {
     va_end(va);
 }
 
-static void emulatorCallback(Cranked *context) {
+static void emulatorCallback(Cranked &context) {
 
 }
 
 void retro_init() {
-    instance = new Cranked(emulatorCallback);
+    instance = new Cranked;
+    instance->config.updateCallback = emulatorCallback;
     instance->graphics.displayBufferNativeEndian = true;
 }
 

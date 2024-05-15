@@ -414,8 +414,7 @@ void cranked::playdate_sys_drawFPS(Cranked *cranked, int32_t x, int32_t y) {
 }
 
 void cranked::playdate_sys_setUpdateCallback(Cranked *cranked, cref_t update, void *userdata) {
-    cranked->nativeUpdateCallback = update;
-    cranked->nativeUpdateUserdata = cranked->toVirtualAddress(userdata);
+    cranked->nativeEngine.setUpdateCallback(update, cranked->toVirtualAddress(userdata));
 }
 
 void cranked::playdate_sys_getButtonState(Cranked *cranked, int32_t *current, int32_t *pushed, int32_t *released) {
@@ -548,7 +547,9 @@ uint32_t cranked::playdate_sys_convertDateTimeToEpoch(Cranked *cranked, PDDateTi
     return 0;
 }
 
-void cranked::playdate_sys_clearICache(Cranked *cranked) {} // Not needed, probably
+void cranked::playdate_sys_clearICache(Cranked *cranked) {
+    // Todo
+}
 
 void cranked::playdate_sys_setButtonCallback(Cranked *cranked, cref_t cb, void *buttonud, int32_t queuesize) {
     cranked->buttonCallback = cb;
@@ -887,8 +888,8 @@ int32_t cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8_t *n
             *outErr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
         return 0;
     }
-    cranked->pushEmulatedLuaFunction(f);
-    cranked->setQualifiedLuaGlobal((const char *) name);
+    cranked->nativeEngine.pushEmulatedLuaFunction(f);
+    cranked->luaEngine.setQualifiedLuaGlobal((const char *) name);
     if (outErr)
         *outErr = 0;
     return 1;
@@ -906,7 +907,7 @@ int32_t cranked::playdate_lua_registerClass(Cranked *cranked, uint8_t *name, lua
 
 void cranked::playdate_lua_pushFunction(Cranked *cranked, cref_t f) {
     if (cranked->getLuaContext())
-        cranked->pushEmulatedLuaFunction(f);
+        cranked->nativeEngine.pushEmulatedLuaFunction(f);
 }
 
 int32_t cranked::playdate_lua_indexMetatable(Cranked *cranked) {
@@ -1078,7 +1079,7 @@ int32_t cranked::playdate_lua_getUserValue(Cranked *cranked, LuaUDObject_32 *obj
 void cranked::playdate_lua_callFunction_deprecated(Cranked *cranked, uint8_t *name, int32_t nargs) {
     if (!cranked->getLuaContext())
         return;
-    cranked->getQualifiedLuaGlobal((const char *) name);
+    cranked->luaEngine.getQualifiedLuaGlobal((const char *) name);
     lua_pcall(cranked->getLuaContext(), nargs, LUA_MULTRET, 0);
 }
 
@@ -1092,14 +1093,14 @@ int32_t cranked::playdate_lua_callFunction(Cranked *cranked, uint8_t *name, int3
         lua_pushnil(cranked->getLuaContext());
     for (int i = 0; i < nargs; i++)
         lua_copy(cranked->getLuaContext(), -i - 2, -i - 1);
-    cranked->getQualifiedLuaGlobal((const char *) name);
+    cranked->luaEngine.getQualifiedLuaGlobal((const char *) name);
     if (nargs > 0) {
         lua_copy(cranked->getLuaContext(), -1, -2 - nargs);
         lua_pop(cranked->getLuaContext(), 1);
     }
     if (int result = lua_pcall(cranked->getLuaContext(), nargs, LUA_MULTRET, 0); result != LUA_OK) {
         if (outerr)
-            *outerr = cranked->getEmulatedStringLiteral(std::string("Error calling function: ") + cranked->getLuaError(result));
+            *outerr = cranked->getEmulatedStringLiteral(std::string("Error calling function: ") + cranked->luaEngine.getLuaError(result));
         return 0;
     }
     return 1;
@@ -1107,7 +1108,7 @@ int32_t cranked::playdate_lua_callFunction(Cranked *cranked, uint8_t *name, int3
 
 void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encoder, cref_t write, void *userdata, int32_t pretty) {
     // Encoder API is stored directly after Playdate API, as subtract json_encoder_32 struct size from API size to get address
-    *encoder = *cranked->fromVirtualAddress<json_encoder_32>(API_ADDRESS + cranked->apiSize - sizeof(json_encoder_32));
+    *encoder = *cranked->fromVirtualAddress<json_encoder_32>(API_ADDRESS + cranked->nativeEngine.getApiSize() - sizeof(json_encoder_32));
     encoder->writeStringFunc = write;
     encoder->userdata = cranked->toVirtualAddress(userdata);
     encoder->pretty = pretty;
@@ -1138,7 +1139,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 bool willDecode = not inArray;
                 if (inArray and context.decoder.shouldDecodeArrayValueAtIndex) {
                     context.arrayIndex++;
-                    willDecode = cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
+                    willDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
                             (context.decoder.shouldDecodeArrayValueAtIndex, &context.decoder, context.arrayIndex);
                 }
                 if (not willDecode)
@@ -1162,7 +1163,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 if (isRoot or context.decoder.returnString) // Copy returnString for all children
                     return true;
                 if (context.decoder.willDecodeSublist)
-                    cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t>
+                    cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t>
                             (context.decoder.willDecodeSublist, &context.decoder, context.path.data(), inArray ? JsonValueType::Array : JsonValueType::Table);
 //                printf("Start %i %s\n", (int) event, parsed.dump().c_str());
                 break;
@@ -1174,7 +1175,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 auto type = event == nlohmann::json::parse_event_t::object_end ? JsonValueType::Table : JsonValueType::Array;
                 // Todo: Is it supposed to call didDecodeSublist when returnString is set?
                 if (!context.decoder.returnString and context.decoder.didDecodeSublist)
-                    value = cranked->invokeEmulatedFunction<void *, ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t>
+                    value = cranked->nativeEngine.invokeEmulatedFunction<void *, ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t>
                             (context.decoder.didDecodeSublist, &context.decoder, context.path.data(), type);
                 if (context.decoder.returnString) { // Todo: How does memory ownership work here? User freed?
                     auto string = parsed.get<std::string>();
@@ -1189,12 +1190,12 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 } else {
                     if (parentContext.inArray) {
                         if (parentContext.decoder.didDecodeArrayValue)
-                            cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
+                            cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeArrayValue, &parentContext.decoder, parentContext.arrayIndex, sublist);
                     } else {
                         auto keyData = vheap_vector<char>(parentContext.lastKey.begin(), parentContext.lastKey.end() + 1, cranked->heap.allocator<char>());
                         if (parentContext.decoder.didDecodeTableValue)
-                            cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
+                            cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeTableValue, &parentContext.decoder, keyData.data(), sublist);
                     }
                 }
@@ -1214,7 +1215,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 bool shouldDecode = true;
                 context.lastKey = key;
                 if (context.decoder.shouldDecodeTableValueForKey)
-                    shouldDecode = cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
+                    shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
                             (context.decoder.shouldDecodeTableValueForKey, &stack.back().decoder, keyData.data());
 //                if (shouldDecode)
 //                    stack.emplace_back(cranked, functions, std::vector<char>(keyData.begin(), keyData.end())); // Todo: Does this copy the original or the current context?
@@ -1253,17 +1254,17 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                     bool shouldDecode = true;
                     context.arrayIndex++; // Indices start at 1...
                     if (context.decoder.shouldDecodeArrayValueAtIndex)
-                        shouldDecode = cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
+                        shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
                                 (context.decoder.shouldDecodeArrayValueAtIndex, &stack.back().decoder, context.arrayIndex);
                     if (shouldDecode) {
                         if (context.decoder.didDecodeArrayValue)
-                            cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::int32_t, ArgType::struct2_t>
+                            cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::int32_t, ArgType::struct2_t>
                                     (context.decoder.didDecodeArrayValue, &stack.back().decoder, context.arrayIndex, parseValue());
                     }
                 } else {
                     auto keyData = vheap_vector<char>(context.lastKey.begin(), context.lastKey.end(), cranked->heap.allocator<char>());
                     if (context.decoder.didDecodeTableValue)
-                        cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
+                        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                 (context.decoder.didDecodeTableValue, &stack.back().decoder, keyData.data(), parseValue());
                 }
 //                printf("Value %i %s\n", (int) event, parsed.dump().c_str());
@@ -1277,7 +1278,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
         return 1;
     } catch (std::exception &ex) {
         if (functions->decodeError)
-            cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::int32_t>
+            cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::int32_t>
                     (functions->decodeError, functions, cranked->getEmulatedStringLiteral(ex.what()), -1); // Todo: Is line number retreivable?
         return 0;
     }
@@ -1288,7 +1289,7 @@ int32_t cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functio
     int size = 0;
     vheap_vector<char> buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
     while (true) {
-        int returned = cranked->invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
+        int returned = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
                 (reader.read, reader.userdata, buffer.data() + size, buffer.size() - size);
         if (returned < BUFFER_SEGMENT)
             break;
@@ -1303,7 +1304,7 @@ int32_t cranked::playdate_json_decodeString(Cranked *cranked, json_decoder_32 *f
 }
 
 inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, cref_t string, int len) {
-    cranked->invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint32_t, ArgType::uint32_t, ArgType::int32_t>
+    cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint32_t, ArgType::uint32_t, ArgType::int32_t>
             (encoder->writeStringFunc, encoder->userdata, string, len);
 }
 
@@ -1410,7 +1411,7 @@ int32_t cranked::playdate_file_listfiles(Cranked *cranked, uint8_t *path, cref_t
     if (cranked->files.listFiles((const char *) path, showhidden, files))
         return -1;
     for (auto &file : files)
-        cranked->invokeEmulatedFunction<void, ArgType::ptr_t, ArgType::ptr_t>(callback, file.c_str(), userdata);
+        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::ptr_t, ArgType::ptr_t>(callback, file.c_str(), userdata);
     return 0;
 }
 

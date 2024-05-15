@@ -7,14 +7,27 @@
 #include <sstream>
 #include <bit>
 #include <chrono>
+#include <functional>
 
 namespace cranked {
+
+    class Cranked;
 
     enum class LogLevel {
         Verbose,
         Info,
         Warning,
         Error
+    };
+
+    typedef std::function<void(Cranked &cranked, LogLevel level, const char *format, va_list args)> LoggingCallback;
+    typedef std::function<void(Cranked &cranked)> InternalUpdateCallback;
+
+    struct Config {
+        LoggingCallback loggingCallback;
+        InternalUpdateCallback updateCallback;
+        void *userdata;
+        int debugPort;
     };
 
     inline std::vector<std::string> splitString(std::string string, const std::string &delimiter) {
@@ -163,14 +176,37 @@ namespace cranked {
 
     template<typename T>
     inline std::string formatHex(T value) {
-        std::stringstream stream;
+        std::ostringstream stream;
         stream << std::hex << value;
         return stream.str();
     }
 
+    template<typename T>
+    static std::string formatHexStringLE(T t) {
+        std::ostringstream stream;
+        stream << std::hex;
+        for (int i = 0; i < (int)sizeof(T); i++)
+            stream << std::format("{:02x}", (t >> 8 * i) & 0xFF);
+        return stream.str();
+    }
+
+    template<typename T>
+    static T decodeHexStringLE(std::string_view string) {
+        if (string.size() / 2 != sizeof(T))
+            throw std::runtime_error("Invalid hex string for type");
+        T t{};
+        uint8_t byte{};
+        for (int i = 0; i < (int)sizeof(T); i++) {
+            auto result = std::from_chars(string.begin() + i * 2, string.begin() + i * 2 + 2, byte, 16);
+            if (result.ec != std::errc{})
+                throw std::runtime_error("Invalid hex byte");
+            t |= byte << i * 8;
+        }
+        return t;
+    }
+
     template<typename S>
-    struct dependent_false : std::false_type {
-    };
+    struct dependent_false : std::false_type {};
 
     template<typename F>
     struct FunctionTypeHelper;

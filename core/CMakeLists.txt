@@ -1,6 +1,6 @@
 project(core)
 
-find_package(PythonInterp)
+find_package (Python3)
 
 find_package(ZLIB)
 
@@ -16,10 +16,13 @@ set(_libzip_pkgcfg " ")
 
 add_subdirectory(libs/unicorn)
 add_subdirectory(libs/capstone)
+add_subdirectory(libs/asio)
+add_subdirectory(libs/dynarmic)
 add_subdirectory(libs/libzip)
 add_subdirectory(libs/libzippp)
 add_subdirectory(libs/nlohmann_json)
 add_subdirectory(libs/ffi)
+add_subdirectory(libs/magic_enum)
 
 file(GLOB lua_sources libs/lua54/*.c)
 list(FILTER lua_sources EXCLUDE REGEX ".*luac?\\.c$")
@@ -30,11 +33,14 @@ endforeach()
 file(GLOB cranked_sources
         Audio.cpp
         Cranked.cpp
+        Debugger.cpp
         File.cpp
         Graphics.cpp
         HeapAllocator.cpp
+        LuaEngine.cpp
         LuaRuntime.cpp
         Menu.cpp
+        NativeEngine.cpp
         Rom.cpp
         Runtime.cpp
         Utils.cpp
@@ -42,8 +48,9 @@ file(GLOB cranked_sources
 )
 
 add_library(cranked STATIC ${cranked_sources} ${lua_sources})
-target_include_directories(cranked PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/capstone/include libs/zlib ${CMAKE_CURRENT_BINARY_DIR}/libs/ffi/include)
-target_link_libraries(cranked unicorn libzippp nlohmann_json::nlohmann_json capstone libffi ${ZLIB_LIBRARIES})
+target_include_directories(cranked PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} gen libs libs/unicorn/include libs/lua54 libs/dynarmic/src libs/capstone/include libs/asio/include libs/zlib ${CMAKE_CURRENT_BINARY_DIR}/libs/ffi/include)
+# Todo: Make debugger libs optional (capstone)
+target_link_libraries(cranked unicorn libzippp nlohmann_json::nlohmann_json capstone libffi dynarmic magic_enum::magic_enum ${ZLIB_LIBRARIES})
 
 function(embed_resource resource_file header_file variable_name args)
     add_custom_command(

@@ -5,7 +5,7 @@
 using namespace cranked;
 
 static LuaRet import_lua(Cranked *cranked, const char *name) {
-    if (cranked->loadedLuaFiles.contains(name))
+    if (cranked->luaEngine.loadedLuaFiles.contains(name))
         return 0;
     for (auto &file: cranked->rom->pdzFiles)
         if (file.type == Rom::FileType::LUAC and file.name == name) { // Name gets extension removed at compile time
@@ -14,6 +14,7 @@ static LuaRet import_lua(Cranked *cranked, const char *name) {
                 luaL_error(cranked->getLuaContext(), "Failed to load module `%s`: %s", name, lua_tostring(cranked->getLuaContext(), -1));
                 return 1;
             }
+            cranked->luaEngine.loadedLuaFiles.emplace(name);
             return 0;
         }
     luaL_error(cranked->getLuaContext(), "Failed to load module: %s", name);
@@ -606,7 +607,7 @@ static LuaRet playdate_graphics_image_vcrPauseFilterImage_lua(Cranked *cranked, 
 static void playdate_graphics_pushContext_lua(Cranked *cranked, LuaVal imageVal) {
     auto image = imageVal.isUserdataObject() ? imageVal.asUserdataObject<LCDBitmap_32>() : nullptr;
     if (image)
-        cranked->preserveLuaReference(image, imageVal);
+        cranked->luaEngine.preserveLuaReference(image, imageVal);
     cranked->graphics.pushContext(image);
 }
 
@@ -801,12 +802,12 @@ static StrokeLocation playdate_graphics_getStrokeLocation_lua(Cranked *cranked) 
 
 static void playdate_graphics_lockFocus_lua(Cranked *cranked, LuaVal imageVal) {
     auto image = imageVal.asUserdataObject<LCDBitmap_32>();
-    cranked->preserveLuaReference(image, imageVal);
+    cranked->luaEngine.preserveLuaReference(image, imageVal);
     cranked->graphics.getCurrentDisplayContext().focusedImage = image;
 }
 
 static void playdate_graphics_unlockFocus_lua(Cranked *cranked) {
-    cranked->releaseLuaReference(cranked->graphics.getCurrentDisplayContext().focusedImage);
+    cranked->luaEngine.releaseLuaReference(cranked->graphics.getCurrentDisplayContext().focusedImage);
     cranked->graphics.getCurrentDisplayContext().focusedImage = nullptr;
 }
 
@@ -908,14 +909,14 @@ static LuaRet playdate_getPowerStatus_lua(Cranked *cranked) {
 
 static LuaRet playdate_getSystemMenu_lua(Cranked *cranked) {
     pushTable(cranked); // Just use an empty table
-    cranked->getQualifiedLuaGlobal("playdate.menu");
+    cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu");
     lua_setmetatable(cranked->getLuaContext(), -2);
     return 1;
 }
 
 static void playdate_setMenuImage_lua(Cranked *cranked, LuaVal image, int xOffset) {
     auto bitmap = image.asUserdataObject<LCDBitmap_32>();
-    cranked->preserveLuaReference(bitmap, image);
+    cranked->luaEngine.preserveLuaReference(bitmap, image);
     cranked->menu.setImage(bitmap, xOffset);
 }
 
@@ -1002,7 +1003,7 @@ static void playdate_menu_removeAllMenuItems_lua(Cranked *cranked, LuaVal menu) 
 
 static void playdate_menu_item_setCallback_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal callback) {
     cranked->menu.assertHasItem(item);
-    cranked->getQualifiedLuaGlobal("cranked.menuCallbacks");
+    cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
     lua_pushvalue(cranked->getLuaContext(), callback);
     lua_seti(cranked->getLuaContext(), -2, (int) (std::find(cranked->menu.items.begin(), cranked->menu.items.end(), item) - cranked->menu.items.begin()) + 1);
     lua_pop(cranked->getLuaContext(), 1);
@@ -1070,7 +1071,7 @@ static LuaRet playdate_menu_item_index_lua(Cranked *cranked, PDMenuItem_32 *item
     else if (key == "title")
         return playdate_menu_item_getTitle_lua(cranked, item);
     else {
-        cranked->getQualifiedLuaGlobal("playdate.menu.item");
+        cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu.item");
         lua_getfield(cranked->getLuaContext(), -1, key.c_str());
         return 1;
     }
@@ -2330,18 +2331,18 @@ static void playdate_sound_micinput_getSource_lua(Cranked *cranked) {
     // Todo
 }
 
-void Cranked::registerLuaGlobals() {
+void LuaEngine::registerLuaGlobals() {
     // Global import function for loading modules
-    lua_pushcfunction(getLuaContext(), luaNativeWrapper<import_lua>);
-    lua_setglobal(getLuaContext(), "import");
+    lua_pushcfunction(getContext(), luaNativeWrapper<import_lua>);
+    lua_setglobal(getContext(), "import");
 
     // Add custom `table` functions (Most are implemented in Lua directly)
-    lua_getglobal(getLuaContext(), "table");
-    setLuaFunction(getLuaContext(), "create", luaNativeWrapper<table_create_lua>);
-    lua_pop(getLuaContext(), 1);
+    lua_getglobal(getContext(), "table");
+    setLuaFunction(getContext(), "create", luaNativeWrapper<table_create_lua>);
+    lua_pop(getContext(), 1);
 
     { // No idea why this isn't on playdate API table
-        auto json = LuaApiHelper(getLuaContext(), "json", true);
+        auto json = LuaApiHelper(getContext(), "json", true);
         json.setWrappedFunction<json_decode_lua>("decode");
         json.setWrappedFunction<json_decodeFile_lua>("decodeFile");
         json.setWrappedFunction<json_encode_lua>("encode");
@@ -2349,14 +2350,14 @@ void Cranked::registerLuaGlobals() {
         json.setWrappedFunction<json_encodeToFile_lua>("encodeToFile");
 
         { // Both functions just return "null"
-            auto jsonNull = LuaApiHelper(getLuaContext(), "null");
+            auto jsonNull = LuaApiHelper(getContext(), "null");
             jsonNull.setWrappedFunction<json_null_tostring_lua>("__call");
             jsonNull.setWrappedFunction<json_null_tostring_lua>("__tostring");
         }
     }
 
     {
-        auto playdate = LuaApiHelper(getLuaContext(), "playdate", true);
+        auto playdate = LuaApiHelper(getContext(), "playdate", true);
         playdate.setInteger("kButtonLeft", 1 << 0);
         playdate.setInteger("kButtonRight", 1 << 1);
         playdate.setInteger("kButtonUp", 1 << 2);
@@ -2403,20 +2404,20 @@ void Cranked::registerLuaGlobals() {
         playdate.setWrappedFunction<playdate_setMenuImage_lua>("setMenuImage");
 
         // Set playdate.metadata table
-        lua_newtable(getLuaContext());
-        for (auto &entry: rom->manifest) {
-            lua_pushstring(getLuaContext(), entry.second.c_str());
-            lua_setfield(getLuaContext(), -2, entry.first.c_str());
+        lua_newtable(getContext());
+        for (auto &entry: cranked->rom->manifest) {
+            lua_pushstring(getContext(), entry.second.c_str());
+            lua_setfield(getContext(), -2, entry.first.c_str());
         }
-        lua_setfield(getLuaContext(), -2, "metadata");
+        lua_setfield(getContext(), -2, "metadata");
 
         { // Implemented in Lua
-            auto inputHandlers = LuaApiHelper(getLuaContext(), "inputHandlers");
+            auto inputHandlers = LuaApiHelper(getContext(), "inputHandlers");
             inputHandlers.setString("__name", "playdate.inputHandlers");
         }
 
         {
-            auto menuApi = LuaApiHelper(getLuaContext(), "menu");
+            auto menuApi = LuaApiHelper(getContext(), "menu");
             menuApi.setString("__name", "playdate.menu");
             menuApi.setWrappedFunction<playdate_menu_addMenuItem_lua>("addMenuItem");
             menuApi.setWrappedFunction<playdate_menu_addCheckmarkMenuItem_lua>("addCheckmarkMenuItem");
@@ -2426,7 +2427,7 @@ void Cranked::registerLuaGlobals() {
             menuApi.setWrappedFunction<playdate_menu_removeAllMenuItems_lua>("removeAllMenuItems");
 
             {
-                auto menuItem = LuaApiHelper(getLuaContext(), "item");
+                auto menuItem = LuaApiHelper(getContext(), "item");
                 menuItem.setString("__name", "playdate.menu.item");
                 menuItem.setWrappedFunction<playdate_menu_item_index_lua>("__index");
                 menuItem.setWrappedFunction<playdate_menu_item_newindex_lua>("__newindex");
@@ -2439,7 +2440,7 @@ void Cranked::registerLuaGlobals() {
         }
 
         {
-            auto display = LuaApiHelper(getLuaContext(), "display");
+            auto display = LuaApiHelper(getContext(), "display");
             display.setSelfIndex();
             display.setWrappedFunction<playdate_display_setRefreshRate>("setRefreshRate");
             display.setWrappedFunction<playdate_display_getRefreshRate_lua>("getRefreshRate");
@@ -2461,7 +2462,7 @@ void Cranked::registerLuaGlobals() {
         }
 
         {
-            auto datastore = LuaApiHelper(getLuaContext(), "datastore");
+            auto datastore = LuaApiHelper(getContext(), "datastore");
             datastore.setSelfIndex();
             datastore.setString("__name", "playdate.datastore");
             datastore.setWrappedFunction<playdate_datastore_write_lua>("write");
@@ -2472,7 +2473,7 @@ void Cranked::registerLuaGlobals() {
         }
 
         {
-            auto file = LuaApiHelper(getLuaContext(), "file");
+            auto file = LuaApiHelper(getContext(), "file");
             file.setSelfIndex();
             file.setInteger("kSeekSet", 0);
             file.setInteger("kSeekFromCurrent", 1);
@@ -2494,7 +2495,7 @@ void Cranked::registerLuaGlobals() {
             file.setWrappedFunction<playdate_file_run_lua>("run");
 
             {
-                auto fileFile = LuaApiHelper(getLuaContext(), "file");
+                auto fileFile = LuaApiHelper(getContext(), "file");
                 fileFile.setSelfIndex();
                 fileFile.setString("__name", "playdate.file.file");
                 fileFile.setWrappedFunction<playdate_file_close_lua>("__gc");
@@ -2509,7 +2510,7 @@ void Cranked::registerLuaGlobals() {
         }
 
         { // Primarily implemented in Lua as tables (Official implementation is presumably done in C for performance, using all userdata)
-            auto geometry = LuaApiHelper(getLuaContext(), "geometry");
+            auto geometry = LuaApiHelper(getContext(), "geometry");
             geometry.setSelfIndex();
             geometry.setInteger("kUnflipped", 0);
             geometry.setInteger("kFlippedX", 1);
@@ -2517,54 +2518,54 @@ void Cranked::registerLuaGlobals() {
             geometry.setInteger("kFlippedXY", 3);
 
             {
-                auto rect = LuaApiHelper(getLuaContext(), "rect");
+                auto rect = LuaApiHelper(getContext(), "rect");
                 rect.setString("__name", "playdate.geometry.rect");
             }
 
             {
-                auto point = LuaApiHelper(getLuaContext(), "point");
+                auto point = LuaApiHelper(getContext(), "point");
                 point.setSelfIndex();
                 point.setString("__name", "playdate.geometry.point");
             }
 
             {
-                auto polygon = LuaApiHelper(getLuaContext(), "polygon");
+                auto polygon = LuaApiHelper(getContext(), "polygon");
                 polygon.setSelfIndex();
                 polygon.setString("__name", "playdate.geometry.polygon");
             }
 
             {
-                auto arc = LuaApiHelper(getLuaContext(), "arc");
+                auto arc = LuaApiHelper(getContext(), "arc");
                 arc.setSelfIndex();
                 arc.setString("__name", "playdate.geometry.arc");
             }
 
             {
-                auto size = LuaApiHelper(getLuaContext(), "size");
+                auto size = LuaApiHelper(getContext(), "size");
                 size.setSelfIndex();
                 size.setString("__name", "playdate.geometry.size");
             }
 
             {
-                auto lineSegment = LuaApiHelper(getLuaContext(), "lineSegment");
+                auto lineSegment = LuaApiHelper(getContext(), "lineSegment");
                 lineSegment.setSelfIndex();
                 lineSegment.setString("__name", "playdate.geometry.lineSegment");
             }
 
             {
-                auto vector2D = LuaApiHelper(getLuaContext(), "vector2D");
+                auto vector2D = LuaApiHelper(getContext(), "vector2D");
                 vector2D.setString("__name", "playdate.geometry.vector2D");
             }
 
             {
-                auto affineTransform = LuaApiHelper(getLuaContext(), "affineTransform");
+                auto affineTransform = LuaApiHelper(getContext(), "affineTransform");
                 affineTransform.setSelfIndex();
                 affineTransform.setString("__name", "playdate.geometry.affineTransform");
             }
         }
 
         {
-            auto gfx = LuaApiHelper(getLuaContext(), "graphics");
+            auto gfx = LuaApiHelper(getContext(), "graphics");
             gfx.setSelfIndex();
             gfx.setInteger("kColorBlack", 0);
             gfx.setInteger("kColorWhite", 1);
@@ -2650,7 +2651,7 @@ void Cranked::registerLuaGlobals() {
             gfx.setWrappedFunction<playdate_graphics_getTextSize_lua>("getTextSize");
 
             {
-                auto image = LuaApiHelper(getLuaContext(), "image");
+                auto image = LuaApiHelper(getContext(), "image");
                 image.setSelfIndex();
                 image.setString("__name", "playdate.graphics.image");
                 image.setInteger("kDitherTypeNone", 0);
@@ -2698,7 +2699,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto imageTable = LuaApiHelper(getLuaContext(), "imagetable");
+                auto imageTable = LuaApiHelper(getContext(), "imagetable");
                 imageTable.setString("__name", "playdate.graphics.imagetable");
                 imageTable.setWrappedFunction<playdate_graphics_imagetable_gc_lua>("__gc");
                 imageTable.setWrappedFunction<playdate_graphics_imagetable_getLength_lua>("__len");
@@ -2714,7 +2715,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto tileMap = LuaApiHelper(getLuaContext(), "tilemap");
+                auto tileMap = LuaApiHelper(getContext(), "tilemap");
                 tileMap.setSelfIndex();
                 tileMap.setString("__name", "playdate.graphics.tilemap");
                 tileMap.setWrappedFunction<playdate_graphics_tilemap_gc_lua>("__gc");
@@ -2734,7 +2735,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto font = LuaApiHelper(getLuaContext(), "font");
+                auto font = LuaApiHelper(getContext(), "font");
                 font.setSelfIndex();
                 font.setString("__name", "playdate.graphics.font");
                 font.setInteger("kLanguageEnglish", 0);
@@ -2752,7 +2753,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             { // Official implementation uses a table with a `_spriteud` userdata field, but using a plain userdata type in `userdata` should work fine
-                auto sprite = LuaApiHelper(getLuaContext(), "sprite");
+                auto sprite = LuaApiHelper(getContext(), "sprite");
                 sprite.setString("__name", "playdate.graphics.sprite");
                 sprite.setInteger("kCollisionTypeSlide", 0);
                 sprite.setInteger("kCollisionTypeFreeze", 1);
@@ -2841,7 +2842,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto video = LuaApiHelper(getLuaContext(), "video");
+                auto video = LuaApiHelper(getContext(), "video");
                 video.setSelfIndex();
                 video.setString("__name", "playdate.graphics.video");
                 video.setWrappedFunction<playdate_graphics_video_gc_lua>("__gc");
@@ -2857,10 +2858,10 @@ void Cranked::registerLuaGlobals() {
         }
 
         { // Todo: Just implement in Lua?
-            auto pathfinder = LuaApiHelper(getLuaContext(), "pathfinder");
+            auto pathfinder = LuaApiHelper(getContext(), "pathfinder");
 
             {
-                auto graph = LuaApiHelper(getLuaContext(), "graph");
+                auto graph = LuaApiHelper(getContext(), "graph");
                 graph.setSelfIndex();
                 graph.setString("__name", "playdate.pathfinder.graph");
                 graph.setWrappedFunction<playdate_pathfinder_graph_gc_lua>("__gc");
@@ -2886,7 +2887,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto node = LuaApiHelper(getLuaContext(), "node");
+                auto node = LuaApiHelper(getContext(), "node");
                 node.setSelfIndex();
                 node.setString("__name", "playdate.pathfinder.node");
                 node.setWrappedFunction<playdate_pathfinder_node_gc_lua>("__gc");
@@ -2903,7 +2904,7 @@ void Cranked::registerLuaGlobals() {
         }
 
         {
-            auto sound = LuaApiHelper(getLuaContext(), "sound");
+            auto sound = LuaApiHelper(getContext(), "sound");
             sound.setSelfIndex();
             sound.setInteger("kFilterLowPass", 0);
             sound.setInteger("kFilterHighPass", 1);
@@ -2940,7 +2941,7 @@ void Cranked::registerLuaGlobals() {
             sound.setWrappedFunction<playdate_sound_resetTime_lua>("resetTime");
 
             {
-                auto samplePlayer = LuaApiHelper(getLuaContext(), "sampleplayer");
+                auto samplePlayer = LuaApiHelper(getContext(), "sampleplayer");
                 samplePlayer.setSelfIndex();
                 samplePlayer.setString("__name", "playdate.sound.sampleplayer");
                 samplePlayer.setWrappedFunction<playdate_sound_sampleplayer_gc_lua>("__gc");
@@ -2967,7 +2968,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto filePlayer = LuaApiHelper(getLuaContext(), "fileplayer");
+                auto filePlayer = LuaApiHelper(getContext(), "fileplayer");
                 filePlayer.setSelfIndex();
                 filePlayer.setString("__name", "playdate.sound.fileplayer");
                 filePlayer.setWrappedFunction<playdate_sound_fileplayer_gc_lua>("__gc");
@@ -2994,7 +2995,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto sample = LuaApiHelper(getLuaContext(), "sample");
+                auto sample = LuaApiHelper(getContext(), "sample");
                 sample.setSelfIndex();
                 sample.setString("__name", "playdate.sound.sample");
                 sample.setWrappedFunction<playdate_sound_sample_gc_lua>("__gc");
@@ -3010,7 +3011,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto channel = LuaApiHelper(getLuaContext(), "channel");
+                auto channel = LuaApiHelper(getContext(), "channel");
                 channel.setSelfIndex();
                 channel.setString("__name", "playdate.sound.channel");
                 channel.setWrappedFunction<playdate_sound_channel_gc_lua>("__gc");
@@ -3028,7 +3029,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto synth = LuaApiHelper(getLuaContext(), "synth");
+                auto synth = LuaApiHelper(getContext(), "synth");
                 synth.setSelfIndex();
                 synth.setString("__name", "playdate.sound.synth");
                 synth.setWrappedFunction<playdate_sound_synth_gc_lua>("__gc");
@@ -3058,7 +3059,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto signal = LuaApiHelper(getLuaContext(), "signal");
+                auto signal = LuaApiHelper(getContext(), "signal");
                 signal.setSelfIndex();
                 signal.setString("__name", "playdate.sound.signal");
                 signal.setWrappedFunction<playdate_sound_signal_setOffset_lua>("setOffset");
@@ -3066,7 +3067,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto lfo = LuaApiHelper(getLuaContext(), "lfo");
+                auto lfo = LuaApiHelper(getContext(), "lfo");
                 lfo.setSelfIndex();
                 lfo.setString("__name", "playdate.sound.lfo");
                 lfo.setWrappedFunction<playdate_sound_lfo_gc_lua>("__gc");
@@ -3083,7 +3084,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto envelope = LuaApiHelper(getLuaContext(), "envelope");
+                auto envelope = LuaApiHelper(getContext(), "envelope");
                 envelope.setSelfIndex();
                 envelope.setString("__name", "playdate.sound.envelope");
                 envelope.setWrappedFunction<playdate_sound_envelope_gc_lua>("__gc");
@@ -3104,7 +3105,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto bitCrusher = LuaApiHelper(getLuaContext(), "bitcrusher");
+                auto bitCrusher = LuaApiHelper(getContext(), "bitcrusher");
                 bitCrusher.setSelfIndex();
                 bitCrusher.setString("__name", "playdate.sound.bitcrusher");
                 bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_gc_lua>("__gc");
@@ -3118,7 +3119,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto ringMod = LuaApiHelper(getLuaContext(), "ringmod");
+                auto ringMod = LuaApiHelper(getContext(), "ringmod");
                 ringMod.setSelfIndex();
                 ringMod.setString("__name", "playdate.sound.ringmod");
                 ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_gc_lua>("__gc");
@@ -3130,7 +3131,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto onePoleFilter = LuaApiHelper(getLuaContext(), "onepolefilter");
+                auto onePoleFilter = LuaApiHelper(getContext(), "onepolefilter");
                 onePoleFilter.setSelfIndex();
                 onePoleFilter.setString("__name", "playdate.sound.onepolefilter");
                 onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_gc_lua>("__gc");
@@ -3142,7 +3143,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto twoPoleFilter = LuaApiHelper(getLuaContext(), "twopolefilter");
+                auto twoPoleFilter = LuaApiHelper(getContext(), "twopolefilter");
                 twoPoleFilter.setSelfIndex();
                 twoPoleFilter.setString("__name", "playdate.sound.twopolefilter");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_gc_lua>("__gc");
@@ -3158,7 +3159,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto overdrive = LuaApiHelper(getLuaContext(), "overdrive");
+                auto overdrive = LuaApiHelper(getContext(), "overdrive");
                 overdrive.setSelfIndex();
                 overdrive.setString("__name", "playdate.sound.overdrive");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_gc_lua>("__gc");
@@ -3173,7 +3174,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto delayLine = LuaApiHelper(getLuaContext(), "delayline");
+                auto delayLine = LuaApiHelper(getContext(), "delayline");
                 delayLine.setSelfIndex();
                 delayLine.setString("__name", "playdate.sound.delayline");
                 delayLine.setWrappedFunction<playdate_sound_delayline_gc_lua>("__gc");
@@ -3185,7 +3186,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto delayLineTap = LuaApiHelper(getLuaContext(), "delaylinetap");
+                auto delayLineTap = LuaApiHelper(getContext(), "delaylinetap");
                 delayLineTap.setSelfIndex();
                 delayLineTap.setString("__name", "playdate.sound.delaylinetap");
                 delayLineTap.setWrappedFunction<playdate_sound_delaylinetap_gc_lua>("__gc");
@@ -3197,7 +3198,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto sequence = LuaApiHelper(getLuaContext(), "sequence");
+                auto sequence = LuaApiHelper(getContext(), "sequence");
                 sequence.setSelfIndex();
                 sequence.setString("__name", "playdate.sound.sequence");
                 sequence.setWrappedFunction<playdate_sound_sequence_gc_lua>("__gc");
@@ -3218,7 +3219,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto track = LuaApiHelper(getLuaContext(), "track");
+                auto track = LuaApiHelper(getContext(), "track");
                 track.setSelfIndex();
                 track.setString("__name", "playdate.sound.track");
                 track.setWrappedFunction<playdate_sound_track_gc_lua>("__gc");
@@ -3239,7 +3240,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto instrument = LuaApiHelper(getLuaContext(), "instrument");
+                auto instrument = LuaApiHelper(getContext(), "instrument");
                 instrument.setSelfIndex();
                 instrument.setString("__name", "playdate.sound.instrument");
                 instrument.setWrappedFunction<playdate_sound_instrument_gc_lua>("__gc");
@@ -3255,7 +3256,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto controlSignal = LuaApiHelper(getLuaContext(), "controlsignal");
+                auto controlSignal = LuaApiHelper(getContext(), "controlsignal");
                 controlSignal.setSelfIndex();
                 controlSignal.setString("__name", "playdate.sound.controlsignal");
                 controlSignal.setWrappedFunction<playdate_sound_controlsignal_gc_lua>("__gc");
@@ -3267,7 +3268,7 @@ void Cranked::registerLuaGlobals() {
             }
 
             {
-                auto micInput = LuaApiHelper(getLuaContext(), "micinput");
+                auto micInput = LuaApiHelper(getContext(), "micinput");
                 micInput.setSelfIndex();
                 micInput.setWrappedFunction<playdate_sound_micinput_recordToSample_lua>("recordToSample");
                 micInput.setWrappedFunction<playdate_sound_micinput_stopRecording_lua>("stopRecording");
@@ -3280,8 +3281,8 @@ void Cranked::registerLuaGlobals() {
     }
 
     // Load Lua sources last so playdate API is mostly populated
-    if (luaL_dostring(getLuaContext(), LUA_BUMP_SOURCE))
-        throw std::runtime_error(std::string("Failed to load Bump: ") + lua_tostring(getLuaContext(), -1));
-    if (luaL_dostring(getLuaContext(), LUA_RUNTIME_SOURCE))
-        throw std::runtime_error(std::string("Failed to load Runtime: ") + lua_tostring(getLuaContext(), -1));
+    if (luaL_dostring(getContext(), LUA_BUMP_SOURCE))
+        throw std::runtime_error(std::string("Failed to load Bump: ") + lua_tostring(getContext(), -1));
+    if (luaL_dostring(getContext(), LUA_RUNTIME_SOURCE))
+        throw std::runtime_error(std::string("Failed to load Runtime: ") + lua_tostring(getContext(), -1));
 }

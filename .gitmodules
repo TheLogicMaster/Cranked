@@ -1,27 +1,61 @@
 [submodule "libs/libzippp"]
 	path = core/libs/libzippp
 	url = https://github.com/ctabin/libzippp
+	update = merge
 [submodule "libs/imgui"]
 	path = desktop/libs/imgui
 	url = https://github.com/ocornut/imgui
+	branch = docking
+	update = merge
 [submodule "libs/lua54"]
 	path = core/libs/lua54
 	url = https://github.com/scratchminer/lua54
+	update = merge
 [submodule "libs/unicorn"]
 	path = core/libs/unicorn
 	url = https://github.com/unicorn-engine/unicorn
+	update = merge
 [submodule "libs/nlohmann_json"]
 	path = core/libs/nlohmann_json
 	url = https://github.com/nlohmann/json
+	update = merge
 [submodule "libs/ffi"]
 	path = core/libs/ffi
 	url = https://github.com/blade-lang/ffi
+	update = merge
 [submodule "libs/zlib"]
 	path = core/libs/zlib
 	url = https://github.com/madler/zlib
+	update = merge
 [submodule "emulator/libs/libzip"]
 	path = core/libs/libzip
 	url = https://github.com/nih-at/libzip
+	update = merge
 [submodule "emulator/libs/capstone"]
 	path = core/libs/capstone
 	url = https://github.com/capstone-engine/capstone
+	update = merge
+[submodule "core/libs/dynarmic"]
+	path = core/libs/dynarmic
+	url = https://github.com/yuzu-mirror/dynarmic
+	update = merge
+[submodule "core/libs/magic_enum"]
+	path = core/libs/magic_enum
+	url = https://github.com/Neargye/magic_enum
+	update = merge
+[submodule "desktop/libs/imgui_club"]
+	path = desktop/libs/imgui_club
+	url = https://github.com/ocornut/imgui_club
+	update = merge
+[submodule "desktop/libs/ImGuiFileDialog"]
+	path = desktop/libs/ImGuiFileDialog
+	url = https://github.com/aiekick/ImGuiFileDialog
+	update = merge
+[submodule "desktop/libs/cxxopts"]
+	path = desktop/libs/cxxopts
+	url = https://github.com/jarro2783/cxxopts
+	update = merge
+[submodule "core/libs/asio"]
+	path = core/libs/asio
+	url = https://github.com/boostorg/asio
+	update = merge

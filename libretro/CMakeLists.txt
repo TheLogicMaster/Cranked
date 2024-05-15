@@ -8,4 +8,4 @@ set_property(TARGET libffi PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_library(cranked_libretro SHARED core.cpp)
 target_include_directories(cranked_libretro PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(cranked_libretro emulator)
+target_link_libraries(cranked_libretro cranked)

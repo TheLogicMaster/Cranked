@@ -13,6 +13,8 @@ and todo items. Expect many crashes.
 ![From C](media/Screenshot_1.png)
 ### From Lua
 ![From Lua](media/Screenshot_2.png)
+### Native Debugging
+![Native Debugging](media/Screenshot_3.png)
 
 ## Building
 Libraries are all embedded as submodules except for SDL2, which is required for building desktop targets.
@@ -44,10 +46,10 @@ likely crash at the moment and there is little in the way of useful debug output
 - Full font support
 - GIF and WAV writing
 - Respect all graphical context options like clip rect
+- Embed system files like fonts somehow
 - Finish C JSON decoding
 - Finish C Lua API
 - Test building on Windows/Mac
-- Emulated core dumps with disassembly
 - Create a testing framework to compare console output to the official simulator
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
 - Java library with native libs for Android app consumption
@@ -57,9 +59,8 @@ likely crash at the moment and there is little in the way of useful debug output
 - System UI/software from SDK
 - Investigate pre-2.0.0 binaries to handle uncompressed data
 - Emulator API wrapper to hide all the messy internals, possible C compatible
-- Use namespaces
 - Values checks, since plenty of null/illegal API parameters will cause a native seg-fault
-- SDK version checks for API backwards compatibility
+- Dynarmic native engine support for more portability
 - GitHub Actions release builds
 
 ## Internals
@@ -69,6 +70,17 @@ likely crash at the moment and there is little in the way of useful debug output
 - Auto-generated 64-bit safe equivalent Playdate API and data structures by parsing the official headers
 - Lua objects represented by tables with userdata field and metatables
 - Reference counting for shared Lua resources like images and fonts
+
+## GDB Debugging
+Requires gdb-multiarch and is run from the project directory with `gdb-multiarch -x gdb_setup`.
+- Connect: `target remote localhost:1337`
+- Set symbols: `add-symbol-file pdex.elf 0x60000020` (Or add `-ex 'add-symbol-file "pdex.elf" 0x60000020'` to gdb-multiarch command)
+- Use normal commands like `break`, `step`, `continue`, `ctrl+c`, etc.
+
+## Updating Submodules
+```
+git submodule foreach git pull
+```
 
 ## Libraries and Resources
 - [libzippp](https://github.com/ctabin/libzippp)
