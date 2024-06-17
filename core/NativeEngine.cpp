@@ -51,6 +51,8 @@ void NativeEngine::reset() {
     nativeContextStack.clear();
 
     emulatedStringLiterals.clear();
+
+    nativeResources.clear();
 }
 
 void NativeEngine::load() {
@@ -70,6 +72,13 @@ void NativeEngine::unload() {
         return;
     assertUC(uc_mem_unmap(nativeEngine, CODE_PAGE_ADDRESS, codeMemory.size()), "Failed to unmap code memory");
     codeMemory.clear();
+}
+
+void NativeEngine::freeResource(void *ptr) {
+    if (nativeResources.contains((NativeResource *) ptr))
+        static_cast<NativeResource *>(ptr)->dereference();
+    else
+        heap.free(ptr);
 }
 
 void NativeEngine::pushEmulatedLuaFunction(cref_t func) {
@@ -274,7 +283,7 @@ void NativeEngine::nativeFunctionDispatch(int index) {
             case ArgType::ptr_t: return &ffi_type_pointer;
             case ArgType::struct2_t: return &struct2Type;
             case ArgType::struct4_t: return &struct4Type;
-            default: throw std::runtime_error("Invalid function arg");
+            default: throw CrankedError("Invalid function arg");
         }
     };
 
@@ -361,7 +370,7 @@ void NativeEngine::nativeFunctionDispatch(int index) {
                     vaListPtr += 8;
                     break;
                 default:
-                    throw std::runtime_error("Unsupported va_list type");
+                    throw CrankedError("Unsupported va_list type");
             }
         }
 
@@ -372,7 +381,7 @@ void NativeEngine::nativeFunctionDispatch(int index) {
     // Call function
     ffi_cif cif;
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, argCount, ffiReturnType, ffiArgTypes.data()) != FFI_OK)
-        throw std::runtime_error("Failed to prep FFI CIF");
+        throw CrankedError("Failed to prep FFI CIF");
     ArgBuffer returnValue{};
     ffi_call(&cif, (void (*)()) metadata.func, returnValue.data, ffiArgs.data());
     // Todo: Exception handling to restore state?

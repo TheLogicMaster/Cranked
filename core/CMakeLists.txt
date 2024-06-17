@@ -41,6 +41,7 @@ file(GLOB cranked_sources
         LuaRuntime.cpp
         Menu.cpp
         NativeEngine.cpp
+        NativeResource.cpp
         Rom.cpp
         Runtime.cpp
         Utils.cpp

@@ -62,7 +62,7 @@ void HeapAllocator::free(void *ptr) {
     Node *node = (Node *)((intptr_t) ptr - sizeof(Node));
 
     if (node->size > totalSize or node->next != nullptr)
-        throw std::runtime_error("Corrupted heap node");
+        throw CrankedError("Corrupted heap node");
 
     // Insert into free node list based on address
     auto it = freeList;

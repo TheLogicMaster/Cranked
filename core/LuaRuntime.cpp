@@ -190,8 +190,7 @@ static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int m
         lua_pushstring(context, cranked->fromVirtualAddress<const char>(cranked->files.lastError));
         return 2;
     }
-    pushUserdataObject(cranked, file, "playdate.file.file");
-
+    pushFile(file);
     return 1;
 }
 
@@ -384,7 +383,7 @@ static LuaRet playdate_datastore_readImage_lua(Cranked *cranked, const char *pat
     if (stringPath.find('/') == std::string::npos)
         stringPath = "images/" + stringPath;
     try {
-        pushImage(cranked, cranked->graphics.getImage(stringPath), true);
+        pushImage(cranked->graphics.getImage(stringPath));
     } catch (std::exception &ex) {
         lua_pushnil(cranked->getLuaContext());
     }
@@ -402,23 +401,21 @@ static LuaRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width, in
             return 1;
         }
     } else {
-        image = cranked->graphics.allocateBitmap(width, height);
+        image = cranked->graphics.createBitmap(width, height);
         image->clear(bgcolor);
     }
-    pushImage(cranked, image, true);
+    pushImage(image);
     return 1;
 }
 
 static void playdate_graphics_image_gc_lua(Cranked *cranked, LuaVal image) {
-    if (releaseOwnedUserdataObject(cranked, image))
-        cranked->graphics.freeBitmap(image.asUserdataObject<LCDBitmap_32>());
+    releaseUserdataResource(image);
 }
 
 static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, LCDBitmap_32 *image, const char *path) {
     try {
-        LCDBitmap_32 *loaded = cranked->graphics.getImage((const char *) path);
+        ResourcePtr<LCDBitmap_32> loaded(cranked->graphics.getImage((const char *) path));
         *image = *loaded;
-        cranked->graphics.freeBitmap(loaded);
     } catch (std::exception &ex) {
         lua_pushboolean(cranked->getLuaContext(), false);
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -429,7 +426,7 @@ static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, LCDBitmap_32 *i
 }
 
 static LuaRet playdate_graphics_image_copy_lua(Cranked *cranked, LCDBitmap_32 *image) {
-    pushUserdataObject(cranked, cranked->heap.construct<LCDBitmap_32>(*image), "playdate.graphics.image");
+    pushImage(cranked->heap.construct<LCDBitmap_32>(*image));
     return 1;
 }
 
@@ -524,33 +521,25 @@ static LuaRet playdate_graphics_image_transformedImage_lua(Cranked *cranked, LCD
     return 0;
 }
 
-static void playdate_graphics_image_drawSampled_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, int width, int height, float centerX, float centerY,
-                                                    float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile) {
+static void playdate_graphics_image_drawSampled_lua(Cranked *cranked, LCDBitmap_32 *image, int x, int y, int width, int height, float centerX, float centerY, float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile) {
     // Basically `Mode 7`
     // Todo
 }
 
 static void playdate_graphics_image_setMaskImage_lua(Cranked *cranked, LCDBitmap_32 *image, LCDBitmap_32 *maskImage) {
-    if (image->mask)
-        cranked->heap.destruct(image->mask);
     image->mask = cranked->heap.construct<LCDBitmap_32>(*maskImage);
 }
 
 static LuaRet playdate_graphics_image_getMaskImage_lua(Cranked *cranked, LCDBitmap_32 *image) {
-    pushImage(cranked, image, false); // Basically holds a weak reference to the image
+    pushImage(image);
     return 1;
 }
 
 static void playdate_graphics_image_addMask_lua(Cranked *cranked, LCDBitmap_32 *image, bool opaque) {
-    if (image->mask)
-        cranked->heap.destruct(image->mask);
-    image->mask = cranked->heap.construct<LCDBitmap_32>(image->width, image->height, &cranked->graphics);
+    image->mask = cranked->heap.construct<LCDBitmap_32>(*cranked, image->width, image->height);
 }
 
 static void playdate_graphics_image_removeMask_lua(Cranked *cranked, LCDBitmap_32 *image) {
-    if (!image->mask)
-        return;
-    cranked->heap.destruct(image->mask);
     image->mask = nullptr;
 }
 
@@ -650,7 +639,7 @@ static void playdate_graphics_drawLine_lua(Cranked *cranked, LuaVal x1, int y1, 
 }
 
 static void playdate_graphics_setLineCapStyle_lua(Cranked *cranked, LCDLineCapStyle style) {
-    cranked->graphics.getCurrentDisplayContext().lineEndCapStype = style;
+    cranked->graphics.getCurrentDisplayContext().lineEndCapStyle = style;
 }
 
 static void playdate_graphics_drawPixel_lua(Cranked *cranked, LuaVal x, int y) {
@@ -801,13 +790,10 @@ static StrokeLocation playdate_graphics_getStrokeLocation_lua(Cranked *cranked) 
 }
 
 static void playdate_graphics_lockFocus_lua(Cranked *cranked, LuaVal imageVal) {
-    auto image = imageVal.asUserdataObject<LCDBitmap_32>();
-    cranked->luaEngine.preserveLuaReference(image, imageVal);
-    cranked->graphics.getCurrentDisplayContext().focusedImage = image;
+    cranked->graphics.getCurrentDisplayContext().focusedImage = imageVal.asUserdataObject<LCDBitmap_32>();
 }
 
 static void playdate_graphics_unlockFocus_lua(Cranked *cranked) {
-    cranked->luaEngine.releaseLuaReference(cranked->graphics.getCurrentDisplayContext().focusedImage);
     cranked->graphics.getCurrentDisplayContext().focusedImage = nullptr;
 }
 
@@ -819,12 +805,12 @@ static LuaRet playdate_graphics_getDrawOffset_lua(Cranked *cranked) {
 }
 
 static LuaRet playdate_graphics_getDisplayImage_lua(Cranked *cranked) {
-    pushImage(cranked, cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer), true);
+    pushImage(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer));
     return 1;
 }
 
 static LuaRet playdate_graphics_getWorkingImage_lua(Cranked *cranked) {
-    pushImage(cranked, cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.previousFrameBuffer), true);
+    pushImage(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.previousFrameBuffer));
     return 1;
 }
 
@@ -923,7 +909,7 @@ static void playdate_setMenuImage_lua(Cranked *cranked, LuaVal image, int xOffse
 static LuaRet playdate_menu_addMenuItem_lua(Cranked *cranked, LuaVal menu, const char *title, LuaVal callback) {
     // Items are all owned by Menu, but assertions should mostly protect against memory corruption after removing items with dangling userdata pointers
     try {
-        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback), "playdate.menu.item");
+        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback));
     } catch (std::exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -941,7 +927,7 @@ static LuaRet playdate_menu_addCheckmarkMenuItem_lua(Cranked *cranked, LuaVal me
     } else
         callback = arg2;
     try {
-        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback), "playdate.menu.item");
+        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback));
     } catch (std::exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -971,7 +957,7 @@ static LuaRet playdate_menu_addOptionsMenuItem_lua(Cranked *cranked, LuaVal menu
     } else
         callback = arg3;
     try {
-        pushUserdataObject(cranked, cranked->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback), "playdate.menu.item");
+        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback));
     } catch (std::exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -983,10 +969,10 @@ static LuaRet playdate_menu_addOptionsMenuItem_lua(Cranked *cranked, LuaVal menu
 static LuaRet playdate_menu_getMenuItems_lua(Cranked *cranked, LuaVal menu) {
     auto items = pushTable(cranked);
     int i = 1;
-    for (auto item : cranked->menu.items) {
+    for (auto &item : cranked->menu.items) {
         if (!item)
             continue;
-        pushUserdataObject(cranked, item, "playdate.menu.item");
+        pushMenuItem(item.get());
         lua_seti(cranked->getLuaContext(), -2, i);
         i++;
     }
@@ -1002,34 +988,28 @@ static void playdate_menu_removeAllMenuItems_lua(Cranked *cranked, LuaVal menu) 
 }
 
 static void playdate_menu_item_setCallback_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal callback) {
-    cranked->menu.assertHasItem(item);
+    // Todo: This needs to call a function on the item instead
     cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
     lua_pushvalue(cranked->getLuaContext(), callback);
-    lua_seti(cranked->getLuaContext(), -2, (int) (std::find(cranked->menu.items.begin(), cranked->menu.items.end(), item) - cranked->menu.items.begin()) + 1);
+    auto found = std::find(cranked->menu.items.begin(), cranked->menu.items.end(), item);
+    lua_seti(cranked->getLuaContext(), -2, (int) (found - cranked->menu.items.begin()) + 1);
     lua_pop(cranked->getLuaContext(), 1);
 }
 
 static void playdate_menu_item_setTitle_lua(Cranked *cranked, PDMenuItem_32 *item, const char *title) {
-    cranked->menu.assertHasItem(item);
-    cranked->menu.setItemTitle(item, title);
+    item->title = title;
 }
 
 static LuaRet playdate_menu_item_getTitle_lua(Cranked *cranked, PDMenuItem_32 *item) {
-    cranked->menu.assertHasItem(item);
-    lua_pushstring(cranked->getLuaContext(), item->title);
+    lua_pushstring(cranked->getLuaContext(), item->title.c_str());
     return 1;
 }
 
 static void playdate_menu_item_setValue_lua(Cranked *cranked, PDMenuItem_32 *item, LuaVal value) {
-    cranked->menu.assertHasItem(item);
     if (value.isString()) {
         std::string string(value.asString());
-        item->value = 0;
-        for (int i = 0; i < item->options.size(); i++)
-            if (string == item->options[i]) {
-                item->value = i;
-                break;
-            }
+        auto found = std::find(item->options.begin(), item->options.end(), string.c_str());
+        item->value = found == item->options.end() ? 0 : int(found - item->options.begin());
     } else if (value.isBool())
         item->value = value.asBool();
     else
@@ -1037,12 +1017,11 @@ static void playdate_menu_item_setValue_lua(Cranked *cranked, PDMenuItem_32 *ite
 }
 
 static LuaRet playdate_menu_item_getValue_lua(Cranked *cranked, PDMenuItem_32 *item) {
-    cranked->menu.assertHasItem(item);
     if (item->type == PDMenuItem_32::Type::Checkmark)
         lua_pushboolean(cranked->getLuaContext(), item->value);
     else if (item->type == PDMenuItem_32::Type::Options) {
         if (item->value >= 0 and item->value < item->options.size())
-            lua_pushstring(cranked->getLuaContext(), item->options[item->value]);
+            lua_pushstring(cranked->getLuaContext(), item->options[item->value].c_str());
         else
             lua_pushnil(cranked->getLuaContext()); // Todo: Is this right for invalid values?
     } else
@@ -1114,11 +1093,10 @@ static LuaRet playdate_display_getOffset_lua(Cranked *cranked) {
 
 static void playdate_display_loadImage_lua(Cranked *cranked, const char *path) {
     // Ignores image size requirement
-    auto image = cranked->graphics.getImage(path);
+    ResourcePtr<LCDBitmap_32> image(cranked->graphics.getImage(path));
     for (int i = 0; i < image->height; i++)
         for (int j = 0; j < image->width; j++)
-            image->graphics->frameBuffer->drawPixel(j, i, image->getPixel(j, i));
-    cranked->graphics.freeBitmap(image);
+            cranked->graphics.frameBuffer->drawPixel(j, i, image->getPixel(j, i));
 }
 
 static LuaRet playdate_file_load_lua(Cranked *cranked, const char *path, LuaVal env) {
@@ -1343,13 +1321,12 @@ static LuaRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, LCDFont_32 *
 }
 
 static LuaRet playdate_graphics_sprite_new_lua(Cranked *context) {
-    pushSprite(context, context->graphics.allocateSprite(), true);
+    pushSprite(context->graphics.createSprite());
     return 1;
 }
 
 static void playdate_graphics_sprite_gc_lua(Cranked *cranked, LuaVal sprite) {
-    if (releaseOwnedUserdataObject(cranked, sprite))
-        cranked->graphics.freeSprite(sprite.asUserdataObject<LCDSprite_32>());
+    releaseUserdataResource(sprite);
 }
 
 static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, LuaVal sprite) {
@@ -2405,7 +2382,7 @@ void LuaEngine::registerLuaGlobals() {
 
         // Set playdate.metadata table
         lua_newtable(getContext());
-        for (auto &entry: cranked->rom->manifest) {
+        for (auto &entry: cranked.rom->manifest) {
             lua_pushstring(getContext(), entry.second.c_str());
             lua_setfield(getContext(), -2, entry.first.c_str());
         }
@@ -3282,7 +3259,7 @@ void LuaEngine::registerLuaGlobals() {
 
     // Load Lua sources last so playdate API is mostly populated
     if (luaL_dostring(getContext(), LUA_BUMP_SOURCE))
-        throw std::runtime_error(std::string("Failed to load Bump: ") + lua_tostring(getContext(), -1));
+        throw CrankedError("Failed to load Bump: {}",  lua_tostring(getContext(), -1));
     if (luaL_dostring(getContext(), LUA_RUNTIME_SOURCE))
-        throw std::runtime_error(std::string("Failed to load Runtime: ") + lua_tostring(getContext(), -1));
+        throw CrankedError("Failed to load Runtime: {}", lua_tostring(getContext(), -1));
 }

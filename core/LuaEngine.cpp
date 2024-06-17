@@ -3,7 +3,7 @@
 
 using namespace cranked;
 
-LuaEngine::LuaEngine(Cranked *cranked) : cranked(cranked) {}
+LuaEngine::LuaEngine(Cranked &cranked) : cranked(cranked) {}
 
 LuaEngine::~LuaEngine() {
     if (luaInterpreter)
@@ -11,13 +11,13 @@ LuaEngine::~LuaEngine() {
 }
 
 void LuaEngine::init() {
-    if (!cranked->rom->hasLua || (cranked->nativeEngine.isLoaded() && cranked->nativeEngine.hasUpdateCallback()))
+    if (!cranked.rom->hasLua || (cranked.nativeEngine.isLoaded() && cranked.nativeEngine.hasUpdateCallback()))
         return; // Don't load Lua chunks in native-only mode
 
     luaInterpreter = lua_newstate(luaAllocator, this);
     lua_atpanic(luaInterpreter, [](lua_State *context) -> int {
         auto message = lua_tostring(context, -1);
-        throw std::runtime_error(std::string("Lua panic: ") + (message ? message : ""));
+        throw CrankedError("Lua panic: {}", message ? message : "");
     });
     luaL_openlibs(luaInterpreter);
     registerLuaGlobals();
@@ -28,28 +28,28 @@ void LuaEngine::init() {
     luaUpdateThread = lua_newthread(luaInterpreter);
     setQualifiedLuaGlobal("cranked.updateThread");
 
-    if (cranked->nativeEngine.isLoaded())
-        cranked->nativeEngine.invokeEventCallback(PDSystemEvent::InitLua, 2);
+    if (cranked.nativeEngine.isLoaded())
+        cranked.nativeEngine.invokeEventCallback(PDSystemEvent::InitLua, 2);
 
     constexpr const char *PRELOADED_SOURCES[] { "sprites.lua", "nineslice.lua", "graphics.lua" }; // Preload so that functions that treat objects as `userdata` can be shimmed
     Rom::File *lastLuaFile{}; // Assuming main Lua file is always last
-    for (auto &file : cranked->rom->pdzFiles)
+    for (auto &file : cranked.rom->pdzFiles)
         if (file.type == Rom::FileType::LUAC) {
             for (auto source : PRELOADED_SOURCES)
                 if (file.name == source) {
                     luaL_loadbuffer(luaInterpreter, (char *) file.data.data(), file.data.size(), file.name.c_str());
                     if (int result = lua_pcall(luaInterpreter, 0, 0, 0); result != LUA_OK)
-                        throw std::runtime_error("Failed to load '" + file.name + "': " + getLuaError(result));
+                        throw CrankedError("Failed to load '{}': {}", file.name, getLuaError(result));
                     loadedLuaFiles.emplace(source, source + strlen(source) - 4);
                     break;
                 }
             lastLuaFile = &file;
         }
     if (!lastLuaFile)
-        throw std::runtime_error("Failed to find main Lua file");
+        throw CrankedError("Failed to find main Lua file");
     luaL_loadbuffer(luaInterpreter, (char *) lastLuaFile->data.data(), lastLuaFile->data.size(), lastLuaFile->name.c_str());
     if (int result = lua_pcall(luaInterpreter, 0, 0, 0); result != LUA_OK)
-        throw std::runtime_error("Failed to load '" + lastLuaFile->name + "': " + getLuaError(result));
+        throw CrankedError("Failed to load '{}': {}", lastLuaFile->name, getLuaError(result));
     lua_settop(luaInterpreter, 0);
 }
 
@@ -76,7 +76,7 @@ void LuaEngine::runUpdateLoop() {
         std::string error(getLuaError(result));
         inLuaUpdate = false;
         lua_resetthread(luaUpdateThread);
-        throw std::runtime_error("Failed to run Lua update loop: " + error);
+        throw CrankedError("Failed to run Lua update loop: {}", error);
     }
     inLuaUpdate = false;
 }

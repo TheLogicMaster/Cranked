@@ -5,11 +5,27 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include "imgui_stdlib.h"
 #include "imgui_internal.h"
-#include "magic_enum_all.hpp"
 #include "imgui_memory_editor.h"
 #include "ImGuiFileDialog.h"
 
 #include <SDL.h>
+
+// Todo: Remove once CLion works with MagicEnum
+#ifndef __CLION_IDE__
+#include "magic_enum_all.hpp"
+#else
+namespace magic_enum {
+    namespace containers {
+        template<typename E, typename V>
+        struct array {
+            int size() { return {}; }
+            V& operator[](E value) { return *(V *)&value; }
+        };
+    }
+    template<typename E> E enum_value(size_t) { return {}; }
+    template<typename E> std::string enum_name(E) { return {}; }
+}
+#endif
 
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -28,9 +44,7 @@ struct Userdata {
     SDL_Window* window;
     std::map<std::string, setting_type> settings;
 
-#ifndef __CLION_IDE__ // Todo: Remove when fixed
     magic_enum::containers::array<Windows, bool> windowStates{};
-#endif
 
     template<typename T>
     bool tryGetSetting(const std::string &name, T &out) {
@@ -49,7 +63,7 @@ int main(int argc, const char *args[]) {
     }
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
-        throw std::runtime_error(std::string("Failed to init SDL: ") + SDL_GetError());
+        throw CrankedError("Failed to init SDL: {}", SDL_GetError());
 
 #ifdef SDL_HINT_IME_SHOW_UI
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
@@ -68,10 +82,10 @@ int main(int argc, const char *args[]) {
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 440, 480, windowFlags);
     if (!window)
-        throw std::runtime_error(std::string("Failed to create SDL window: ") + SDL_GetError());
+        throw CrankedError("Failed to create SDL window: {}", SDL_GetError());
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (!renderer)
-        throw std::runtime_error(std::string("Failed to create SDL renderer: ") + SDL_GetError());
+        throw CrankedError("Failed to create SDL renderer: {}", SDL_GetError());
 
     IMGUI_CHECKVERSION();
     auto imguiContext = ImGui::CreateContext();
@@ -120,7 +134,7 @@ int main(int argc, const char *args[]) {
             size_t typeSeparatorIndex = lineStr.find('@');
             size_t valueSeparatorIndex = lineStr.find('=');
             if (typeSeparatorIndex == std::string::npos or valueSeparatorIndex == std::string::npos)
-                throw std::runtime_error(std::format("Bad settings item in line: `{}`", line));
+                throw CrankedError("Bad settings item in line: `{}`", line);
             auto type = lineStr.substr(0, typeSeparatorIndex);
             auto name = lineStr.substr(typeSeparatorIndex + 1, valueSeparatorIndex - typeSeparatorIndex - 1);
             auto value = lineStr.substr(valueSeparatorIndex + 1);
@@ -134,9 +148,9 @@ int main(int argc, const char *args[]) {
                 else if (type == "Bool")
                     userdata->settings[name] = (bool) std::stoi(value);
                 else
-                    throw std::runtime_error(std::format("Bad settings item type in line: `{}`", line));
+                    throw CrankedError("Bad settings item type in line: `{}`", line);
             } catch (std::logic_error &ex) {
-                throw std::runtime_error(std::format("Bad settings item value in line: `{}` ({})", line, ex.what()));
+                throw CrankedError("Bad settings item value in line: `{}` ({})", line, ex.what());
             }
         };
         settingsHandler.ApplyAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler) {
@@ -145,14 +159,12 @@ int main(int argc, const char *args[]) {
             if (userdata->tryGetSetting("WindowWidth", width) && userdata->tryGetSetting("WindowHeight", height))
                 SDL_SetWindowSize(userdata->window, width, height);
 
-#ifndef __CLION_IDE__ // Todo: Remove when fixed
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
                 bool shown{};
                 userdata->tryGetSetting("ShowWindow" + std::string(magic_enum::enum_name(value)), shown);
                 userdata->windowStates[value] = shown;
             }
-#endif
         };
         settingsHandler.WriteAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf) {
             auto userdata = (Userdata *)handler->UserData;
@@ -162,12 +174,10 @@ int main(int argc, const char *args[]) {
             userdata->settings["WindowWidth"] = width;
             userdata->settings["WindowHeight"] = height;
 
-#ifndef __CLION_IDE__ // Todo: Remove when fixed
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
                 userdata->settings["ShowWindow" + std::string(magic_enum::enum_name(value))] = userdata->windowStates[value];
             }
-#endif
 
             buf->append("[Cranked][Settings]\n");
             for (const auto &entry : userdata->settings) {
@@ -180,7 +190,7 @@ int main(int argc, const char *args[]) {
                 else if (std::holds_alternative<bool>(entry.second))
                     buf->appendf("Bool@%s=%d\n", entry.first.c_str(), std::get<bool>(entry.second));
                 else
-                    throw std::runtime_error("Unexpected settings type variant");
+                    throw CrankedError("Unexpected settings type variant");
             }
         };
         imguiContext->SettingsHandlers.push_back(settingsHandler);
@@ -188,15 +198,9 @@ int main(int argc, const char *args[]) {
 
     SDL_Texture* displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
     if (!displayTexture)
-        throw std::runtime_error(std::string("Failed to create SDL display texture: ") + SDL_GetError());
+        throw CrankedError("Failed to create SDL display texture: ", SDL_GetError());
 
-    auto getWindowOpen = [&](Windows window) -> bool & {
-#ifdef __CLION_IDE__ // Todo: Remove when fixed
-        bool _; return *&_;
-#else
-        return userdata.windowStates[window];
-#endif
-    };
+    auto getWindowOpen = [&](Windows window) -> bool & { return userdata.windowStates[window]; };
 
     MemoryEditor codeMemoryEditor;
     MemoryEditor heapMemoryEditor;

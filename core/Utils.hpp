@@ -8,6 +8,9 @@
 #include <bit>
 #include <chrono>
 #include <functional>
+#include <stdexcept>
+#include <string>
+#include <format>
 
 namespace cranked {
 
@@ -22,6 +25,20 @@ namespace cranked {
 
     typedef std::function<void(Cranked &cranked, LogLevel level, const char *format, va_list args)> LoggingCallback;
     typedef std::function<void(Cranked &cranked)> InternalUpdateCallback;
+
+    class CrankedError : public std::runtime_error {
+    public:
+        explicit CrankedError(const char *message) : std::runtime_error(message) {}
+
+        explicit CrankedError(const std::string &message) : std::runtime_error(message) {}
+
+        template<class... Args>
+        explicit CrankedError(std::string_view fmt, Args&&... args) : CrankedError(std::vformat(fmt, std::make_format_args(args...))) {}
+
+        CrankedError(const CrankedError &other) = default;
+
+        CrankedError(CrankedError &&other) noexcept : std::runtime_error(std::move(other)) {}
+    };
 
     struct Config {
         LoggingCallback loggingCallback;
@@ -62,7 +79,7 @@ namespace cranked {
 
         static int parseVersion(const std::string &string) {
             auto split = splitString(string, '.');
-            if (split.size() != 3) throw std::runtime_error("Invalid version string");
+            if (split.size() != 3) throw CrankedError("Invalid version string");
             return std::stoi(split[0]) * 10000 + std::stoi(split[1]) * 100 + std::stoi(split[2]);
         }
 
@@ -130,11 +147,11 @@ namespace cranked {
     inline std::vector<uint8_t> readFileData(const std::string &path) {
         std::vector<uint8_t> data;
         if (!std::filesystem::is_regular_file(path))
-            throw std::runtime_error("No such file: " + path);
+            throw CrankedError("No such file: {}", path);
         std::ifstream input(path, std::ios::binary | std::ios::ate);
         auto size = input.tellg();
         if (size <= 0)
-            throw std::runtime_error("Failed to read file: " + path);
+            throw CrankedError("Failed to read file: {}", path);
         input.seekg(0, std::ios::beg);
         data.resize(size);
         input.read((char *) data.data(), size);
@@ -193,13 +210,13 @@ namespace cranked {
     template<typename T>
     static T decodeHexStringLE(std::string_view string) {
         if (string.size() / 2 != sizeof(T))
-            throw std::runtime_error("Invalid hex string for type");
+            throw CrankedError("Invalid hex string for type");
         T t{};
         uint8_t byte{};
         for (int i = 0; i < (int)sizeof(T); i++) {
             auto result = std::from_chars(string.begin() + i * 2, string.begin() + i * 2 + 2, byte, 16);
             if (result.ec != std::errc{})
-                throw std::runtime_error("Invalid hex byte");
+                throw CrankedError("Invalid hex byte");
             t |= byte << i * 8;
         }
         return t;

@@ -4,6 +4,7 @@
 #include "Constants.hpp"
 #include "Rom.hpp"
 #include "HeapAllocator.hpp"
+#include "NativeResource.hpp"
 
 #include <cmath>
 #include <unordered_map>
@@ -104,21 +105,25 @@ namespace cranked {
         cref_t pattern;
     };
 
-    struct LCDVideoPlayer_32 {
+    struct LCDVideoPlayer_32 : NativeResource {
+        explicit LCDVideoPlayer_32(Cranked &cranked);
 
+        LCDVideoPlayer_32(const LCDVideoPlayer_32 &other) = delete;
+        LCDVideoPlayer_32(LCDVideoPlayer_32 &&other) = delete;
+        ~LCDVideoPlayer_32() override = default;
     };
 
 /**
  * The operations implemented here aren't affected by draw offsets or clipping rects (Except for display buffer writes, which are affected by display offsets)
  */
-    struct LCDBitmap_32 {
+    struct LCDBitmap_32 : NativeResource {
+        LCDBitmap_32(Cranked &cranked, int width, int height);
+
         LCDBitmap_32(const LCDBitmap_32 &other);
 
-        LCDBitmap_32(LCDBitmap_32 &&other) noexcept;
+        LCDBitmap_32(LCDBitmap_32 &&other) = delete;
 
-        LCDBitmap_32(int width, int height, Graphics *graphics);
-
-        ~LCDBitmap_32();
+        ~LCDBitmap_32() override = default;
 
         LCDBitmap_32 &operator=(const LCDBitmap_32 &other);
 
@@ -143,13 +148,18 @@ namespace cranked {
         int height;
         bool inverted{};
         vheap_vector<uint8_t> data;
-        Graphics *graphics;
-        LCDBitmap_32 *mask; // Always owns mask
+        ResourcePtr<LCDBitmap_32> mask;
     };
 
-    struct LCDSprite_32 {
+    struct LCDSprite_32 : NativeResource {
+        explicit LCDSprite_32(Cranked &cranked);
+
+        LCDSprite_32(const LCDSprite_32 &other) = delete;
+        LCDSprite_32(LCDSprite_32 &&other) = delete;
+        ~LCDSprite_32() override;
+
         PDRect_32 bounds{};
-        LCDBitmap_32 *image{}; // Todo: Does the sprite own this?
+        ResourcePtr<LCDBitmap_32> image{};
         float centerX{}, centerY{};
         bool visible{};
         bool updatesEnabled{};
@@ -166,7 +176,7 @@ namespace cranked {
         uint8_t tag{};
         LCDBitmapDrawMode drawMode{};
         LCDBitmapFlip flip{};
-        LCDBitmap_32 *stencil{};
+        ResourcePtr<LCDBitmap_32> stencil{};
         bool stencilTiled{};
         uint8_t stencilPattern[8]{};
         cref_t updateFunction{};
@@ -177,65 +187,92 @@ namespace cranked {
         std::vector<LCDRect_32> dirtyRects;
     };
 
-    struct LCDBitmapTable_32 {
-        LCDBitmapTable_32(Graphics *graphics, int cellsPerRow);
+    struct LCDBitmapTable_32 : NativeResource {
+        LCDBitmapTable_32(Cranked &cranked, int cellsPerRow);
+
+        LCDBitmapTable_32(const LCDBitmapTable_32 &other) = default;
+        LCDBitmapTable_32(LCDBitmapTable_32 &&other) = delete;
+        ~LCDBitmapTable_32() override = default;
 
         LCDBitmapTable_32 &operator=(const LCDBitmapTable_32 &other);
 
-        Graphics *graphics;
         int cellsPerRow{};
-        vheap_vector<LCDBitmap_32> bitmaps; // Todo: Is this supposed to make copies and own the bitmaps? Lua API needs reference to stored bitmap...
+        std::vector<ResourcePtr<LCDBitmap_32>> bitmaps;
     };
 
-    struct LCDFontGlyph_32 {
-        explicit LCDFontGlyph_32(LCDBitmap_32 &&bitmap, int advance, const std::map<int, int8_t> &shortKerningTable,
-                                 const std::map<int, int8_t> &longKerningTable);
+    struct LCDFontGlyph_32 : NativeResource {
+        explicit LCDFontGlyph_32(LCDBitmap_32 *bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable);
+
+        LCDFontGlyph_32(const LCDFontGlyph_32 &other) = delete;
+        LCDFontGlyph_32(LCDFontGlyph_32 &&other) = delete;
+        ~LCDFontGlyph_32() override = default;
 
         int advance;
         std::map<int, int8_t> shortKerningTable;
         std::map<int, int8_t> longKerningTable; // Page 0 entries
-        LCDBitmap_32 bitmap;
+        ResourcePtr<LCDBitmap_32> bitmap;
     };
 
-    struct LCDFontPage_32 {
-        explicit LCDFontPage_32(Graphics *graphics);
+    struct LCDFontPage_32 : NativeResource {
+        explicit LCDFontPage_32(Cranked &cranked);
 
-        vheap_map<int, LCDFontGlyph_32> glyphs;
+        LCDFontPage_32(const LCDFontPage_32 &other) = delete;
+        LCDFontPage_32(LCDFontPage_32 &&other) = delete;
+        ~LCDFontPage_32() override = default;
+
+        std::unordered_map<int, ResourcePtr<LCDFontGlyph_32>> glyphs;
     };
 
-    struct LCDFont_32 {
-        explicit LCDFont_32(Graphics *graphics, int tracking, int glyphWidth, int glyphHeight);
+    struct LCDFont_32 : NativeResource {
+        explicit LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight);
+
+        LCDFont_32(const LCDFont_32 &other) = delete;
+        LCDFont_32(LCDFont_32 &&other) = delete;
+        ~LCDFont_32() override = default;
 
         int tracking;
         int glyphWidth;
         int glyphHeight;
-        vheap_map<int, LCDFontPage_32> pages;
+        std::unordered_map<int, ResourcePtr<LCDFontPage_32>> pages;
     };
 
     struct DisplayContext { // Todo: Lua native resources used here should be saved into a `set` table to prevent garbage collection until popped/reset
-        LCDBitmap_32 *bitmap;
-        IntVec2 drawOffset;
-        IntRect clipRect; // In world-space (Offset by drawOffset)
-        LCDSolidColor drawingColor;
-        LCDSolidColor backgroundColor;
-        int lineWidth;
-        LCDLineCapStyle lineEndCapStype;
-        StrokeLocation strokeLocation; // Only used by drawRect
-        LCDBitmap_32 *stencilImage;
-        bool stencilTiled;
-        uint8_t stencilPattern[8]; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
-        bool usingStencil;
-        LCDBitmap_32 *focusedImage; // Todo: Is this global or context specific?
-        LCDBitmapDrawMode bitmapDrawMode;
-        LCDFont_32 *font;
-        LCDPolygonFillRule polygonFillRule;
-        int textTracking;
-        int textLeading;
+        explicit DisplayContext(LCDBitmap_32 *bitmap) : bitmap(bitmap) {}
+
+        DisplayContext(const DisplayContext &other) = default;
+        DisplayContext(DisplayContext &&other) = delete;
+        DisplayContext &operator=(const DisplayContext &other) = default;
+
+        void reset() {
+            bitmap.reset();
+            stencilImage.reset();
+            focusedImage.reset();
+            font.reset();
+        }
+
+        ResourcePtr<LCDBitmap_32> bitmap;
+        IntVec2 drawOffset{};
+        IntRect clipRect{}; // In world-space (Offset by drawOffset)
+        LCDSolidColor drawingColor{};
+        LCDSolidColor backgroundColor = LCDSolidColor::White;
+        int lineWidth = 1;
+        LCDLineCapStyle lineEndCapStyle{};
+        StrokeLocation strokeLocation{}; // Only used by drawRect
+        ResourcePtr<LCDBitmap_32> stencilImage{};
+        bool stencilTiled{};
+        uint8_t stencilPattern[8]{}; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
+        bool usingStencil{};
+        ResourcePtr<LCDBitmap_32> focusedImage; // Todo: Is this global or context specific?
+        LCDBitmapDrawMode bitmapDrawMode{};
+        ResourcePtr<LCDFont_32> font{};
+        LCDPolygonFillRule polygonFillRule{};
+        int textTracking{};
+        int textLeading{};
     };
 
     class Graphics {
     public:
-        explicit Graphics(Cranked *cranked);
+        explicit Graphics(Cranked &cranked);
 
         void init();
 
@@ -251,7 +288,7 @@ namespace cranked {
 
         inline LCDBitmap_32 *getTargetBitmap() {
             auto &context = getCurrentDisplayContext();
-            return context.focusedImage ? context.focusedImage : context.bitmap;
+            return (context.focusedImage ? context.focusedImage : context.bitmap).get();
         }
 
         void pushContext(LCDBitmap_32 *target);
@@ -288,65 +325,40 @@ namespace cranked {
         void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle,
                          LCDColor color, bool filled);
 
-        inline LCDSprite_32 *allocateSprite() {
-            auto sprite = heap.construct<LCDSprite_32>();
-            allocatedSprites.emplace(sprite);
-            return sprite;
+        inline LCDSprite_32 *createSprite() {
+            return heap.construct<LCDSprite_32>(cranked);
         }
 
-        inline void freeSprite(LCDSprite_32 *sprite) {
-            heap.destruct(sprite);
-            allocatedSprites.erase(sprite);
+        inline LCDBitmap_32 *createBitmap(int width, int height) {
+            return heap.construct<LCDBitmap_32>(cranked, width, height);
         }
 
-        inline LCDBitmap_32 *allocateBitmap(int width, int height) {
-            auto bitmap = heap.construct<LCDBitmap_32>(width, height, this);
-            allocatedBitmaps.emplace(bitmap);
-            return bitmap;
-        }
-
-        inline void freeBitmap(LCDBitmap_32 *bitmap) {
-            heap.destruct(bitmap);
-            allocatedBitmaps.erase(bitmap);
-        }
-
-        inline LCDBitmapTable_32 *allocateBitmapTable(int count) {
-            auto table = heap.construct<LCDBitmapTable_32>(this, count);
-            allocatedBitmapTables.emplace(table);
-            return table;
-        }
-
-        inline void freeBitmapTable(LCDBitmapTable_32 *table) {
-            allocatedBitmapTables.erase(table);
-            heap.destruct(table);
+        inline LCDBitmapTable_32 *createBitmapTable(int count) {
+            return heap.construct<LCDBitmapTable_32>(cranked, count);
         }
 
         LCDBitmapTable_32 *getBitmapTable(const std::string &path);
 
         LCDBitmap_32 *getImage(const std::string &path);
 
-        // Doesn't add to allocatedBitmaps
         LCDBitmap_32 *getImage(const Rom::ImageCell &source);
 
         LCDFont_32 *getFont(const std::string &path);
 
-        // Doesn't add to loadedFonts or allocatedFonts
         LCDFont_32 *getFont(const Rom::Font &source);
 
         LCDFont_32 *getFont(const uint8_t *data, bool wide);
 
-        bool handleFree(void *ptr);
-
-        Cranked *cranked;
+        Cranked &cranked;
         HeapAllocator &heap;
         Rom::Font systemFontSource;
-        LCDFont_32 *systemFont{};
+        ResourcePtr<LCDFont_32> systemFont;
         uint32_t displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
         bool displayBufferNativeEndian = false;
         uint32_t displayBufferOnColor = 0xB0AEA7FF;
         uint32_t displayBufferOffColor = 0x302E27FF;
-        LCDBitmap_32 *frameBuffer{}, *previousFrameBuffer{};
-        DisplayContext frameBufferContext{};
+        ResourcePtr<LCDBitmap_32> frameBuffer, previousFrameBuffer;
+        DisplayContext frameBufferContext{frameBuffer.get()};
         std::vector<DisplayContext> displayContextStack;
         IntVec2 displayOffset{};
         int32_t displayScale{};
@@ -355,14 +367,7 @@ namespace cranked {
         IntVec2 displayMosaic{};
         float framerate{};
         bool alwaysRedrawSprites{};
-        std::unordered_set<LCDSprite_32 *> allocatedSprites;
-        std::vector<LCDSprite_32 *> spriteDrawList;
-        std::unordered_map<std::string, Rom::Image> loadedImages;
-        std::unordered_set<LCDBitmap_32 *> allocatedBitmaps;
-        std::unordered_map<std::string, Rom::ImageTable> loadedBitmapTables;
-        std::unordered_set<LCDBitmapTable_32 *> allocatedBitmapTables;
-        std::unordered_map<std::string, LCDFont_32 *> loadedFonts;
-        std::unordered_set<LCDFont_32 *> allocatedFonts; // Only used when allocating from raw data in C
+        std::vector<ResourcePtr<LCDSprite_32>> spriteDrawList;
     };
 
 }

@@ -15,7 +15,7 @@ namespace cranked {
 
     class LuaEngine {
     public:
-        explicit LuaEngine(Cranked *cranked);
+        explicit LuaEngine(Cranked &cranked);
         ~LuaEngine();
 
         void init();
@@ -174,7 +174,7 @@ namespace cranked {
 
         void registerLuaGlobals();
 
-        Cranked *cranked;
+        Cranked &cranked;
         lua_State *luaInterpreter{};
         lua_State *luaUpdateThread{};
         bool inLuaUpdate{};

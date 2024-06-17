@@ -2,9 +2,18 @@
 
 using namespace cranked;
 
+Cranked::~Cranked() {
+    try {
+        reset();
+    } catch (std::exception &ex) {
+        logMessage(LogLevel::Error, "Failed to clean up: %s", ex.what());
+    }
+}
+
 void Cranked::init() {
     graphics.init();
     files.init();
+    audio.init();
     nativeEngine.init();
     luaEngine.init();
     debugger.init();
@@ -160,7 +169,7 @@ void Cranked::update() {
 
 void Cranked::start() {
     if (!rom)
-        throw std::runtime_error("Rom not loaded");
+        throw CrankedError("Rom not loaded");
     state = State::Running;
     if (!initialized)
         init();

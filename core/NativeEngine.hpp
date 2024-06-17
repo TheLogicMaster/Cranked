@@ -5,6 +5,8 @@
 #include "Rom.hpp"
 #include "HeapAllocator.hpp"
 #include "Debugger.hpp"
+#include "NativeResource.hpp"
+#include "Utils.hpp"
 
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
@@ -16,8 +18,10 @@
 #include "lauxlib.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
+#include <concepts>
 
 // Todo: Dynarmic implementation
 
@@ -26,12 +30,14 @@ namespace cranked {
     class Cranked;
 
     class NativeEngine {
+        friend NativeResource;
+
     public:
-        class NativeExecutionError : public std::runtime_error {
+        class NativeExecutionError : public CrankedError {
         public:
             explicit NativeExecutionError(const char *message, std::string dump = "") : NativeExecutionError(std::string(message), std::move(dump)) {}
 
-            explicit NativeExecutionError(const std::string &message, std::string dump = "") : std::runtime_error(message), dump(std::move(dump)) {}
+            explicit NativeExecutionError(const std::string &message, std::string dump = "") : CrankedError(message), dump(std::move(dump)) {}
 
             const std::string &getDump() {
                 return dump;
@@ -93,7 +99,7 @@ namespace cranked {
                 offset = (intptr_t) apiMemory.data() - API_ADDRESS;
             else {
                 if (throws)
-                    throw std::runtime_error("Invalid native address");
+                    throw CrankedError("Invalid native address");
                 else
                     return (T *) (intptr_t) nullptr;
             }
@@ -118,7 +124,7 @@ namespace cranked {
                 offset = API_ADDRESS - (intptr_t) apiMemory.data();
             else {
                 if (throws)
-                    throw std::runtime_error("Invalid native address");
+                    throw CrankedError("Invalid native address");
                 else
                     return 0;
             }
@@ -157,6 +163,15 @@ namespace cranked {
             return value;
         }
 
+        void freeResource(void *ptr);
+
+        template<typename T, typename ...Args> requires std::derived_from<T, NativeResource>
+        T *createReferencedResource(Args ...args) {
+            T *resource = heap.construct<T>(cranked, args...);
+            resource->reference();
+            return resource;
+        }
+
         int32_t invokeEventCallback(PDSystemEvent event, uint32_t arg) {
             return invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
                     (nativeEventCallback, toVirtualAddress(apiMemory.data()), (int32_t) event, (uint32_t) arg);
@@ -164,7 +179,7 @@ namespace cranked {
 
         int32_t invokeUpdateCallback() {
             if (!nativeUpdateCallback)
-                throw std::runtime_error("Update callback not set");
+                throw CrankedError("Update callback not set");
             return invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t>(nativeUpdateCallback, nativeUpdateUserdata);
         }
 
@@ -183,7 +198,7 @@ namespace cranked {
         template<typename R, ArgType N, ArgType... A, typename... P>
         R invokeEmulatedFunction(uint32_t address, [[maybe_unused]] P... params) {
             if (!loaded)
-                throw std::runtime_error("Native binary not loaded");
+                throw CrankedError("Native binary not loaded");
 
             if (++nativeContextStackDepth > 1) {
                 if (nativeContextStack.size() < nativeContextStackDepth - 1)
@@ -206,7 +221,7 @@ namespace cranked {
                 ([&] { // C++ fold magic
                     const auto param = params;
                     if (i >= sizeof...(A))
-                        throw std::runtime_error("Argument out of range");
+                        throw CrankedError("Argument out of range");
                     auto type = args[i];
                     bool wide = type == ArgType::int64_t or type == ArgType::uint64_t;
                     if (wide and currentReg < 4 and (currentReg % 2) != 0)
@@ -224,8 +239,7 @@ namespace cranked {
                             assertUC(uc_mem_write(nativeEngine, sp, &param, sizeof(double)), "Mem write failed");
                             sp -= sizeof(double);
                         } else {
-                            assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0 + currentFloatReg / 2, &param),
-                                     "Register write failed");
+                            assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0 + currentFloatReg / 2, &param), "Register write failed");
                             currentFloatReg += 2;
                         }
                     } else if (currentReg >= 4 or (wide and currentReg > 2) or (type == ArgType::struct2_t and currentReg > 2) or (type == ArgType::struct4_t and currentReg > 0)) {
@@ -372,6 +386,7 @@ namespace cranked {
         std::unordered_map<std::string, cref_t> emulatedStringLiterals;
         std::vector<cref_t> emulatedLuaFunctions;
         cref_t lastBadAccessAddress{};
+        std::unordered_set<NativeResource *> nativeResources;
     };
 
 }

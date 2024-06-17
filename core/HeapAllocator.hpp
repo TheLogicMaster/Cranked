@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "Utils.hpp"
+
 #include <cstdio>
 #include <unordered_map>
 #include <map>
@@ -13,6 +15,7 @@
 #include <set>
 #include <unordered_set>
 #include <cstring>
+#include <memory>
 
 namespace cranked {
 
@@ -26,7 +29,7 @@ namespace cranked {
             typedef T value_type;
 
             inline AdaptorSTL() : allocator(nullptr) { // This should be deleted, but it doesn't compile
-                throw std::runtime_error("Null allocator");
+                throw CrankedError("Null allocator");
             }
 
             inline explicit AdaptorSTL(HeapAllocator &allocator) noexcept: allocator(&allocator) {}
@@ -34,8 +37,7 @@ namespace cranked {
             inline AdaptorSTL(const AdaptorSTL &other) noexcept: allocator(other.allocator) {};
 
             template<typename U>
-            inline AdaptorSTL(const AdaptorSTL<U> &other) noexcept : allocator(
-                    other.allocator) {}; // NOLINT: Intended conversion
+            inline AdaptorSTL(const AdaptorSTL<U> &other) noexcept : allocator(other.allocator) {}; // NOLINT: Intended conversion
 
             [[nodiscard]] inline constexpr T *allocate(size_t n) {
                 return (T *) allocator->allocate(n * sizeof(T));
@@ -70,21 +72,21 @@ namespace cranked {
 
         void reset();
 
-        inline const char *allocateString(const char *string) {
+        const char *allocateString(const char *string) {
             auto ptr = (char *) allocate(strlen(string) + 1);
             strcpy(ptr, string);
             return ptr;
         }
 
         template<typename T, typename... Args>
-        inline T *construct(Args &&... args) {
+        T *construct(Args &&... args) {
             auto ptr = (T *) allocate(sizeof(T));
             new(ptr) T(args...);
             return ptr;
         }
 
         template<typename T>
-        inline void destruct(T *ptr) {
+        void destruct(T *ptr) {
             if (!ptr)
                 return;
             ptr->~T();
@@ -92,12 +94,12 @@ namespace cranked {
         }
 
         template<typename T>
-        inline AdaptorSTL<T> allocator() {
+        AdaptorSTL<T> allocator() {
             return AdaptorSTL<T>(*this);
         }
 
         template<typename Key, typename T>
-        inline AdaptorSTL<std::pair<const Key, T>> pairAllocator() {
+        AdaptorSTL<std::pair<const Key, T>> pairAllocator() {
             return AdaptorSTL<std::pair<const Key, T>>(*this);
         }
 
@@ -120,6 +122,9 @@ namespace cranked {
         void removeFreeNode(Node *previousNode, Node *node);
     };
 
+    // The following containers can be annoying to use correctly because they must always be constructed with a custom allocator/deleter,
+    // or they will use the default allocator for the normal heap, which is problematic for emulated access.
+
     template<typename Key, typename T>
     using HeapAllocatorMap = HeapAllocator::AdaptorSTL<std::pair<const Key, T>>;
 
@@ -132,7 +137,7 @@ namespace cranked {
     template<typename T>
     using vheap_vector = std::vector<T, HeapAllocator::AdaptorSTL<T>>;
 
-// Be careful using this because it starts with a small local buffer which isn't heap stored, prefer vector, or store the heap_string itself in the heap
+    // Be careful using this because it starts with a small local buffer which isn't heap stored, prefer vector, or store the heap_string itself in the heap
     using vheap_string = std::basic_string<char, std::char_traits<char>, HeapAllocator::AdaptorSTL<char>>;
 
     template<typename T, typename Compare = std::less<T>>
@@ -144,4 +149,18 @@ namespace cranked {
     template<typename T>
     using HeapAllocatorSTL = HeapAllocator::AdaptorSTL<T>;
 
+    template<typename T>
+    class HeapDeleter {
+    public:
+        explicit HeapDeleter(HeapAllocator &allocator) : allocator(allocator) {}
+
+        void operator()(T* ptr) const {
+            allocator.destruct(ptr);
+        }
+    private:
+        HeapAllocator &allocator;
+    };
+
+    template<typename T>
+    using vheap_unique_ptr = std::unique_ptr<T, HeapDeleter<T>>;
 }

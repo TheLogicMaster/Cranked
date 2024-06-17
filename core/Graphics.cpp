@@ -4,46 +4,36 @@
 
 using namespace cranked;
 
-Graphics::Graphics(Cranked *cranked)
-        : cranked(cranked), heap(cranked->heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
+Graphics::Graphics(Cranked &cranked)
+        : cranked(cranked), heap(cranked.heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
 
-LCDBitmap_32::LCDBitmap_32(int width, int height, Graphics *graphics)
-        : width(width), height(height), graphics(graphics), data(vheap_vector<uint8_t>(width * height, graphics->heap.allocator<uint8_t>())), mask(nullptr) {}
+LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked) : NativeResource(cranked) {}
+
+LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
+        : NativeResource(cranked), width(width), height(height), data(vheap_vector<uint8_t>(width * height, cranked.heap.allocator<uint8_t>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
-        : width(other.width), height(other.height), data(other.data), graphics(other.graphics), mask(other.mask ? graphics->heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
-
-LCDBitmap_32::LCDBitmap_32(LCDBitmap_32 &&other) noexcept : width(other.width), height(other.height), data(std::move(other.data)), mask(other.mask), graphics(other.graphics) {
-    if (other.mask)
-        other.mask = nullptr;
-}
-
-LCDBitmap_32::~LCDBitmap_32() {
-    if (mask)
-        graphics->heap.destruct(mask);
-}
+        : NativeResource(other), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
 
 LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     if (&other == this)
         return *this;
-    if (mask)
-        graphics->heap.destruct(mask);
+    width = other.width;
+    height = other.height;
     data = other.data;
-    mask = other.mask ? graphics->heap.construct<LCDBitmap_32>(*other.mask) : nullptr;
+    mask = other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr;
     return *this;
 }
 
-LCDFontGlyph_32::LCDFontGlyph_32(LCDBitmap_32 &&bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable)
-        : bitmap(bitmap), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable) {}
+LCDFontGlyph_32::LCDFontGlyph_32(LCDBitmap_32 *bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable)
+        : NativeResource(bitmap->cranked), bitmap(bitmap), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable) {}
 
-LCDFontPage_32::LCDFontPage_32(Graphics *graphics)
-        : glyphs(vheap_map<int, LCDFontGlyph_32>(graphics->heap.pairAllocator<int, LCDFontGlyph_32>())) {}
+LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked) {}
 
-LCDFont_32::LCDFont_32(Graphics *graphics, int tracking, int glyphWidth, int glyphHeight)
-        : tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight), pages(vheap_map<int, LCDFontPage_32>(graphics->heap.pairAllocator<int, LCDFontPage_32>())) {}
+LCDFont_32::LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight)
+        : NativeResource(cranked), tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight) {}
 
-LCDBitmapTable_32::LCDBitmapTable_32(Graphics *graphics, int cellsPerRow)
-        : cellsPerRow(cellsPerRow), graphics(graphics), bitmaps(graphics->heap.allocator<LCDBitmap_32>()) {}
+LCDBitmapTable_32::LCDBitmapTable_32(Cranked &cranked, int cellsPerRow) : NativeResource(cranked), cellsPerRow(cellsPerRow) {}
 
 LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) {
     if (&other == this)
@@ -79,8 +69,8 @@ void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
     if (color.pattern >= 4) {
         auto row = y % 8;
         auto column = x % 8;
-        auto word = graphics->cranked->virtualRead<uint8_t>(color.pattern + row);
-        auto maskWord = graphics->cranked->virtualRead<uint8_t>(color.pattern + row + 8);
+        auto word = cranked.virtualRead<uint8_t>(color.pattern + row);
+        auto maskWord = cranked.virtualRead<uint8_t>(color.pattern + row + 8);
         if (maskWord & (0x80 >> column))
             c = word & (0x80 >> column) ? LCDSolidColor::White : LCDSolidColor::Black;
         else
@@ -159,20 +149,20 @@ void LCDBitmap_32::fillRect(int x, int y, int w, int h, LCDColor color) {
     }
 }
 
+LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {}
+
+LCDSprite_32::~LCDSprite_32() {
+    auto &drawList = cranked.graphics.spriteDrawList;
+    drawList.erase(std::remove(drawList.begin(), drawList.end(), this), drawList.end());
+}
+
 void Graphics::pushContext(LCDBitmap_32 *target) {
-    displayContextStack.emplace_back(DisplayContext{.bitmap = target ? target : frameBuffer, .lineWidth = 1});
+    displayContextStack.emplace_back(target ? target : frameBuffer.get());
 }
 
 void Graphics::popContext() {
     if (displayContextStack.empty())
         return;
-    auto &context = displayContextStack.back();
-    // Free any preserved Lua references (Safe for non-preserved values, as well)
-    cranked->luaEngine.releaseLuaReference(context.focusedImage);
-    cranked->luaEngine.releaseLuaReference(context.font);
-    cranked->luaEngine.releaseLuaReference(context.stencilImage);
-    if (context.bitmap != frameBuffer)
-        cranked->luaEngine.releaseLuaReference(context.bitmap);
     displayContextStack.pop_back();
 }
 
@@ -285,14 +275,14 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
     const char *string = (const char *) text;
     auto &context = getCurrentDisplayContext();
     if (!font)
-        font = context.font ? context.font : systemFont;
+        font = (context.font ? context.font : systemFont).get();
     for (int i = 0; i < len; i++) {
         char character = string[i];
         int pageIndex = 0; // Todo: Temp ascii
         try {
             auto &page = font->pages.at(pageIndex);
-            auto &glyph = page.glyphs.at(character);
-            drawBitmap(&glyph.bitmap, x, y, LCDBitmapFlip::Unflipped);
+            auto &glyph = *page->glyphs.at(character);
+            drawBitmap(glyph.bitmap.get(), x, y, LCDBitmapFlip::Unflipped);
             x += glyph.advance;
         } catch (std::out_of_range &ignored) {}
     }
@@ -440,28 +430,21 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
 }
 
 LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
-    auto &bitmapTable = loadedBitmapTables[path];
-    if (bitmapTable.cells.empty())
-        bitmapTable = cranked->rom->getImageTable(path);
-    auto table = heap.construct<LCDBitmapTable_32>(this, bitmapTable.cellsPerRow);
-    allocatedBitmapTables.emplace(table);
+    auto bitmapTable = cranked.rom->getImageTable(path);
+    auto table = heap.construct<LCDBitmapTable_32>(cranked, bitmapTable.cellsPerRow);
     table->bitmaps.reserve(bitmapTable.cells.size());
     for (auto &bitmap : bitmapTable.cells)
-        table->bitmaps.emplace_back(*getImage(bitmap));
+        table->bitmaps.emplace_back(getImage(bitmap));
     return table;
 }
 
 LCDBitmap_32 *Graphics::getImage(const std::string &path) {
-    auto &image = loadedImages[path];
-    if (image.cell.data.empty())
-        image = cranked->rom->getImage(path);
-    auto bitmap = getImage(image.cell);
-    allocatedBitmaps.emplace(bitmap);
-    return bitmap;
+    auto image = cranked.rom->getImage(path);
+    return getImage(image.cell);
 }
 
 LCDBitmap_32 *Graphics::getImage(const Rom::ImageCell &source) {
-    auto bitmap = heap.construct<LCDBitmap_32>(source.width, source.height, this);
+    auto bitmap = heap.construct<LCDBitmap_32>(cranked, source.width, source.height);
     auto stride = (int) std::ceil((float) source.width / 8);
     auto readBitmapData = [&](const uint8_t *src, uint8_t *dest){
         for (int i = 0; i < source.height; i++)
@@ -471,27 +454,23 @@ LCDBitmap_32 *Graphics::getImage(const Rom::ImageCell &source) {
     };
     readBitmapData(source.data.data(), bitmap->data.data());
     if (!source.mask.empty()) {
-        bitmap->mask = heap.construct<LCDBitmap_32>(source.width, source.height, this);
+        bitmap->mask = heap.construct<LCDBitmap_32>(cranked, source.width, source.height);
         readBitmapData(source.mask.data(), bitmap->mask->data.data());
     }
     return bitmap;
 }
 
 LCDFont_32 *Graphics::getFont(const std::string &path) {
-    auto &font = loadedFonts[path];
-    if (font)
-        return font;
-    font = getFont(cranked->rom->getFont(path));
-    return font;
+    return getFont(cranked.rom->getFont(path));
 }
 
 LCDFont_32 *Graphics::getFont(const Rom::Font &source) {
-    auto font = heap.construct<LCDFont_32>(this, source.tracking, source.glyphWidth, source.glyphHeight);
+    auto font = heap.construct<LCDFont_32>(cranked, source.tracking, source.glyphWidth, source.glyphHeight);
     for (auto &pageEntry : source.glyphs) {
-        auto &page = (*font->pages.emplace(std::pair{pageEntry.first, LCDFontPage_32{this}}).first).second;
+        auto &page = font->pages[pageEntry.first] = heap.construct<LCDFontPage_32>(cranked);
         for (auto &glyphEntry : pageEntry.second) {
             auto &glyph = glyphEntry.second;
-            page.glyphs.emplace(std::pair{glyphEntry.first, LCDFontGlyph_32{std::move(*getImage(glyph.cell)), glyph.advance, glyph.shortKerningTable, glyph.longKerningTable}});
+            page->glyphs[glyphEntry.first] = heap.construct<LCDFontGlyph_32>(getImage(glyph.cell), glyph.advance, glyph.shortKerningTable, glyph.longKerningTable);
         }
     }
     return font;
@@ -500,33 +479,30 @@ LCDFont_32 *Graphics::getFont(const Rom::Font &source) {
 LCDFont_32 *Graphics::getFont(const uint8_t *data, bool wide) {
     auto fontData = Rom::readFontData((uint8_t *) data, wide);
     auto font = getFont(fontData);
-    allocatedFonts.emplace(font);
     return font;
 }
 
 void Graphics::init() {
-    frameBuffer = heap.construct<LCDBitmap_32>(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT, this);
-    previousFrameBuffer = heap.construct<LCDBitmap_32>(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT, this);
-    frameBufferContext.bitmap = frameBuffer;
+    frameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
+    previousFrameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
+    frameBufferContext = DisplayContext(frameBuffer.get());
     systemFont = getFont(systemFontSource);
 }
 
 void Graphics::reset() {
-    // Don't bother freeing resources since heap will be reset
-
-    frameBuffer = nullptr;
-    previousFrameBuffer = nullptr;
-    systemFont = nullptr;
-
-    allocatedBitmaps.clear();
-    allocatedBitmapTables.clear();
-    loadedFonts.clear();
-    allocatedSprites.clear();
+    for (auto &sprite : spriteDrawList)
+        sprite.reset();
     spriteDrawList.clear();
-    loadedImages.clear();
 
+    frameBuffer.reset();
+    previousFrameBuffer.reset();
+    systemFont.reset();
+
+    for (auto &context : displayContextStack)
+        context.reset();
     displayContextStack.clear();
-    frameBufferContext = {.bitmap = frameBuffer, .backgroundColor = LCDSolidColor::White, .lineWidth = 1};
+
+    frameBufferContext.reset();
 
     memset(displayBufferRGBA, 0, sizeof(displayBufferRGBA));
     displayOffset = {};
@@ -566,17 +542,5 @@ void Graphics::flushDisplayBuffer() {
 
     memcpy(previousFrameBuffer->data.data(), frameBuffer->data.data(), frameBuffer->data.size());
 
-    cranked->menu.render();
-}
-
-bool Graphics::handleFree(void *ptr) {
-    if (allocatedBitmapTables.contains((LCDBitmapTable_32 *) ptr)) {
-        freeBitmapTable((LCDBitmapTable_32 *) ptr); // Todo: Are bitmap tables meant to be freed with realloc?
-        return true;
-    } else if (allocatedFonts.contains((LCDFont_32 *) ptr)) {
-        allocatedFonts.erase((LCDFont_32 *) ptr);
-        heap.destruct((LCDFont_32 *) ptr);
-        return true;
-    }
-    return false;
+    cranked.menu.render();
 }

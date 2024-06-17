@@ -67,7 +67,7 @@ void Rom::load() {
         // Last N 4-byte ints of compressed data are relocation offsets
         const int HEADER_SIZE = 0x30; // Magic + 16 byte MD5 + 4 32-bit integers
         if (strcmp((char *) pdexData.data(), PDX_MAGIC) != 0)
-            throw std::runtime_error("Invalid PDX magic");
+            throw CrankedError("Invalid PDX magic");
         auto decompressedSize = *(uint32_t *) &pdexData[0x20];
         combinedProgramSize = *(uint32_t *) &pdexData[0x24];
         auto shimOffset = *(uint32_t *) &pdexData[0x28];
@@ -151,7 +151,7 @@ std::vector<uint8_t> Rom::readRomFile(const std::string &name, const std::string
     if (zip) {
         auto entry = zip->getEntry(filepath);
         if (entry.isNull())
-            throw std::runtime_error("No such file: " + name);
+            throw CrankedError("No such file: " + name);
         data.resize(entry.getSize());
         auto zipData = entry.readAsBinary();
         memcpy(data.data(), zipData, data.size());
@@ -201,10 +201,10 @@ std::vector<std::string> Rom::listRomFiles(std::string base, bool recursive) {
 std::vector<Rom::File> Rom::loadPDZ(const std::vector<uint8_t> &data) {
     std::vector<File> files;
     if (data.size() <= strlen(PDZ_MAGIC) or strcmp(PDZ_MAGIC, (char *) data.data()) != 0)
-        throw std::runtime_error("Invalid PDZ magic");
+        throw CrankedError("Invalid PDZ magic");
     auto flags = readUint32LE(&data[12]);
     if (flags & 0x40000000)
-        throw std::runtime_error("Encrypted PDZ");
+        throw CrankedError("Encrypted PDZ");
     size_t index = 0x10;
 
     while (index < data.size()) {
@@ -243,7 +243,7 @@ std::vector<Rom::File> Rom::loadPDZ(const std::vector<uint8_t> &data) {
 
 Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
     if (strcmp(FONT_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad font magic");
+        throw CrankedError("Bad font magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
     bool wide = flags & 0x80000001; // Contains characters above U+1FFFF // Todo: Is this needed?
@@ -352,7 +352,7 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
 
 Rom::StringTable Rom::readStringTable(const uint8_t *data, size_t dataSize) {
     if (strcmp(STRING_TABLE_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad string table magic");
+        throw CrankedError("Bad string table magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
     const uint8_t *stringData;
@@ -382,7 +382,7 @@ Rom::StringTable Rom::readStringTable(const uint8_t *data, size_t dataSize) {
 
 Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
     if (strcmp(AUDIO_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad audio magic");
+        throw CrankedError("Bad audio magic");
     auto headerWord = readUint32LE(data + 12);
     auto sampleRate = headerWord >> 8;
     auto format = SoundFormat(headerWord & 0xFF);
@@ -472,7 +472,7 @@ Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
 
 Rom::Image Rom::readImage(const uint8_t *data, size_t dataSize) {
     if (strcmp(IMAGE_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad image magic");
+        throw CrankedError("Bad image magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
     const uint8_t *imageData;
@@ -495,7 +495,7 @@ Rom::Image Rom::readImage(const uint8_t *data, size_t dataSize) {
 
 Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
     if (strcmp(IMAGE_TABLE_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad image table magic");
+        throw CrankedError("Bad image table magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
     const uint8_t *tableData;
@@ -526,7 +526,7 @@ Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
 
 Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     if (strcmp(VIDEO_MAGIC, (char *) data) != 0)
-        throw std::runtime_error("Bad video magic");
+        throw CrankedError("Bad video magic");
     data += 16; // Previous 32-bit word is reserved
     auto frameCount = readUint16LE(data);
     data += 4; // Previous 16-bit word is reserved

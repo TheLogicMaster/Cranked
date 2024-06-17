@@ -1,25 +1,31 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
+#include "NativeResource.hpp"
 
 #include <filesystem>
-#include <unordered_set>
 #include <vector>
 
 namespace cranked {
 
     class Cranked;
 
-    struct SDFile_32 {
-        FILE *file;
-        std::vector<uint8_t> *romData;
-        int romFilePosition;
+    struct SDFile_32 : NativeResource {
+        explicit SDFile_32(Cranked &cranked);
+
+        SDFile_32(const SDFile_32 &other) = delete;
+        SDFile_32(SDFile_32 &&other) = delete;
+        ~SDFile_32() override;
+
+        FILE *file{};
+        std::vector<uint8_t> *romData{};
+        int romFilePosition{};
     };
 
     class File {
     public:
 
-        inline explicit File(Cranked *cranked) : cranked(cranked) {}
+        explicit File(Cranked &cranked);
 
         void init();
 
@@ -35,7 +41,7 @@ namespace cranked {
 
         int unlink(const std::string &path, bool recursive);
 
-        const char *getType(const std::string &path);
+        [[nodiscard]] const char *getType(const std::string &path) const;
 
         int stat(const std::string &path, FileStat_32 &stat);
 
@@ -55,9 +61,13 @@ namespace cranked {
 
         int tell(SDFile_32 *file);
 
-        Cranked *cranked;
+        bool isFileOpen(SDFile_32 *file) {
+            return std::find_if(openFiles.begin(), openFiles.end(), [&](auto &val){ return val.get() == file; }) != openFiles.end();
+        }
 
-        std::unordered_set<SDFile_32 *> openFiles;
+        Cranked &cranked;
+
+        std::vector<ResourcePtr<SDFile_32>> openFiles{};
         std::filesystem::path appDataPath = "./appData/";
         cref_t lastError{};
 

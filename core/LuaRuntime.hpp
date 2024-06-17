@@ -294,9 +294,9 @@ namespace cranked {
 
         void pop() {
             if (popped)
-                throw std::runtime_error("Double LuaVal pop");
+                throw CrankedError("Double LuaVal pop");
             if (lua_gettop(val.context) != val.index)
-                throw std::runtime_error("Unbalanced LuaVal pop");
+                throw CrankedError("Unbalanced LuaVal pop");
             lua_pop(val.context, 1);
         }
 
@@ -449,7 +449,7 @@ namespace cranked {
         ffi_cif cif;
         static_assert(sizeof(LuaRet) <= sizeof(returnValue)); // Ensure LuaRet fits in returnValue
         if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, argCount, ffiReturnType, ffiArgTypes.data()) != FFI_OK)
-            throw std::runtime_error("Failed to prep FFI CIF in Lua wrapper");
+            throw CrankedError("Failed to prep FFI CIF in Lua wrapper");
         try {
             ffi_call(&cif, (void (*)()) F, &returnValue, ffiArgs.data());
         } catch (std::exception &ex) {
@@ -561,29 +561,31 @@ namespace cranked {
         return object;
     }
 
-/**
- * Owned userdata objects can share ownership of a native resource using reference counting
- */
-    inline LuaVal pushOwnedUserdataObject(Cranked *cranked, void *value, const char *metatable, bool owner = true) {
-        auto object = pushUserdataObject(cranked, value, metatable);
-        object.setBoolField("owner", owner);
-        if (owner)
-            cranked->luaEngine.preserveLuaReference(value, object);
+    inline LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) {
+        auto object = pushUserdataObject(&resource->cranked, resource, metatable);
+        resource->reference();
         return object;
     }
 
-    inline bool releaseOwnedUserdataObject(Cranked *cranked, LuaVal value) {
-        if (!value.getBoolField("owner"))
-            return false;
-        return cranked->luaEngine.releaseLuaReference(value.getLightUserdataField("userdata"));
+    inline void releaseUserdataResource(LuaVal value) {
+        auto resource = (NativeResource *)value.getLightUserdataField("userdata");
+        resource->dereference();
     }
 
-    inline LuaVal pushImage(Cranked *cranked, LCDBitmap_32 *image, bool owner) {
-        return pushOwnedUserdataObject(cranked, image, "playdate.graphics.image", owner);
+    inline LuaVal pushImage(LCDBitmap_32 *image) {
+        return pushUserdataResource(image, "playdate.graphics.image");
     }
 
-    inline LuaVal pushSprite(Cranked *cranked, LCDSprite_32 *sprite, bool owner) {
-        return pushOwnedUserdataObject(cranked, sprite, "playdate.graphics.sprite", owner);
+    inline LuaVal pushSprite(LCDSprite_32 *sprite) {
+        return pushUserdataResource(sprite, "playdate.graphics.sprite");
+    }
+
+    inline LuaVal pushFile(SDFile_32 *file) {
+        return pushUserdataResource(file, "playdate.file.file");
+    }
+
+    inline LuaVal pushMenuItem(PDMenuItem_32 *item) {
+        return pushUserdataResource(item, "playdate.menu.item");
     }
 
     template<typename T>

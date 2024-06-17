@@ -51,6 +51,8 @@ namespace cranked {
 
         Cranked() = default;
         Cranked(const Cranked &) = delete;
+        Cranked(Cranked &&) = delete;
+        ~Cranked();
         Cranked &operator=(const Cranked &) = delete;
 
         void load(const std::string &path);
@@ -132,12 +134,12 @@ namespace cranked {
         }
 
         HeapAllocator heap = HeapAllocator(HEAP_SIZE);
-        Graphics graphics = Graphics(this); // Todo: Replace pointers with references
-        Audio audio = Audio(this);
-        File files = File(this);
-        Menu menu = Menu(this);
         NativeEngine nativeEngine = NativeEngine(*this);
-        LuaEngine luaEngine = LuaEngine(this);
+        Graphics graphics = Graphics(*this);
+        Audio audio = Audio(*this);
+        File files = File(*this);
+        Menu menu = Menu(*this);
+        LuaEngine luaEngine = LuaEngine(*this);
         Debugger debugger = Debugger(*this);
         std::unique_ptr<Rom> rom;
 

@@ -71,7 +71,7 @@ void cranked::playdate_graphics_clearClipRect(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32_t endCapStyle) {
-    cranked->graphics.getCurrentDisplayContext().lineEndCapStype = LCDLineCapStyle(endCapStyle);
+    cranked->graphics.getCurrentDisplayContext().lineEndCapStyle = LCDLineCapStyle(endCapStyle);
 }
 
 void cranked::playdate_graphics_setFont(Cranked *cranked, LCDFont_32 *font) {
@@ -132,13 +132,14 @@ int32_t cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32
 }
 
 LCDBitmap_32 *cranked::playdate_graphics_newBitmap(Cranked *cranked, int32_t width, int32_t height, uint32_t bgcolor) {
-    auto bitmap = cranked->graphics.allocateBitmap(width, height);
+    auto bitmap = cranked->graphics.createBitmap(width, height);
+    bitmap->reference();
     bitmap->clear(bgcolor);
     return bitmap;
 }
 
 void cranked::playdate_graphics_freeBitmap(Cranked *cranked, LCDBitmap_32 *ptr) {
-    cranked->graphics.freeBitmap(ptr);
+    ptr->dereference();
 }
 
 LCDBitmap_32 *cranked::playdate_graphics_loadBitmap(Cranked *cranked, uint8_t *path, cref_t *outerr) {
@@ -156,9 +157,8 @@ LCDBitmap_32 *cranked::playdate_graphics_copyBitmap(Cranked *cranked, LCDBitmap_
 
 void cranked::playdate_graphics_loadIntoBitmap(Cranked *cranked, uint8_t *path, LCDBitmap_32 *bitmap, cref_t *outerr) {
     try {
-        auto loaded = cranked->graphics.getImage((const char *) path);
+        ResourcePtr<LCDBitmap_32> loaded(cranked->graphics.getImage((const char *) path));
         *bitmap = *loaded;
-        cranked->graphics.freeBitmap(loaded);
     } catch (std::exception &ex) {
         if (outerr)
             *outerr = cranked->getEmulatedStringLiteral(ex.what());
@@ -183,16 +183,20 @@ LCDBitmap_32 *cranked::playdate_graphics_rotatedBitmap(Cranked *cranked, LCDBitm
 }
 
 LCDBitmapTable_32 *cranked::playdate_graphics_newBitmapTable(Cranked *cranked, int32_t count, int32_t width, int32_t height) {
-    return cranked->graphics.allocateBitmapTable(count);
+    auto table = cranked->graphics.createBitmapTable(count);
+    table->reference();
+    return table;
 }
 
 void cranked::playdate_graphics_freeBitmapTable(Cranked *cranked, LCDBitmapTable_32 *table) {
-    cranked->graphics.freeBitmapTable(table);
+    table->dereference();
 }
 
 LCDBitmapTable_32 *cranked::playdate_graphics_loadBitmapTable(Cranked *cranked, uint8_t *path, cref_t *outerr) {
     try {
-        return cranked->graphics.getBitmapTable((const char *) path);
+        auto table = cranked->graphics.getBitmapTable((const char *) path);
+        table->reference();
+        return table;
     } catch (std::exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
@@ -201,21 +205,22 @@ LCDBitmapTable_32 *cranked::playdate_graphics_loadBitmapTable(Cranked *cranked, 
 
 void cranked::playdate_graphics_loadIntoBitmapTable(Cranked *cranked, uint8_t *path, LCDBitmapTable_32 *table, cref_t *outerr) {
     try {
-        auto loaded = cranked->graphics.getBitmapTable((const char *) path);
+        ResourcePtr<LCDBitmapTable_32> loaded(cranked->graphics.getBitmapTable((const char *) path));
         *table = *loaded;
-        cranked->graphics.freeBitmapTable(loaded);
     } catch (std::exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
     }
 }
 
 LCDBitmap_32 *cranked::playdate_graphics_getTableBitmap(Cranked *cranked, LCDBitmapTable_32 *table, int32_t idx) {
-    return idx < table->bitmaps.size() ? &table->bitmaps[idx] : nullptr;
+    return idx < table->bitmaps.size() ? table->bitmaps[idx].get() : nullptr;
 }
 
 LCDFont_32 *cranked::playdate_graphics_loadFont(Cranked *cranked, uint8_t *path, cref_t *outerr) {
     try {
-        return cranked->graphics.getFont((const char *) path);
+        auto font = cranked->graphics.getFont((const char *) path);
+        font->reference();
+        return font;
     } catch (std::exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
@@ -224,7 +229,7 @@ LCDFont_32 *cranked::playdate_graphics_loadFont(Cranked *cranked, uint8_t *path,
 
 LCDFontPage_32 *cranked::playdate_graphics_getFontPage(Cranked *cranked, LCDFont_32 *font, uint32_t c) {
     try {
-        return &font->pages.at(c / 256);
+        return font->pages.at(c / 256).get();
     } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
@@ -232,12 +237,12 @@ LCDFontPage_32 *cranked::playdate_graphics_getFontPage(Cranked *cranked, LCDFont
 
 LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, LCDFontPage_32 *page, uint32_t c, cref_t *bitmap, int32_t *advance) {
     try {
-        auto glyph = &page->glyphs.at(c % 256);
+        auto &glyph = page->glyphs.at(c % 256);
         if (bitmap)
-            *bitmap = cranked->toVirtualAddress(&glyph->bitmap);
+            *bitmap = cranked->toVirtualAddress(glyph->bitmap.get());
         if (advance)
             *advance = glyph->advance;
-        return glyph;
+        return glyph.get();
     } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
@@ -245,7 +250,7 @@ LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, LCDFo
 
 int32_t cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_32 *glyph, uint32_t glyphcode, uint32_t nextcode) {
     try {
-        return nextcode < 256 ? glyph->shortKerningTable.at(nextcode) : glyph->longKerningTable.at(nextcode);
+        return nextcode < 256 ? glyph->shortKerningTable.at((int)nextcode) : glyph->longKerningTable.at((int)nextcode);
     } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
         return 0;
     }
@@ -260,7 +265,7 @@ int32_t cranked::playdate_graphics_getTextWidth(Cranked *cranked, LCDFont_32 *fo
         char character = *string;
         size += font->glyphWidth;
         try {
-            glyph = &font->pages.at(character / 256).glyphs.at(character % 256);
+            glyph = font->pages.at(character / 256)->glyphs.at(character % 256).get();
         } catch (std::out_of_range &ex) {}
         if (glyph) {
             size += glyph->advance;
@@ -316,7 +321,7 @@ uint8_t cranked::playdate_graphics_getFontHeight(Cranked *cranked, LCDFont_32 *f
 }
 
 LCDBitmap_32 *cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
-    return cranked->graphics.frameBuffer;
+    return cranked->graphics.frameBuffer.get();
 }
 
 void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t x, int32_t y, float rotation, float centerx, float centery, float xscale, float yscale) {
@@ -328,14 +333,15 @@ void cranked::playdate_graphics_setTextLeading(Cranked *cranked, int32_t lineHei
 }
 
 int32_t cranked::playdate_graphics_setBitmapMask(Cranked *cranked, LCDBitmap_32 *bitmap, LCDBitmap_32 *mask) {
-    if (bitmap->mask)
-        cranked->graphics.freeBitmap(bitmap->mask);
-    bitmap->mask = mask; // Todo: Make copy?
+    bitmap->mask = mask;
     return 0; // Todo: Return value?
 }
 
 LCDBitmap_32 *cranked::playdate_graphics_getBitmapMask([[maybe_unused]] Cranked *cranked, LCDBitmap_32 *bitmap) {
-    return bitmap->mask;
+    if (!bitmap->mask)
+        return nullptr;
+    bitmap->mask->reference();
+    return bitmap->mask.get();
 }
 
 void cranked::playdate_graphics_setStencilImage(Cranked *cranked, LCDBitmap_32 *stencil, int32_t tile) {
@@ -354,8 +360,7 @@ int32_t cranked::playdate_graphics_getTextTracking(Cranked *cranked) {
 void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32_t size) {
     // Todo: Check for objects that need to be user freed and call destructors
     if (size == 0) {
-        if (!cranked->graphics.handleFree(ptr)) // Handle allocated objects that need to be freed with `system->realloc`
-            cranked->heap.free(ptr);
+        cranked->nativeEngine.freeResource(ptr);
         return nullptr;
     } else
         return cranked->heap.reallocate(ptr, size);
@@ -409,7 +414,7 @@ void cranked::playdate_sys_drawFPS(Cranked *cranked, int32_t x, int32_t y) {
     cranked->graphics.fillRect(x - 2, y - 2, 14 * string.size() + 2, 30, LCDSolidColor::White);
     cranked->graphics.pushContext(cranked->graphics.getTargetBitmap());
     cranked->graphics.getCurrentDisplayContext().bitmapDrawMode = LCDBitmapDrawMode::Copy;
-    cranked->graphics.drawText(string.c_str(), string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont);
+    cranked->graphics.drawText(string.c_str(), string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont.get());
     cranked->graphics.popContext();
 }
 
@@ -495,11 +500,11 @@ void cranked::playdate_sys_setMenuItemValue(Cranked *cranked, PDMenuItem_32 *men
 }
 
 uint8_t *cranked::playdate_sys_getMenuItemTitle(Cranked *cranked, PDMenuItem_32 *menuItem) {
-    return (uint8_t *) menuItem->title;
+    return (uint8_t *) menuItem->title.c_str();
 }
 
 void cranked::playdate_sys_setMenuItemTitle(Cranked *cranked, PDMenuItem_32 *menuItem, uint8_t *title) {
-    cranked->menu.setItemTitle(menuItem, (char *) title);
+    menuItem->title = (char *)title;
 }
 
 void *cranked::playdate_sys_getMenuItemUserdata(Cranked *cranked, PDMenuItem_32 *menuItem) {
@@ -1247,7 +1252,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                         value.data.floatval = parsed.get<float>();
                         value.type = (int) JsonValueType::Float;
                     } else
-                        throw std::runtime_error("Invalid JSON value type");
+                        throw CrankedError("Invalid JSON value type");
                     return value;
                 };
                 if (context.inArray) {
@@ -1481,8 +1486,7 @@ LCDSprite_32 *cranked::playdate_sprite_newSprite(Cranked *cranked) {
 }
 
 void cranked::playdate_sprite_freeSprite(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
-    cranked->graphics.freeSprite(sprite);
+    sprite->dereference();
 }
 
 LCDSprite_32 *cranked::playdate_sprite_copy(Cranked *cranked, LCDSprite_32 *sprite) {
@@ -1746,15 +1750,15 @@ int32_t cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource_3
 
 void cranked::playdate_sound_source_setFinishCallback(Cranked *cranked, SoundSource_32 *c, cref_t callback, void *userdata) {
     c->completionCallback = callback;
-    c->completionCallbackUserdata = cranked->version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
+    c->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
 FilePlayer_32 *cranked::playdate_sound_fileplayer_newPlayer(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<FilePlayer_32>();
+    return cranked->audio.allocateReferencedSource<FilePlayer_32>();
 }
 
 void cranked::playdate_sound_fileplayer_freePlayer(Cranked *cranked, FilePlayer_32 *player) {
-    cranked->audio.freeSoundSource(player);
+    player->dereference();
 }
 
 int32_t cranked::playdate_sound_fileplayer_loadIntoPlayer(Cranked *cranked, FilePlayer_32 *player, uint8_t *path) {
@@ -1817,12 +1821,12 @@ int32_t cranked::playdate_sound_fileplayer_didUnderrun(Cranked *cranked, FilePla
 
 void cranked::playdate_sound_fileplayer_setFinishCallback(Cranked *cranked, FilePlayer_32 *player, cref_t callback, void *userdata) {
     player->completionCallback = callback;
-    player->completionCallbackUserdata = cranked->version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
+    player->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
 void cranked::playdate_sound_fileplayer_setLoopCallback(Cranked *cranked, FilePlayer_32 *player, cref_t callback, void *userdata) {
     player->loopCallback = callback;
-    player->loopCallbackUserdata = cranked->version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
+    player->loopCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
 float cranked::playdate_sound_fileplayer_getOffset(Cranked *cranked, FilePlayer_32 *player) {
@@ -1845,7 +1849,7 @@ void cranked::playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, Fil
 }
 
 AudioSample_32 *cranked::playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32_t byteCount) {
-    return cranked->audio.allocateAudioSample(byteCount);
+    return cranked->nativeEngine.createReferencedResource<AudioSample_32>(byteCount);
 }
 
 int32_t cranked::playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample_32 *sample, uint8_t *path) {
@@ -1875,7 +1879,7 @@ void cranked::playdate_sound_sample_getData(Cranked *cranked, AudioSample_32 *sa
 }
 
 void cranked::playdate_sound_sample_freeSample(Cranked *cranked, AudioSample_32 *sample) {
-    cranked->audio.freeAudioSample(sample);
+    sample->dereference();
 }
 
 float cranked::playdate_sound_sample_getLength(Cranked *cranked, AudioSample_32 *sample) {
@@ -1887,11 +1891,11 @@ int32_t cranked::playdate_sound_sample_decompress(Cranked *cranked, AudioSample_
 }
 
 SamplePlayer_32 *cranked::playdate_sound_sampleplayer_newPlayer(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<SamplePlayer_32>();
+    return cranked->audio.allocateReferencedSource<SamplePlayer_32>();
 }
 
 void cranked::playdate_sound_sampleplayer_freePlayer(Cranked *cranked, SamplePlayer_32 *player) {
-    cranked->audio.freeSoundSource(player);
+    player->dereference();
 }
 
 void cranked::playdate_sound_sampleplayer_setSample(Cranked *cranked, SamplePlayer_32 *player, AudioSample_32 *sample) {
@@ -1948,7 +1952,7 @@ void cranked::playdate_sound_sampleplayer_setFinishCallback(Cranked *cranked, Sa
 
 void cranked::playdate_sound_sampleplayer_setLoopCallback(Cranked *cranked, SamplePlayer_32 *player, cref_t callback, void *userdata) {
     player->loopCallback = callback;
-    player->loopCallbackUserdata = cranked->version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
+    player->loopCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
 float cranked::playdate_sound_sampleplayer_getOffset(Cranked *cranked, SamplePlayer_32 *player) {
@@ -1969,7 +1973,7 @@ PDSynthSignal_32 *cranked::playdate_sound_signal_newSignal(Cranked *cranked, cre
 }
 
 void cranked::playdate_sound_signal_freeSignal(Cranked *cranked, PDSynthSignal_32 *signal) {
-    cranked->audio.freeSynthSignal(signal);
+    signal->dereference();
 }
 
 float cranked::playdate_sound_signal_getValue(Cranked *cranked, PDSynthSignal_32 *signal) {
@@ -1990,11 +1994,11 @@ uint8_t *cranked::playdate_sound_getError(Cranked *cranked) {
 }
 
 PDSynthLFO_32 *cranked::playdate_sound_lfo_newLFO(Cranked *cranked, int32_t type) {
-    return cranked->audio.allocateSynthSignal<PDSynthLFO_32>((LFOType)type);
+    return cranked->nativeEngine.createReferencedResource<PDSynthLFO_32>((LFOType)type);
 }
 
 void cranked::playdate_sound_lfo_freeLFO(Cranked *cranked, PDSynthLFO_32 *lfo) {
-    cranked->audio.freeSynthSignal(lfo);
+    lfo->dereference();
 }
 
 void cranked::playdate_sound_lfo_setType(Cranked *cranked, PDSynthLFO_32 *lfo, int32_t type) {
@@ -2054,11 +2058,11 @@ void cranked::playdate_sound_lfo_setStartPhase(Cranked *cranked, PDSynthLFO_32 *
 }
 
 PDSynthEnvelope_32 *cranked::playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release) {
-    return cranked->audio.allocateSynthSignal<PDSynthEnvelope_32>(attack, decay, sustain, release);
+    return cranked->nativeEngine.createReferencedResource<PDSynthEnvelope_32>(attack, decay, sustain, release);
 }
 
 void cranked::playdate_sound_envelope_freeEnvelope(Cranked *cranked, PDSynthEnvelope_32 *env) {
-    cranked->audio.freeSynthSignal(env);
+    env->dereference();
 }
 
 void cranked::playdate_sound_envelope_setAttack(Cranked *cranked, PDSynthEnvelope_32 *env, float attack) {
@@ -2105,11 +2109,11 @@ void cranked::playdate_sound_envelope_setRateScaling(Cranked *cranked, PDSynthEn
 }
 
 PDSynth_32 *cranked::playdate_sound_synth_newSynth(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<PDSynth_32>();
+    return cranked->audio.allocateReferencedSource<PDSynth_32>();
 }
 
 void cranked::playdate_sound_synth_freeSynth(Cranked *cranked, PDSynth_32 *synth) {
-    cranked->audio.freeSoundSource(synth);
+    synth->dereference();
 }
 
 void cranked::playdate_sound_synth_setWaveform(Cranked *cranked, PDSynth_32 *synth, int32_t wave) {
@@ -2167,7 +2171,7 @@ void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, PDSyn
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_synth_getFrequencyModulator(Cranked *cranked, PDSynth_32 *synth) {
-    return synth->frequencyModulator;
+    return synth->frequencyModulator.get();
 }
 
 void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, PDSynth_32 *synth, PDSynthSignalValue_32 *mod) {
@@ -2175,7 +2179,7 @@ void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, PDSyn
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_synth_getAmplitudeModulator(Cranked *cranked, PDSynth_32 *synth) {
-    return synth->amplitudeModulator;
+    return synth->amplitudeModulator.get();
 }
 
 int32_t cranked::playdate_sound_synth_getParameterCount(Cranked *cranked, PDSynth_32 *synth) {
@@ -2193,7 +2197,7 @@ void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, PDSyn
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_synth_getParameterModulator(Cranked *cranked, PDSynth_32 *synth, int32_t parameter) {
-    return synth->parameterModulators[parameter];
+    return synth->parameterModulators[parameter].get();
 }
 
 void cranked::playdate_sound_synth_playNote(Cranked *cranked, PDSynth_32 *synth, float freq, float vel, float len, uint32_t when) {
@@ -2235,11 +2239,11 @@ int32_t cranked::playdate_sound_synth_setWavetable(Cranked *cranked, PDSynth_32 
 }
 
 ControlSignal_32 *cranked::playdate_control_signal_newSignal(Cranked *cranked) {
-    return cranked->audio.allocateSynthSignal<ControlSignal_32>();
+    return cranked->nativeEngine.createReferencedResource<ControlSignal_32>();
 }
 
 void cranked::playdate_control_signal_freeSignal(Cranked *cranked, ControlSignal_32 *signal) {
-    cranked->audio.freeSynthSignal(signal);
+    signal->dereference();
 }
 
 void cranked::playdate_control_signal_clearEvents(Cranked *cranked, ControlSignal_32 *control) {
@@ -2259,16 +2263,16 @@ int32_t cranked::playdate_control_signal_getMIDIControllerNumber(Cranked *cranke
 }
 
 PDSynthInstrument_32 *cranked::playdate_sound_instrument_newInstrument(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<PDSynthInstrument_32>();
+    return cranked->audio.allocateReferencedSource<PDSynthInstrument_32>();
 }
 
 void cranked::playdate_sound_instrument_freeInstrument(Cranked *cranked, PDSynthInstrument_32 *inst) {
-    cranked->audio.freeSoundSource(inst);
+    inst->dereference();
 }
 
 int32_t cranked::playdate_sound_instrument_addVoice(Cranked *cranked, PDSynthInstrument_32 *inst, PDSynth_32 *synth, float rangeStart, float rangeEnd, float transpose) {
     // Todo: Check if already in an instrument or channel
-    inst->voices.push_back(synth);
+    inst->voices.emplace_back(synth);
     synth->instrumentStartFrequency = rangeStart;
     synth->instrumentEndFrequency = rangeEnd;
     synth->instrumentTranspose = transpose;
@@ -2321,11 +2325,11 @@ int32_t cranked::playdate_sound_instrument_activeVoiceCount(Cranked *cranked, PD
 }
 
 SequenceTrack_32 *cranked::playdate_sound_track_newTrack(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<SequenceTrack_32>();
+    return cranked->audio.allocateReferencedSource<SequenceTrack_32>();
 }
 
 void cranked::playdate_sound_track_freeTrack(Cranked *cranked, SequenceTrack_32 *track) {
-    cranked->audio.freeSoundSource(track);
+    track->dereference();
 }
 
 void cranked::playdate_sound_track_setInstrument(Cranked *cranked, SequenceTrack_32 *track, PDSynthInstrument_32 *inst) {
@@ -2333,7 +2337,7 @@ void cranked::playdate_sound_track_setInstrument(Cranked *cranked, SequenceTrack
 }
 
 PDSynthInstrument_32 *cranked::playdate_sound_track_getInstrument(Cranked *cranked, SequenceTrack_32 *track) {
-    return track->instrument;
+    return track->instrument.get();
 }
 
 void cranked::playdate_sound_track_addNoteEvent(Cranked *cranked, SequenceTrack_32 *track, uint32_t step, uint32_t len, float note, float velocity) {
@@ -2397,11 +2401,11 @@ ControlSignal_32 *cranked::playdate_sound_track_getSignalForController(Cranked *
 }
 
 SoundSequence_32 *cranked::playdate_sound_sequence_newSequence(Cranked *cranked) {
-    return cranked->audio.allocateSoundSource<SoundSequence_32>();
+    return cranked->audio.allocateReferencedSource<SoundSequence_32>();
 }
 
 void cranked::playdate_sound_sequence_freeSequence(Cranked *cranked, SoundSequence_32 *sequence) {
-    cranked->audio.freeSoundSource(sequence);
+    sequence->dereference();
 }
 int32_t cranked::playdate_sound_sequence_loadMIDIFile(Cranked *cranked, SoundSequence_32 *seq, uint8_t *path) {
     // Todo
@@ -2413,7 +2417,7 @@ uint32_t cranked::playdate_sound_sequence_getTime(Cranked *cranked, SoundSequenc
 }
 
 void cranked::playdate_sound_sequence_setTime(Cranked *cranked, SoundSequence_32 *seq, uint32_t time) {
-    seq->time = time;
+    seq->time = (int)time;
 }
 
 void cranked::playdate_sound_sequence_setLoops(Cranked *cranked, SoundSequence_32 *seq, int32_t loopstart, int32_t loopend, int32_t loops) {
@@ -2432,7 +2436,7 @@ void cranked::playdate_sound_sequence_setTempo(Cranked *cranked, SoundSequence_3
 }
 
 void cranked::playdate_sound_sequence_setTempo_int(Cranked *cranked, SoundSequence_32 * seq, int32_t stepsPerSecond) {
-    seq->tempo = stepsPerSecond;
+    seq->tempo = (float)stepsPerSecond;
 }
 
 int32_t cranked::playdate_sound_sequence_getTrackCount(Cranked *cranked, SoundSequence_32 *seq) {
@@ -2485,11 +2489,11 @@ void cranked::playdate_sound_sequence_setCurrentStep(Cranked *cranked, SoundSequ
 }
 
 TwoPoleFilter_32 *cranked::playdate_sound_effect_twopolefilter_newFilter(Cranked *cranked) {
-    return cranked->audio.allocateSoundEffect<TwoPoleFilter_32>();
+    return cranked->nativeEngine.createReferencedResource<TwoPoleFilter_32>();
 }
 
 void cranked::playdate_sound_effect_twopolefilter_freeFilter(Cranked *cranked, TwoPoleFilter_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_twopolefilter_setType(Cranked *cranked, TwoPoleFilter_32 *filter, int32_t type) {
@@ -2505,7 +2509,7 @@ void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked 
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_twopolefilter_getFrequencyModulator(Cranked *cranked, TwoPoleFilter_32 *filter) {
-    return filter->frequencyModulator;
+    return filter->frequencyModulator.get();
 }
 
 void cranked::playdate_sound_effect_twopolefilter_setGain(Cranked *cranked, TwoPoleFilter_32 *filter, float gain) {
@@ -2521,15 +2525,15 @@ void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked 
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_twopolefilter_getResonanceModulator(Cranked *cranked, TwoPoleFilter_32 *filter) {
-    return filter->resonanceModulator;
+    return filter->resonanceModulator.get();
 }
 
 OnePoleFilter_32 *cranked::playdate_sound_effect_onepolefilter_newFilter(Cranked *cranked) {
-    return cranked->audio.allocateSoundEffect<OnePoleFilter_32>();
+    return cranked->nativeEngine.createReferencedResource<OnePoleFilter_32>();
 }
 
 void cranked::playdate_sound_effect_onepolefilter_freeFilter(Cranked *cranked, OnePoleFilter_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_onepolefilter_setParameter(Cranked *cranked, OnePoleFilter_32 *filter, float parameter) {
@@ -2541,15 +2545,15 @@ void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked 
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_onepolefilter_getParameterModulator(Cranked *cranked, OnePoleFilter_32 *filter) {
-    return filter->cutoffFrequencyModulator;
+    return filter->cutoffFrequencyModulator.get();
 }
 
 BitCrusher_32 *cranked::playdate_sound_effect_bitcrusher_newBitCrusher(Cranked *cranked) {
-    return cranked->audio.allocateSoundEffect<BitCrusher_32>();
+    return cranked->nativeEngine.createReferencedResource<BitCrusher_32>();
 }
 
 void cranked::playdate_sound_effect_bitcrusher_freeBitCrusher(Cranked *cranked, BitCrusher_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_bitcrusher_setAmount(Cranked *cranked, BitCrusher_32 *filter, float amount) {
@@ -2561,7 +2565,7 @@ void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *crank
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getAmountModulator(Cranked *cranked, BitCrusher_32 *filter) {
-    return filter->amountModulator;
+    return filter->amountModulator.get();
 }
 
 void cranked::playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked, BitCrusher_32 *filter, float undersampling) {
@@ -2573,15 +2577,15 @@ void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher_32 *filter) {
-    return filter->undersamplingModulator;
+    return filter->undersamplingModulator.get();
 }
 
 RingModulator_32 *cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
-    return cranked->audio.allocateSoundEffect<RingModulator_32>();
+    return cranked->nativeEngine.createReferencedResource<RingModulator_32>();
 }
 
 void cranked::playdate_sound_effect_ringmodulator_freeRingmod(Cranked *cranked, RingModulator_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_ringmodulator_setFrequency(Cranked *cranked, RingModulator_32 *filter, float frequency) {
@@ -2593,15 +2597,15 @@ void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked 
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_ringmodulator_getFrequencyModulator(Cranked *cranked, RingModulator_32 *filter) {
-    return filter->frequencyModulator;
+    return filter->frequencyModulator.get();
 }
 
 DelayLine_32 *cranked::playdate_sound_effect_delayline_newDelayLine(Cranked *cranked, int32_t length, int32_t stereo) {
-    return cranked->audio.allocateSoundEffect<DelayLine_32>((int) length, (bool) stereo);
+    return cranked->nativeEngine.createReferencedResource<DelayLine_32>((int) length, (bool) stereo);
 }
 
 void cranked::playdate_sound_effect_delayline_freeDelayLine(Cranked *cranked, DelayLine_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_delayline_setLength(Cranked *cranked, DelayLine_32 *d, int32_t frames) {
@@ -2614,11 +2618,11 @@ void cranked::playdate_sound_effect_delayline_setFeedback(Cranked *cranked, Dela
 }
 
 DelayLineTap_32 *cranked::playdate_sound_effect_delayline_addTap(Cranked *cranked, DelayLine_32 *d, int32_t delay) {
-    return cranked->audio.allocateSoundSource<DelayLineTap_32>(d, (int) delay);
+    return cranked->audio.allocateReferencedSource<DelayLineTap_32>(d, (int) delay);
 }
 
 void cranked::playdate_sound_effect_delayline_freeTap(Cranked *cranked, DelayLineTap_32 *tap) {
-    cranked->audio.freeSoundSource(tap);
+    tap->dereference();
 }
 
 void cranked::playdate_sound_effect_delayline_setTapDelay(Cranked *cranked, DelayLineTap_32 *t, int32_t frames) {
@@ -2630,7 +2634,7 @@ void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cran
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_delayline_getTapDelayModulator(Cranked *cranked, DelayLineTap_32 *t) {
-    return t->delayModulator;
+    return t->delayModulator.get();
 }
 
 void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cranked, DelayLineTap_32 *t, int32_t flip) {
@@ -2638,11 +2642,11 @@ void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cra
 }
 
 Overdrive_32 *cranked::playdate_sound_effect_overdrive_newOverdrive(Cranked *cranked) {
-    return cranked->audio.allocateSoundEffect<Overdrive_32>();
+    return cranked->nativeEngine.createReferencedResource<Overdrive_32>();
 }
 
 void cranked::playdate_sound_effect_overdrive_freeOverdrive(Cranked *cranked, Overdrive_32 *filter) {
-    cranked->audio.freeSoundEffect(filter);
+    filter->dereference();
 }
 
 void cranked::playdate_sound_effect_overdrive_setGain(Cranked *cranked, Overdrive_32 *o, float gain) {
@@ -2658,7 +2662,7 @@ void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_overdrive_getLimitModulator(Cranked *cranked, Overdrive_32 *o) {
-    return o->limitModulator;
+    return o->limitModulator.get();
 }
 
 void cranked::playdate_sound_effect_overdrive_setOffset(Cranked *cranked, Overdrive_32 *o, float offset) {
@@ -2670,7 +2674,7 @@ void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranke
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_overdrive_getOffsetModulator(Cranked *cranked, Overdrive_32 *o) {
-    return o->offsetModulator;
+    return o->offsetModulator.get();
 }
 
 SoundEffect_32 *cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_t proc, void *userdata) {
@@ -2679,7 +2683,7 @@ SoundEffect_32 *cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_
 }
 
 void cranked::playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect_32 *effect) {
-    cranked->audio.freeSoundEffect(effect);
+    effect->dereference();
 }
 
 void cranked::playdate_sound_effect_setMix(Cranked *cranked, SoundEffect_32 *effect, float level) {
@@ -2691,7 +2695,7 @@ void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffec
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect_32 *effect) {
-    return effect->mixModulator;
+    return effect->mixModulator.get();
 }
 
 void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect_32 *effect, void *userdata) {
@@ -2707,13 +2711,13 @@ SoundChannel_32 *cranked::playdate_sound_channel_newChannel(Cranked *cranked) {
 }
 
 void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel_32 *channel) {
-    cranked->audio.freeChannel(channel);
+    channel->dereference();
 }
 
 int32_t cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel_32 *channel, SoundSource_32 *source) {
     if (std::find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
         return false;
-    channel->sources.push_back(source);
+    channel->sources.emplace_back(source);
     return true;
 }
 
@@ -2727,7 +2731,7 @@ SoundSource_32 *cranked::playdate_sound_channel_addCallbackSource(Cranked *crank
 }
 
 void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel_32 *channel, SoundEffect_32 *effect) {
-    channel->effects.push_back(effect);
+    channel->effects.emplace_back(effect);
 }
 
 void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel_32 *channel, SoundEffect_32 *effect) {
@@ -2747,7 +2751,7 @@ void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundC
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_channel_getVolumeModulator(Cranked *cranked, SoundChannel_32 *channel) {
-    return channel->volumeModulator;
+    return channel->volumeModulator.get();
 }
 
 void cranked::playdate_sound_channel_setPan(Cranked *cranked, SoundChannel_32 *channel, float pan) {
@@ -2759,7 +2763,7 @@ void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChan
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel_32 *channel) {
-    return channel->panModulator;
+    return channel->panModulator.get();
 }
 
 PDSynthSignalValue_32 *cranked::playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel_32 *channel) {
@@ -2782,20 +2786,22 @@ SoundSource_32 *cranked::playdate_sound_addSource(Cranked *cranked, cref_t callb
 }
 
 SoundChannel_32 *cranked::playdate_sound_getDefaultChannel(Cranked *cranked) {
-    return cranked->audio.mainChannel;
+    return cranked->audio.mainChannel.get();
 }
 
 int32_t cranked::playdate_sound_addChannel(Cranked *cranked, SoundChannel_32 *channel) {
     if (channel == cranked->audio.mainChannel)
         return false;
-    bool success = !cranked->audio.activeChannels.contains(channel);
-    cranked->audio.activeChannels.emplace(channel);
+    auto &activeChannels = cranked->audio.activeChannels;
+    bool success = std::find(activeChannels.begin(), activeChannels.end(), channel) == activeChannels.end();
+    activeChannels.emplace_back(channel);
     return success;
 }
 
 int32_t cranked::playdate_sound_removeChannel(Cranked *cranked, SoundChannel_32 *channel) {
-    bool success = cranked->audio.activeChannels.contains(channel);
-    cranked->audio.activeChannels.erase(channel);
+    auto &activeChannels = cranked->audio.activeChannels;
+    bool success = std::find(activeChannels.begin(), activeChannels.end(), channel) != activeChannels.end();
+    activeChannels.erase(std::remove(activeChannels.begin(), activeChannels.end(), channel), activeChannels.end());
     return success;
 }
 
@@ -2820,7 +2826,7 @@ void cranked::playdate_sound_setOutputsActive(Cranked *cranked, int32_t headphon
 int32_t cranked::playdate_sound_removeSource(Cranked *cranked, SoundSource_32 *source) {
     if (std::erase(cranked->audio.mainChannel->sources, source))
         return true;
-    for (auto channel : cranked->audio.activeChannels)
+    for (auto &channel : cranked->audio.activeChannels)
         if (std::erase(channel->sources, source))
             return true;
     return false;

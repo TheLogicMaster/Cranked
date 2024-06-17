@@ -1,6 +1,8 @@
 #pragma once
 
 #include "PlaydateTypes.hpp"
+#include "NativeResource.hpp"
+#include "HeapAllocator.hpp"
 
 #include <string>
 #include <vector>
@@ -13,24 +15,30 @@ namespace cranked {
 
 // Todo: Cleanup with emulator reference
 // Virtual heap strings must be manually freed (To avoid needing emulator reference)
-    struct PDMenuItem_32 {
+    struct PDMenuItem_32 : NativeResource {
         enum class Type {
             Button,
             Checkmark,
             Options,
-        } type;
-        std::vector<const char *> options;
-        const char *title;
-        int32_t value;
-        cref_t emulatedCallback;
-        cref_t userdata;
+        };
+
+        PDMenuItem_32(Cranked &cranked, Type type);
+        ~PDMenuItem_32() override = default;
+
+        Type type{};
+
+        vheap_vector<vheap_string> options;
+        vheap_string title{};
+        int32_t value{};
+        cref_t emulatedCallback{};
+        cref_t userdata{};
     };
 
     class Menu {
     public:
         static constexpr int MAX_ITEMS = 3;
 
-        explicit Menu(Cranked *cranked);
+        explicit Menu(Cranked &cranked);
 
         void reset();
 
@@ -40,21 +48,18 @@ namespace cranked {
 
         void setImage(LCDBitmap_32 *bitmap, int xOffset);
 
-        PDMenuItem_32 *
-        addItem(const std::string &title, PDMenuItem_32::Type type, const std::vector<std::string> &options, int value,
-                cref_t emulatedCallback, int luaCallback);
+        PDMenuItem_32 *addItem(const std::string &title, PDMenuItem_32::Type type, const std::vector<std::string> &options, int value, cref_t emulatedCallback, int luaCallback);
 
         void removeItem(PDMenuItem_32 *item);
 
         void clearItems();
 
-        void setItemTitle(PDMenuItem_32 *item, const char *title); // Todo: Move to PDMenuItem_32
-        void assertHasItem(PDMenuItem_32 *item);
+        int findItem(PDMenuItem_32 *item);
 
-        Cranked *cranked;
+        Cranked &cranked;
         bool isOpen{};
-        std::vector<PDMenuItem_32 *> items{MAX_ITEMS};
-        LCDBitmap_32 *image{};
+        std::vector<ResourcePtr<PDMenuItem_32>> items{MAX_ITEMS};
+        ResourcePtr<LCDBitmap_32> image;
         int imageXOffset{};
     };
 

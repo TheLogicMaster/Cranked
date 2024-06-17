@@ -53,15 +53,18 @@ likely crash at the moment and there is little in the way of useful debug output
 - Create a testing framework to compare console output to the official simulator
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
 - Java library with native libs for Android app consumption
-- Further investigation for native resource ownership and memory management (Plus Lua sprite/bitmap interactions)
+- Ensuring that all resource reference counting is done correctly
 - Scoreboard support
-- Investigate Catalog app (Find internal APIs), see if emulator can play encrypted games with a dumped key or something
+- Investigate Catalog app (Web API already documented)
+- See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
 - System UI/software from SDK
 - Investigate pre-2.0.0 binaries to handle uncompressed data
 - Emulator API wrapper to hide all the messy internals, possible C compatible
 - Values checks, since plenty of null/illegal API parameters will cause a native seg-fault
 - Dynarmic native engine support for more portability
 - GitHub Actions release builds
+- USB serial functionality (As controller, dump saves, backup games?)
+- Better execution model (The current approach works, but has limitations, coroutines might be elegant, avoiding recursive Lua invocation would be good)
 
 ## Internals
 - Unicorn to provide Arm CPU emulation

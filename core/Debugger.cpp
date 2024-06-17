@@ -7,7 +7,7 @@ using namespace cranked;
 
 Debugger::Debugger(Cranked &cranked) : cranked(cranked), nativeEngine(cranked.nativeEngine) {
     if (auto result = cs_open(CS_ARCH_ARM, CS_MODE_THUMB, &capstoneHandle); result != CS_ERR_OK)
-        throw std::runtime_error(std::format("Failed to open capstone: {}", cs_strerror(result)));
+        throw CrankedError("Failed to open capstone: {}", cs_strerror(result));
 }
 
 Debugger::~Debugger() {
@@ -27,7 +27,7 @@ void Debugger::init() {
     }
 
     if (disassemblySize = (int)cs_disasm(capstoneHandle, nativeEngine.getCodeMemory().data() + CODE_OFFSET, nativeEngine.getCodeMemory().size() - CODE_OFFSET, CODE_ADDRESS, 0, &disassembly); disassemblySize == 0)
-        throw std::runtime_error(std::format("Failed to disassemble program: {}", cs_strerror(cs_errno(capstoneHandle))));
+        throw CrankedError("Failed to disassemble program: {}", cs_strerror(cs_errno(capstoneHandle)));
 }
 
 void Debugger::reset() {
@@ -214,7 +214,7 @@ void Debugger::handleCmdWriteReg(const std::vector<std::string> &args) {
     const char *start = data.c_str();
     try {
         if ((int)data.size() / 2 != 200)
-            throw std::runtime_error("Wrong number of registers");
+            throw CrankedError("Wrong number of registers");
         for (int i = 0; i < 13; i++) {
             cranked.nativeEngine.writeRegister(UC_ARM_REG_R0 + i, decodeHexStringLE<uint32_t>(std::string_view(start, start + 4 * 2)));
             start += 4 * 2;
