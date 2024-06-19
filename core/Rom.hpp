@@ -16,6 +16,7 @@ namespace cranked {
 
     class Cranked;
 
+    // Todo: Validate ROM files to avoid unsafe memory accesses
     class Rom {
     public:
         enum class FileType {
@@ -50,6 +51,7 @@ namespace cranked {
             std::time_t modTime;
         };
 
+        // Stored with one byte per pixel
         struct ImageCell {
             int width{};
             int height{};
@@ -253,7 +255,7 @@ namespace cranked {
 
         void loadManifest();
 
-        static ImageCell readCell(const uint8_t *data);
+        static ImageCell readImageCell(const uint8_t *start);
     };
 
 }

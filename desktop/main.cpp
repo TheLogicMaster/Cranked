@@ -7,6 +7,7 @@
 #include "imgui_internal.h"
 #include "imgui_memory_editor.h"
 #include "ImGuiFileDialog.h"
+#include "cxxopts.hpp"
 
 #include <SDL.h>
 
@@ -41,9 +42,9 @@ enum class Windows {
 
 struct Userdata {
     Cranked &cranked;
-    SDL_Window* window;
-    std::map<std::string, setting_type> settings;
-
+    SDL_Window* window{};
+    std::map<std::string, setting_type> settings; // Only updated while saving/loading
+    float scale = 1;
     magic_enum::containers::array<Windows, bool> windowStates{};
 
     template<typename T>
@@ -57,10 +58,15 @@ struct Userdata {
 };
 
 int main(int argc, const char *args[]) {
-    if (argc != 2) {
-        printf("Usage: emulator_main <pdx_path>");
-        return -1;
-    }
+    cxxopts::Options commandArgOptions("Cranked", "A Playdate console emulator");
+    commandArgOptions.add_options()
+        ("d,debug", "GDB enable/port", cxxopts::value<int>())
+        ("program", "The program to run", cxxopts::value<std::string>());
+    commandArgOptions.parse_positional({"program"});
+
+    auto result = commandArgOptions.parse(argc, args);
+    std::string programPath = result["program"].as<std::string>();
+    int debugPort = result["debug"].as_optional<int>().value_or(0);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
         throw CrankedError("Failed to init SDL: {}", SDL_GetError());
@@ -118,6 +124,7 @@ int main(int argc, const char *args[]) {
     Cranked cranked;
     Userdata userdata { .cranked = cranked, .window = window };
     cranked.config.userdata = &userdata;
+    float &scale = userdata.scale;
 
     { // Todo: This would be good to extract to a header and make more generic
         ImGuiSettingsHandler settingsHandler;
@@ -159,6 +166,9 @@ int main(int argc, const char *args[]) {
             if (userdata->tryGetSetting("WindowWidth", width) && userdata->tryGetSetting("WindowHeight", height))
                 SDL_SetWindowSize(userdata->window, width, height);
 
+            userdata->tryGetSetting("Scale", userdata->scale);
+            ImGui::GetStyle().ScaleAllSizes((float)userdata->scale);
+
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
                 bool shown{};
@@ -173,6 +183,8 @@ int main(int argc, const char *args[]) {
             SDL_GetWindowSize(userdata->window, &width, &height);
             userdata->settings["WindowWidth"] = width;
             userdata->settings["WindowHeight"] = height;
+
+            userdata->settings["Scale"] = userdata->scale;
 
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
@@ -210,6 +222,9 @@ int main(int argc, const char *args[]) {
 
     auto keyboardState = SDL_GetKeyboardState(nullptr);
     bool exited = false;
+    bool wasScaling = false;
+    int newScale = 1;
+    bool firstFrame = true;
 
     // Todo: Extract the following disaster to separate functions
     auto callback = [&](Cranked &cranked){
@@ -235,22 +250,34 @@ int main(int argc, const char *args[]) {
             if (keyboardState[keys[i]])
                 cranked.currentInputs |= (1 << i);
 
+        io.FontGlobalScale = (float)scale;
+
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        if (firstFrame) {
+            newScale = (int)scale;
+            firstFrame = false;
+        }
+
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
-
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("View")) {
+                if (ImGui::SliderInt("Scale", &newScale, 1, 6, "%dx", ImGuiSliderFlags_NoInput))
+                    wasScaling = true;
                 ImGui::MenuItem("Show Debug", nullptr, &getWindowOpen(Windows::Debug));
                 ImGui::MenuItem("Show Registers", nullptr, &getWindowOpen(Windows::Registers));
                 ImGui::MenuItem("Show Code Memory", nullptr, &getWindowOpen(Windows::CodeMemory));
                 ImGui::MenuItem("Show Heap Memory", nullptr, &getWindowOpen(Windows::HeapMemory));
                 ImGui::MenuItem("Show Disassembly", nullptr, &getWindowOpen(Windows::Disassembly));
                 ImGui::EndMenu();
+            } else if (wasScaling) {
+                style.ScaleAllSizes((float)newScale / scale);
+                scale = (float)newScale;
+                wasScaling = false;
             }
             ImGui::EndMainMenuBar();
         }
@@ -261,12 +288,14 @@ int main(int argc, const char *args[]) {
 
         // Todo: Performance/stats window (Heap usage, frame times, program size), or just throw them around
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, bezelColor);
-        ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoDocking);
-        SDL_UpdateTexture(displayTexture, nullptr, cranked.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
-        ImGui::Image((ImTextureID) (intptr_t) displayTexture, ImVec2(DISPLAY_WIDTH, DISPLAY_HEIGHT));
-        ImGui::End();
-        ImGui::PopStyleColor();
+        {
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, bezelColor);
+            ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+            SDL_UpdateTexture(displayTexture, nullptr, cranked.graphics.displayBufferRGBA, 4 * DISPLAY_WIDTH);
+            ImGui::Image((ImTextureID) (intptr_t) displayTexture, ImVec2(DISPLAY_WIDTH * scale, DISPLAY_HEIGHT * scale));
+            ImGui::End();
+            ImGui::PopStyleColor();
+        }
 
         if (getWindowOpen(Windows::Debug)) {
             ImGui::Begin("Debug", &getWindowOpen(Windows::Debug), ImGuiWindowFlags_None);
@@ -284,7 +313,7 @@ int main(int argc, const char *args[]) {
 
             ImGui::SeparatorText("Breakpoints");
 
-            ImGui::BeginChild("BreakpointList", ImVec2(ImGui::GetWindowWidth() - 10, ImGui::GetWindowHeight() - 130));
+            ImGui::BeginChild("BreakpointList", ImVec2(ImGui::GetWindowWidth() - 10 * scale, ImGui::GetWindowHeight() - 130 * scale));
             bool oddBreakpoint = false;
             for (cref_t breakpoint: cranked.debugger.getBreakpoints()) {
                 ImGui::PushID((int) breakpoint);
@@ -302,7 +331,7 @@ int main(int argc, const char *args[]) {
             }
             ImGui::EndChild();
 
-            ImGui::SetNextItemWidth(80);
+            ImGui::SetNextItemWidth(80 * scale);
             ImGui::InputText("##", &newBreakpointText, ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_AlwaysOverwrite | ImGuiInputTextFlags_AutoSelectAll);
             ImGui::SameLine();
             if (ImGui::Button("Add") && !newBreakpointText.empty()) {
@@ -326,7 +355,7 @@ int main(int argc, const char *args[]) {
             ImGui::SameLine();
             ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_PC));
 
-            ImGui::SameLine(0.0, 20);
+            ImGui::SameLine(0.0, 20 * scale);
             ImGui::TextColored(bezelColor, "SP ");
             ImGui::SameLine();
             ImGui::TextColored(bezelColor, "%08x", cranked.nativeEngine.readRegister(UC_ARM_REG_SP));
@@ -335,7 +364,7 @@ int main(int argc, const char *args[]) {
             ImGui::SameLine();
             ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_LR));
 
-            ImGui::SameLine(0.0, 20);
+            ImGui::SameLine(0.0, 20 * scale);
             ImGui::TextColored(bezelColor, "SR ");
             ImGui::SameLine();
             ImGui::TextColored(bezelColor, "%08x", cranked.nativeEngine.readRegister(UC_ARM_REG_XPSR));
@@ -344,7 +373,7 @@ int main(int argc, const char *args[]) {
                 bool oddRegister = false;
                 for (int i = 0; i < 13; i++) {
                     if (oddRegister)
-                        ImGui::SameLine(0.0, 20);
+                        ImGui::SameLine(0.0, 20 * scale);
                     ImGui::TextColored(bezelColor, i < 10 ? "R%d " : "R%d", i);
                     ImGui::SameLine();
                     ImGui::TextColored(bezelColor, "%08X", cranked.nativeEngine.readRegister(UC_ARM_REG_R0 + i));
@@ -362,7 +391,7 @@ int main(int argc, const char *args[]) {
                 bool oddRegister = false;
                 for (int i = 0; i < 32; i++) {
                     if (oddRegister)
-                        ImGui::SameLine(0.0, 20);
+                        ImGui::SameLine(0.0, 20 * scale);
                     ImGui::TextColored(bezelColor, i < 10 ? "S%d " : "S%d", i);
                     ImGui::SameLine();
                     ImGui::TextColored(bezelColor, "%08f", bit_cast<float>(cranked.nativeEngine.readRegister(UC_ARM_REG_S0 + i)));
@@ -376,7 +405,7 @@ int main(int argc, const char *args[]) {
                 bool oddRegister = false;
                 for (int i = 0; i < 16; i++) {
                     if (oddRegister)
-                        ImGui::SameLine(0.0, 20);
+                        ImGui::SameLine(0.0, 20 * scale);
                     ImGui::TextColored(bezelColor, i < 10 ? "D%d " : "D%d", i);
                     ImGui::SameLine();
                     ImGui::TextColored(bezelColor, "%08f", bit_cast<double>(cranked.nativeEngine.readRegister64(UC_ARM_REG_D0 + i)));
@@ -410,10 +439,10 @@ int main(int argc, const char *args[]) {
         drawMemoryWindow(Windows::HeapMemory, "Heap Memory", heapMemoryEditor, cranked.heap.baseAddress(), HEAP_SIZE, HEAP_ADDRESS);
 
         if (getWindowOpen(Windows::Disassembly)) {
-            ImGui::SetNextWindowSize(ImVec2(250, 400), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(250 * scale, 400 * scale), ImGuiCond_FirstUseEver);
             ImGui::Begin("Disassembly", &getWindowOpen(Windows::Disassembly), ImGuiWindowFlags_NoScrollbar);
             ImGui::Checkbox("Follow PC", &disassemblyFollowPc);
-            ImGui::BeginChild("DisassemblyView", ImVec2(ImGui::GetWindowWidth() - 10, ImGui::GetWindowHeight() - 55));
+            ImGui::BeginChild("DisassemblyView", ImVec2(ImGui::GetWindowWidth() - 10 * scale, ImGui::GetWindowHeight() - 55 * scale));
             auto disassembly = cranked.debugger.getDisassembly();
             int size = cranked.debugger.getDisassemblySize();
             cref_t pc = cranked.nativeEngine.readRegister(UC_ARM_REG_PC) & ~0x1;
@@ -442,8 +471,8 @@ int main(int argc, const char *args[]) {
         SDL_RenderPresent(renderer);
     };
     cranked.config.updateCallback = callback;
-    cranked.config.debugPort = 1337;
-    cranked.load(args[1]); // Todo: Actual arg parsing with cxxopts
+    cranked.config.debugPort = debugPort;
+    cranked.load(programPath);
     cranked.start();
 
     while (!exited) {

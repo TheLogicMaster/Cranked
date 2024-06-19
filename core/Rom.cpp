@@ -246,7 +246,7 @@ Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
         throw CrankedError("Bad font magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
-    bool wide = flags & 0x80000001; // Contains characters above U+1FFFF // Todo: Is this needed?
+    bool wide = flags & 0x00000001; // Contains characters above U+1FFFF // Todo: Is this needed?
     const uint8_t *fontData;
     std::vector<uint8_t> decompressedData;
     if (compressed) {
@@ -257,7 +257,7 @@ Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
         decompressedData = decompressData(&data[0x20], dataSize - 0x20, size);
         fontData = decompressedData.data();
     } else
-        fontData = data;
+        fontData = data + 0x10;
 
     return readFontData(fontData, wide);
 }
@@ -265,7 +265,7 @@ Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
 Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
     // Read page list header
     Font font{};
-    font.glyphWidth = data[0]; // Advance?
+    font.glyphWidth = data[0];
     font.glyphHeight = data[1];
     font.tracking = readUint16LE(data + 2);
     std::vector<uint8_t> pageUsageFlags(64);
@@ -342,7 +342,7 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
                 glyphData += 4;
             }
 
-            glyph.cell = readCell(glyphData);
+            glyph.cell = readImageCell(glyphData);
         }
     }
 
@@ -487,7 +487,7 @@ Rom::Image Rom::readImage(const uint8_t *data, size_t dataSize) {
         imageData = decompressedData.data();
     } else
         imageData = data + 0x10;
-    image.cell = readCell(imageData);
+    image.cell = readImageCell(imageData);
     image.width = image.cell.width;
     image.height = image.cell.height;
     return image;
@@ -520,7 +520,7 @@ Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
     Rom::ImageTable table;
     table.cellsPerRow = cellsPerRow;
     for (int i = 0; i < cellCount; i++)
-        table.cells.emplace_back(readCell(tableData + offsets[i]));
+        table.cells.emplace_back(readImageCell(tableData + offsets[i]));
     return table;
 }
 
@@ -578,10 +578,10 @@ Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     return video;
 }
 
-Rom::ImageCell Rom::readCell(const uint8_t *data) {
+Rom::ImageCell Rom::readImageCell(const uint8_t *data) {
     int clipWidth = readUint16LE(data + 0);
     int clipHeight = readUint16LE(data + 2);
-    int cellStride = readUint16LE(data + 4);
+    int srcStride = readUint16LE(data + 4);
     int clipLeft = readUint16LE(data + 6);
     int clipRight = readUint16LE(data + 8);
     int clipTop = readUint16LE(data + 10);
@@ -592,16 +592,20 @@ Rom::ImageCell Rom::readCell(const uint8_t *data) {
     cell.width = clipLeft + clipWidth + clipRight;
     cell.height = clipTop + clipHeight + clipBottom;
     cell.data.resize(cell.width * cell.height);
-    if (transparency)
-        cell.mask.resize(cell.data.size());
-    auto read = [&](int offset, uint8_t *out){
+    cell.mask.resize(cell.data.size());
+    auto read = [&](int start, uint8_t *out){
         for (int y = 0; y < clipHeight; y++)
             for (int x = 0; x < clipWidth; x++)
-                out[(clipTop + y) * cell.width + clipLeft + x] = (char) (bool) (data[offset + y * cellStride + x / 8] & (1 << (7 - x % 8)));
+                out[(clipTop + y) * cell.width + clipLeft + x] = (bool) (data[start + y * srcStride + x / 8] & (1 << (7 - x % 8)));
     };
     read(16, cell.data.data());
-    if (!cell.mask.empty())
-        read(16 + cellStride * clipHeight, cell.mask.data());
+    if (transparency)
+        read(16 + srcStride * clipHeight, cell.mask.data());
+    else {
+        for (int y = 0; y < clipHeight; y++)
+            for (int x = 0; x < clipWidth; x++)
+                cell.mask[(clipTop + y) * cell.width + clipLeft + x] = 1;
+    }
     return cell;
 }
 

@@ -2,6 +2,8 @@ project(desktop)
 
 find_package(SDL2)
 
+add_subdirectory(libs/cxxopts)
+
 file(GLOB IMGUI_SOURCES
         libs/imgui/*.cpp
         libs/imgui/backends/imgui_impl_sdl2.cpp
@@ -23,4 +25,4 @@ target_include_directories(cranked_desktop PUBLIC
         libs/ImGuiFileDialog/
         ${SDL2_INCLUDE_DIRS}
 )
-target_link_libraries(cranked_desktop cranked ${SDL2_LIBRARIES})
+target_link_libraries(cranked_desktop cranked cxxopts ${SDL2_LIBRARIES})

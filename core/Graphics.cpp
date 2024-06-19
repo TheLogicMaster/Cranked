@@ -283,7 +283,7 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
             auto &page = font->pages.at(pageIndex);
             auto &glyph = *page->glyphs.at(character);
             drawBitmap(glyph.bitmap.get(), x, y, LCDBitmapFlip::Unflipped);
-            x += glyph.advance;
+            x += glyph.advance + font->tracking;
         } catch (std::out_of_range &ignored) {}
     }
 }

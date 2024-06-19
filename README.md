@@ -72,7 +72,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - C++ template magic plus libFFI to translate calls between emulated Arm, Lua, and C++ natives, handling type marshaling and virtual memory mapping
 - Auto-generated 64-bit safe equivalent Playdate API and data structures by parsing the official headers
 - Lua objects represented by tables with userdata field and metatables
-- Reference counting for shared Lua resources like images and fonts
+- Reference counting for all native resources (Higher memory usage when using many resources such as with fonts)
 
 ## GDB Debugging
 Requires gdb-multiarch and is run from the project directory with `gdb-multiarch -x gdb_setup`.
