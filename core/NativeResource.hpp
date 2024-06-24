@@ -1,6 +1,6 @@
 #pragma once
 
-#include <exception>
+#include "Utils.hpp"
 
 namespace cranked {
 
@@ -40,21 +40,21 @@ namespace cranked {
     };
 
     template<typename T> // Can't use a constraint here, or it would be impossible to use recursively due to incomplete typing
-    class ResourcePtr {
+    class ResourceRef {
     public:
 
-        ResourcePtr(T *resource = nullptr) : resource(resource) { // NOLINT(*-explicit-constructor)
+        ResourceRef(T *resource = nullptr) : resource(resource) { // NOLINT(*-explicit-constructor)
             if (resource)
                 resource->reference();
         }
 
-        ResourcePtr(const ResourcePtr &other) : ResourcePtr(other.resource) {}
+        ResourceRef(const ResourceRef &other) : ResourceRef(other.resource) {}
 
-        ResourcePtr(ResourcePtr &&other) noexcept : resource(other.resource) {
+        ResourceRef(ResourceRef &&other) noexcept : resource(other.resource) {
             other.resource = nullptr;
         }
 
-        ~ResourcePtr() {
+        ~ResourceRef() {
             if (resource)
                 resource->dereference();
         }
@@ -75,24 +75,24 @@ namespace cranked {
         void reset(bool throws = false) {
             try {
                 reset(nullptr);
-            } catch (std::exception &ex) {
+            } catch (exception &ex) {
                 if (throws)
                     throw ex;
             }
         }
 
-        ResourcePtr &operator=(T *newResource) {
+        ResourceRef &operator=(T *newResource) {
             reset(newResource);
             return *this;
         }
 
-        ResourcePtr &operator=(const ResourcePtr &other) {
+        ResourceRef &operator=(const ResourceRef &other) {
             if (&other != this)
                 reset(other.resource);
             return *this;
         }
 
-        bool operator==(ResourcePtr const &other) const = default;
+        bool operator==(ResourceRef const &other) const = default;
 
         bool operator==(T *other) const {
             return resource == other;
@@ -115,3 +115,12 @@ namespace cranked {
     };
 
 }
+
+template<typename T>
+struct std::hash<cranked::ResourceRef<T>> // NOLINT(*-dcl58-cpp)
+{
+    size_t operator()(const cranked::ResourceRef<T>& s) const noexcept
+    {
+        return (size_t)s.get();
+    }
+};

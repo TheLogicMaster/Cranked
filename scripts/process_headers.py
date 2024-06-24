@@ -15,10 +15,11 @@ COMMA_SPLIT_MAGIC = r',\s*(?![^()]*\))'  # https://stackoverflow.com/a/26634150
 KNOWN_STRUCTS = ['SDFile']
 CUSTOM_TYPES = [
     ('SDFile', 'uint32_t', 'SDFile_32'),
+    ('SpriteCollisionResponseType', 'int8_t', 'int8_t'),
 ]
 CUSTOM_NATIVE_TYPES = {
     'LCDRect': 'ArgType::struct4_t',
-    'PDRect': 'ArgType::struct4_t',
+    'PDRect': 'ArgType::struct4f_t',
     'json_value': 'ArgType::struct2_t',
     'json_reader': 'ArgType::struct2_t',
 }
@@ -391,6 +392,8 @@ def main():
             param_types = [get_native_type(param.c_type) for param in func.params]
             f.write(f'\t{{ "{func.qualified_name}", (void *) {func.qualified_name}, {{ {", ".join(param_types)} }}, {get_native_type(func.return_type)} }},\n')
         f.write('};\n\n')
+
+        # Todo: Padding for new API functions
 
         f.write('int cranked::populatePlaydateApiStruct(void *api, Version version) {\n')
         f.write('\tint offset = 0;\n')

@@ -1,15 +1,8 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "PlaydateTypes.hpp"
-#include "Constants.hpp"
 #include "HeapAllocator.hpp"
 #include "NativeResource.hpp"
-
-#include <cstdint>
-#include <set>
-#include <vector>
-#include <cmath>
 
 namespace cranked {
 
@@ -18,11 +11,11 @@ namespace cranked {
     class Audio;
 
     inline float noteToFrequency(MIDINote note) {
-        return NOTE_C4_FREQUENCY * (float) std::pow(2, (note - NOTE_C4_HALF_STEPS) / 12);
+        return NOTE_C4_FREQUENCY * (float) pow(2, (note - NOTE_C4_HALF_STEPS) / 12);
     }
 
     inline MIDINote noteFromFrequency(float frequency) {
-        return NOTE_C4_HALF_STEPS + std::log2(frequency / NOTE_C4_FREQUENCY) * 12;
+        return NOTE_C4_HALF_STEPS + log2(frequency / NOTE_C4_FREQUENCY) * 12;
     }
 
     inline float framesToSeconds(int frames) {
@@ -30,7 +23,7 @@ namespace cranked {
     }
 
     inline int framesFromSeconds(float seconds) {
-        return (int) std::round(seconds * AUDIO_SAMPLING_RATE);
+        return (int) round(seconds * AUDIO_SAMPLING_RATE);
     }
 
     struct SoundSource_32 : NativeResource {
@@ -56,9 +49,9 @@ namespace cranked {
         AudioSample_32(AudioSample_32 &&other) = delete;
         ~AudioSample_32() override = default;
 
-        vheap_vector<uint8_t> data;
-        uint32_t sampleRate{};
-        SoundFormat format{};
+        vheap_vector<uint8> data;
+        uint32 sampleRate{};
+        SoundFormat soundFormat{};
     };
 
     struct SoundEffect_32 : NativeResource {
@@ -69,7 +62,7 @@ namespace cranked {
         ~SoundEffect_32() override;
 
         float mixLevel = 1.0f;
-        ResourcePtr<PDSynthSignalValue_32> mixModulator{};
+        SynthSignalValueRef mixModulator{};
         cref_t userdata{};
     };
 
@@ -92,7 +85,7 @@ namespace cranked {
             ~Signal() override = default;
 
 //        float stepSignal() override;
-            SoundChannel_32 *channel;
+            SoundChannel channel;
             const bool wet;
         };
 
@@ -102,12 +95,12 @@ namespace cranked {
         SoundChannel_32(SoundChannel_32 &&other) = delete;
         ~SoundChannel_32() override;
 
-        std::vector<ResourcePtr<SoundSource_32>> sources{};
-        std::vector<ResourcePtr<SoundEffect_32>> effects{};
+        unordered_set<SoundSourceRef> sources{};
+        unordered_set<SoundEffectRef> effects{};
         float volume = 1.0f;
         float pan = 0.5f;
-        ResourcePtr<PDSynthSignalValue_32> volumeModulator{};
-        ResourcePtr<PDSynthSignalValue_32> panModulator{};
+        SynthSignalValueRef volumeModulator{};
+        SynthSignalValueRef panModulator{};
         Signal wetSignal{this, true};
         Signal drySignal{this, false};
     };
@@ -136,7 +129,7 @@ namespace cranked {
         FilePlayer_32(FilePlayer_32 &&other) = delete;
         ~FilePlayer_32() override = default;
 
-        ResourcePtr<SDFile_32> file{};
+        FileRef file{};
         bool stopOnUnderrun{};
         bool underran{};
         float leftFadeTarget{}, rightFadeTarget{};
@@ -151,7 +144,7 @@ namespace cranked {
         SamplePlayer_32(SamplePlayer_32 &&other) = delete;
         ~SamplePlayer_32() override = default;
 
-        ResourcePtr<AudioSample_32> sample{};
+        AudioSampleRef sample{};
     };
 
     struct PDSynthSignal_32 : PDSynthSignalValue_32 {
@@ -178,10 +171,10 @@ namespace cranked {
         float startPhase{};
         float center{};
         float depth{};
-        cref_t function{};
+        cref_t func{};
         bool functionInterpolate{};
         cref_t functionUserdata{};
-        std::vector<float> arpeggiationSteps{};
+        vector<float> arpeggiationSteps{};
         int holdOffSamples{}, rampTimeSamples{};
         bool reTrigger{};
         bool global{};
@@ -226,17 +219,17 @@ namespace cranked {
         cref_t generatorSetParameterFunc{};
         cref_t generatorDeallocFunc{};
         cref_t generatorCopyUserdataFunc{};
-        ResourcePtr<AudioSample_32> sample{};
-        uint32_t sampleSustainStart{}, sampleSustainEnd{};
+        AudioSampleRef sample{};
+        uint32 sampleSustainStart{}, sampleSustainEnd{};
         int waveTableLog2size{};
         int waveTableColumns{}, waveTableRows{};
-        PDSynthEnvelope_32 envelope;
+        SynthEnvelopeRef envelope;
         float transposeHalfSteps{};
-        ResourcePtr<PDSynthSignalValue_32> frequencyModulator{};
-        ResourcePtr<PDSynthSignalValue_32> amplitudeModulator{};
-        std::multimap<uint32_t, NoteEvent> noteEvents{};
+        SynthSignalValueRef frequencyModulator{};
+        SynthSignalValueRef amplitudeModulator{};
+        multimap<uint32, NoteEvent> noteEvents{};
         float parameters[4]{};
-        ResourcePtr<PDSynthSignalValue_32> parameterModulators[4]{};
+        SynthSignalValueRef parameterModulators[4]{};
         int playingTime{};
         float instrumentStartFrequency{}, instrumentEndFrequency{};
         float instrumentTranspose{}; // Todo: Is this supposed to be separate?
@@ -254,7 +247,7 @@ namespace cranked {
         ControlSignal_32(ControlSignal_32 &&other) = delete;
         ~ControlSignal_32() override = default;
 
-        std::multimap<int32_t, Event> events{};
+        multimap<int32, Event> events{};
         int controllerNumber{};
     };
 
@@ -265,12 +258,12 @@ namespace cranked {
         PDSynthInstrument_32(PDSynthInstrument_32 &&other) = delete;
         ~PDSynthInstrument_32() override = default;
 
-//    void playNote(float frequency, float vel, float length, uint32_t when);
-//    void setNoteOff(float frequency, uint32_t when);
-//    void setAllNotesOff(uint32_t when);
+//    void playNote(float frequency, float vel, float length, uint32 when);
+//    void setNoteOff(float frequency, uint32 when);
+//    void setAllNotesOff(uint32 when);
 //    int countVoicesPlaying();
 
-        std::vector<ResourcePtr<PDSynth_32>> voices{};
+        unordered_set<SynthRef> voices{};
         float pitchBend{};
         float pitchBendRangeHalfSteps{};
         float transposeHalfSteps{};
@@ -283,7 +276,7 @@ namespace cranked {
         SequenceTrack_32(SequenceTrack_32 &&other) = delete;
         ~SequenceTrack_32() override = default;
 
-        ResourcePtr<PDSynthInstrument_32> instrument{};
+        SynthInstrumentRef instrument{};
         bool muted{};
     };
 
@@ -310,10 +303,10 @@ namespace cranked {
 
         TwoPoleFilterType type{};
         float frequency{};
-        ResourcePtr<PDSynthSignalValue_32> frequencyModulator{};
+        SynthSignalValueRef frequencyModulator{};
         float gain{};
         float resonance{};
-        ResourcePtr<PDSynthSignalValue_32> resonanceModulator{};
+        SynthSignalValueRef resonanceModulator{};
     };
 
     struct OnePoleFilter_32 : SoundEffect_32 {
@@ -324,7 +317,7 @@ namespace cranked {
         ~OnePoleFilter_32() override = default;
 
         float cutoffFrequency{};
-        ResourcePtr<PDSynthSignalValue_32> cutoffFrequencyModulator{};
+        SynthSignalValueRef cutoffFrequencyModulator{};
     };
 
     struct BitCrusher_32 : SoundEffect_32 {
@@ -335,9 +328,9 @@ namespace cranked {
         ~BitCrusher_32() override = default;
 
         float amount{};
-        ResourcePtr<PDSynthSignalValue_32> amountModulator{};
+        SynthSignalValueRef amountModulator{};
         float undersampling{};
-        ResourcePtr<PDSynthSignalValue_32> undersamplingModulator{};
+        SynthSignalValueRef undersamplingModulator{};
     };
 
     struct RingModulator_32 : SoundEffect_32 {
@@ -348,7 +341,7 @@ namespace cranked {
         ~RingModulator_32() override = default;
 
         float frequency{};
-        ResourcePtr<PDSynthSignalValue_32> frequencyModulator{};
+        SynthSignalValueRef frequencyModulator{};
     };
 
     struct DelayLine_32 : SoundEffect_32 {
@@ -359,7 +352,7 @@ namespace cranked {
         ~DelayLine_32() override = default;
 
         const bool stereo;
-        std::vector<int32_t> data;
+        vector<int32> data;
         float feedback{};
     };
 
@@ -370,9 +363,9 @@ namespace cranked {
         DelayLineTap_32(DelayLineTap_32 &&other) = delete;
         ~DelayLineTap_32() override = default;
 
-        ResourcePtr<DelayLine_32> delayLine;
+        DelayLineRef delayLine;
         int delayFrames{};
-        ResourcePtr<PDSynthSignalValue_32> delayModulator{};
+        SynthSignalValueRef delayModulator{};
         bool channelsFlipped{};
     };
 
@@ -385,25 +378,25 @@ namespace cranked {
 
         float gain{};
         float limit{};
-        ResourcePtr<PDSynthSignalValue_32> limitModulator{};
+        SynthSignalValueRef limitModulator{};
         float offset{};
-        ResourcePtr<PDSynthSignalValue_32> offsetModulator{};
+        SynthSignalValueRef offsetModulator{};
     };
 
     class Audio {
     public:
         explicit Audio(Cranked &cranked);
 
-        void sampleAudio(int16_t *samples, int len);
+        void sampleAudio(int16 *samples, int len);
 
         void reset();
 
         void init();
 
-        template<class T, typename ...Args>
+        template<class T, typename ...Args> requires derived_from<T, SoundSource_32>
         T *allocateSource(Args ...args) {
             T *source = heap.construct<T>(cranked, args...);
-            mainChannel->sources.push_back(source);
+            mainChannel->sources.emplace(source);
             return source;
         }
 
@@ -414,16 +407,16 @@ namespace cranked {
             return source;
         }
 
-        SoundChannel_32 *allocateChannel() {
+        SoundChannel allocateChannel() {
             auto channel = heap.construct<SoundChannel_32>(cranked);
-            activeChannels.emplace_back(channel);
+            activeChannels.emplace(channel);
             return channel;
         }
 
         Cranked &cranked;
         HeapAllocator &heap;
-        ResourcePtr<SoundChannel_32> mainChannel;
-        std::vector<ResourcePtr<SoundChannel_32>> activeChannels{};
+        SoundChannelRef mainChannel;
+        unordered_set<SoundChannelRef> activeChannels{};
         int sampleTime{};
         cref_t lastError{};
         cref_t micCallback{};

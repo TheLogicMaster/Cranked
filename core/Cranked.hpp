@@ -1,38 +1,14 @@
 #pragma once
 
 #include "HeapAllocator.hpp"
-#include "Rom.hpp"
-#include "Utils.hpp"
-#include "Constants.hpp"
-#include "gen/PlaydateAPI.hpp"
-#include "PlaydateTypes.hpp"
 #include "Graphics.hpp"
 #include "Audio.hpp"
-#include "File.hpp"
+#include "Files.hpp"
 #include "Menu.hpp"
 #include "NativeEngine.hpp"
 #include "LuaEngine.hpp"
 #include "Debugger.hpp"
-
-#include "lua.h"
-#include "lualib.h"
-#include "lauxlib.h"
-#include "unicorn/unicorn.h"
-#include "nlohmann/json.hpp"
-#include "capstone/platform.h"
-#include "capstone/capstone.h"
-#include "ffi.h"
-
-#include <utility>
-#include <string>
-#include <memory>
-#include <cstdint>
-#include <cstring>
-#include <chrono>
-#include <regex>
-#include <optional>
-#include <vector>
-#include <string>
+#include "Bump.hpp"
 
 namespace cranked {
 
@@ -55,7 +31,7 @@ namespace cranked {
         ~Cranked();
         Cranked &operator=(const Cranked &) = delete;
 
-        void load(const std::string &path);
+        void load(const string &path);
 
         void unload();
 
@@ -83,12 +59,12 @@ namespace cranked {
         }
 
         template<typename T>
-        inline void virtualWrite(uint32_t address, T value) {
+        inline void virtualWrite(uint32 address, T value) {
             return nativeEngine.virtualWrite(address, value);
         }
 
         template<typename T>
-        inline T virtualRead(uint32_t address) {
+        inline T virtualRead(uint32 address) {
             return nativeEngine.virtualRead<T>(address);
         }
 
@@ -102,7 +78,7 @@ namespace cranked {
             return luaEngine.getContext();
         }
 
-        inline cref_t getEmulatedStringLiteral(const std::string &message) {
+        inline cref_t getEmulatedStringLiteral(const string &message) {
             return nativeEngine.getEmulatedStringLiteral(message);
         }
 
@@ -116,41 +92,42 @@ namespace cranked {
         }
 
         // Todo: Clean up logging, should probably send pre-formatted string and filter based on a configured log level (And use C++20 std::format)
-        inline static void logMessageCallback(Cranked &cranked, LogLevel level, const char *format, va_list args) {
-            vprintf(format, args);
+        inline static void logMessageCallback(Cranked &cranked, LogLevel level, const char *fmt, va_list args) {
+            vprintf(fmt, args);
             printf("\n");
         }
 
-        inline void logMessageVA(LogLevel level, const char *format, va_list args) {
+        inline void logMessageVA(LogLevel level, const char *fmt, va_list args) {
             if (config.loggingCallback)
-                config.loggingCallback(*this, level, format, args);
+                config.loggingCallback(*this, level, fmt, args);
         }
 
-        inline void logMessage(LogLevel level, const char *format, ...) {
+        inline void logMessage(LogLevel level, const char *fmt, ...) {
             va_list args;
-            va_start(args, format);
-            logMessageVA(level, format, args);
+            va_start(args, fmt);
+            logMessageVA(level, fmt, args);
             va_end(args);
         }
 
-        HeapAllocator heap = HeapAllocator(HEAP_SIZE);
-        NativeEngine nativeEngine = NativeEngine(*this);
-        Graphics graphics = Graphics(*this);
-        Audio audio = Audio(*this);
-        File files = File(*this);
-        Menu menu = Menu(*this);
-        LuaEngine luaEngine = LuaEngine(*this);
-        Debugger debugger = Debugger(*this);
-        std::unique_ptr<Rom> rom;
+        HeapAllocator heap{ HEAP_SIZE };
+        NativeEngine nativeEngine{ *this };
+        Graphics graphics{ *this };
+        Audio audio{ *this };
+        Files files{ *this };
+        Menu menu{ *this };
+        LuaEngine luaEngine{ *this };
+        Bump bump { *this };
+        Debugger debugger { *this };
+        unique_ptr<Rom> rom;
 
         Config config { .loggingCallback = logMessageCallback };
 
-        std::chrono::system_clock::time_point elapsedTimeStart, startTime;
-        uint32_t currentMillis{}; // Milliseconds elapsed while game is running
-        std::chrono::system_clock::time_point lastFrameTime;
-        int32_t currentInputs{}, previousInputs{};
-        int32_t pressedInputs{}, releasedInputs{};
-        std::chrono::system_clock::time_point buttonDownTimeA, buttonDownTimeB;
+        chrono::system_clock::time_point elapsedTimeStart, startTime;
+        uint32 currentMillis{}; // Milliseconds elapsed while game is running
+        chrono::system_clock::time_point lastFrameTime;
+        int32 currentInputs{}, previousInputs{};
+        int32 pressedInputs{}, releasedInputs{};
+        chrono::system_clock::time_point buttonDownTimeA, buttonDownTimeB;
         PDLanguage systemLanguage{};
         float crankAngle{}, previousCrankAngle{};
         bool crankDocked{}, previousCrankDocked{};
@@ -160,14 +137,14 @@ namespace cranked {
         bool tryReduceFlashing{};
         float accelerometerX{}, accelerometerY{}, accelerometerZ{};
         bool use24HourTime{};
-        int32_t timezoneOffset{};
+        int32 timezoneOffset{};
         float batteryVoltage = 4.2f;
         float batteryPercentage = 100.0f;
         cref_t serialMessageCallback{};
         cref_t buttonCallback{};
         cref_t buttonCallbackUserdata{};
         cref_t buttonCallbackQueueSize{};
-        std::chrono::system_clock::time_point suspendUpdateLoopUntil;
+        chrono::system_clock::time_point suspendUpdateLoopUntil;
         bool disableUpdateLoop{};
         int statsInterval{};
 

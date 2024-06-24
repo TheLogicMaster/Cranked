@@ -6,17 +6,6 @@
 
 #include "Utils.hpp"
 
-#include <cstdio>
-#include <unordered_map>
-#include <map>
-#include <vector>
-#include <string>
-#include <stdexcept>
-#include <set>
-#include <unordered_set>
-#include <cstring>
-#include <memory>
-
 namespace cranked {
 
 // Todo: Mirrored data structure to detect heap corruption, or just keep structure separate and use cookies for corruption
@@ -99,8 +88,8 @@ namespace cranked {
         }
 
         template<typename Key, typename T>
-        AdaptorSTL<std::pair<const Key, T>> pairAllocator() {
-            return AdaptorSTL<std::pair<const Key, T>>(*this);
+        AdaptorSTL<pair<const Key, T>> pairAllocator() {
+            return AdaptorSTL<pair<const Key, T>>(*this);
         }
 
     private:
@@ -126,25 +115,25 @@ namespace cranked {
     // or they will use the default allocator for the normal heap, which is problematic for emulated access.
 
     template<typename Key, typename T>
-    using HeapAllocatorMap = HeapAllocator::AdaptorSTL<std::pair<const Key, T>>;
+    using HeapAllocatorMap = HeapAllocator::AdaptorSTL<pair<const Key, T>>;
 
-    template<typename Key, typename T, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>>
-    using vheap_unordered_map = std::unordered_map<Key, T, Hash, KeyEqual, HeapAllocatorMap<Key, T>>;
+    template<typename Key, typename T, typename Hash = hash<Key>, typename KeyEqual = equal_to<Key>>
+    using vheap_unordered_map = unordered_map<Key, T, Hash, KeyEqual, HeapAllocatorMap<Key, T>>;
 
-    template<typename Key, typename T, typename Compare = std::less<Key>>
-    using vheap_map = std::map<Key, T, Compare, HeapAllocatorMap<Key, T>>;
+    template<typename Key, typename T, typename Compare = less<Key>>
+    using vheap_map = map<Key, T, Compare, HeapAllocatorMap<Key, T>>;
 
     template<typename T>
-    using vheap_vector = std::vector<T, HeapAllocator::AdaptorSTL<T>>;
+    using vheap_vector = vector<T, HeapAllocator::AdaptorSTL<T>>;
 
     // Be careful using this because it starts with a small local buffer which isn't heap stored, prefer vector, or store the heap_string itself in the heap
-    using vheap_string = std::basic_string<char, std::char_traits<char>, HeapAllocator::AdaptorSTL<char>>;
+    using vheap_string = basic_string<char, char_traits<char>, HeapAllocator::AdaptorSTL<char>>;
 
-    template<typename T, typename Compare = std::less<T>>
-    using vheap_set = std::set<T, Compare, HeapAllocator::AdaptorSTL<T>>;
+    template<typename T, typename Compare = less<T>>
+    using vheap_set = set<T, Compare, HeapAllocator::AdaptorSTL<T>>;
 
-    template<typename T, typename Hash = std::hash<T>, typename Equal = std::equal_to<T>>
-    using vheap_unordered_set = std::unordered_set<T, Hash, Equal, HeapAllocator::AdaptorSTL<T>>;
+    template<typename T, typename Hash = hash<T>, typename Equal = equal_to<T>>
+    using vheap_unordered_set = unordered_set<T, Hash, Equal, HeapAllocator::AdaptorSTL<T>>;
 
     template<typename T>
     using HeapAllocatorSTL = HeapAllocator::AdaptorSTL<T>;
@@ -162,5 +151,5 @@ namespace cranked {
     };
 
     template<typename T>
-    using vheap_unique_ptr = std::unique_ptr<T, HeapDeleter<T>>;
+    using vheap_unique_ptr = unique_ptr<T, HeapDeleter<T>>;
 }

@@ -10,7 +10,7 @@
 using namespace cranked;
 
 static Cranked *instance;
-static std::shared_ptr<Rom> rom;
+static shared_ptr<Rom> rom;
 
 static retro_log_callback logging;
 static retro_log_printf_t log_cb;
@@ -55,7 +55,7 @@ void retro_run() {
 
     instance->update();
 
-    video_cb(instance->graphics.displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_WIDTH * sizeof(uint32_t));
+    video_cb(instance->graphics.displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_WIDTH * sizeof(uint32));
 }
 
 bool retro_load_game(const retro_game_info *info) {

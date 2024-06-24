@@ -3,15 +3,6 @@
 #include "PlaydateTypes.hpp"
 #include "Utils.hpp"
 
-#include <boost/asio.hpp>
-#include <string>
-#include <queue>
-#include <map>
-#include <unordered_set>
-#include <regex>
-#include <format>
-#include <capstone/capstone.h>
-
 namespace cranked {
 
     namespace asio = boost::asio;
@@ -48,7 +39,7 @@ namespace cranked {
             breakpoints.erase(address);
         }
 
-        const std::unordered_set<cref_t> &getBreakpoints() const {
+        const unordered_set<cref_t> &getBreakpoints() const {
             return breakpoints;
         }
 
@@ -71,7 +62,7 @@ namespace cranked {
         }
 
         bool isHalted() const {
-            return halted && enabled;
+            return halted and enabled;
         }
 
         void step() {
@@ -82,7 +73,7 @@ namespace cranked {
         }
 
         bool handleStep() {
-            bool stepping = singleStepping && enabled;
+            bool stepping = singleStepping and enabled;
             singleStepping = false;
             return stepping;
         }
@@ -97,43 +88,43 @@ namespace cranked {
         static constexpr const char *SUPPORTS_HARDWARE_BREAKPOINTS = "hwbreak+";
         static constexpr int MESSAGE_MAX_LENGTH = 4096;
         static constexpr const char *HARDWARE_BREAKPOINT_STR = "1";
-        static constexpr uint16_t BREAKPOINT_INSTRUCTION = 0xBEBE;
+        static constexpr uint16 BREAKPOINT_INSTRUCTION = 0xBEBE;
 
         void startTcpAccept();
         void startTcpRead();
         void processDecodeBuffer();
-        void processPacket(std::string_view data);
+        void processPacket(string_view data);
 
-        void sendData(std::string data);
+        void sendData(string data);
 
-        void sendResponse(const std::string &data);
+        void sendResponse(const string &data);
 
-        static uint8_t computePacketChecksum(std::string_view data);
+        static uint8 computePacketChecksum(string_view data);
 
         void sendErrorResponse(int error) {
-            sendResponse(std::format("E{:02x}", error));
+            sendResponse(format("E{:02x}", error));
         }
 
         void sendHaltResponse() {
-            sendResponse(std::format("S{:02x}", SIGTRAP));
+            sendResponse(format("S{:02x}", SIGTRAP));
         }
 
-        void handleCmdHaltReason(const std::vector<std::string> &args);
-        void handleCmdReadReg(const std::vector<std::string> &args);
-        void handleCmdWriteReg(const std::vector<std::string> &args);
-        void handleCmdDetach(const std::vector<std::string> &args);
-        void handleCmdReadMem(const std::vector<std::string> &args);
-        void handleCmdWriteMem(const std::vector<std::string> &args);
-        void handleCmdContinue(const std::vector<std::string> &args);
-        void handleCmdContinueWithSignal(const std::vector<std::string> &args);
-        void handleCmdStep(const std::vector<std::string> &args);
-        void handleCmdStepWithSignal(const std::vector<std::string> &args);
-        void handleCmdInsertBreakpoint(const std::vector<std::string> &args);
-        void handleCmdRemoveBreakpoint(const std::vector<std::string> &args);
-        void handleCmdSupported(const std::vector<std::string> &args);
-        void handleCmdAttached(const std::vector<std::string> &args);
+        void handleCmdHaltReason(const vector<string> &args);
+        void handleCmdReadReg(const vector<string> &args);
+        void handleCmdWriteReg(const vector<string> &args);
+        void handleCmdDetach(const vector<string> &args);
+        void handleCmdReadMem(const vector<string> &args);
+        void handleCmdWriteMem(const vector<string> &args);
+        void handleCmdContinue(const vector<string> &args);
+        void handleCmdContinueWithSignal(const vector<string> &args);
+        void handleCmdStep(const vector<string> &args);
+        void handleCmdStepWithSignal(const vector<string> &args);
+        void handleCmdInsertBreakpoint(const vector<string> &args);
+        void handleCmdRemoveBreakpoint(const vector<string> &args);
+        void handleCmdSupported(const vector<string> &args);
+        void handleCmdAttached(const vector<string> &args);
 
-        const std::map<std::string, void(Debugger::*)(const std::vector<std::string> &args)> packetHandlers {
+        const unordered_map<string, void(Debugger::*)(const vector<string> &args)> packetHandlers {
                 {"?", &Debugger::handleCmdHaltReason},
                 {"g", &Debugger::handleCmdReadReg},
                 {"G", &Debugger::handleCmdWriteReg},
@@ -158,15 +149,15 @@ namespace cranked {
         asio::io_context ioContext;
         asio::ip::tcp::acceptor tcpAcceptor {ioContext};
         asio::ip::tcp::socket tcpSocket {ioContext};
-        std::array<char, MESSAGE_MAX_LENGTH> tcpReceiveBuffer{};
-        std::string packetDecodeBuffer;
-        std::queue<std::string> tcpTransmitBuffers;
+        array<char, MESSAGE_MAX_LENGTH> tcpReceiveBuffer{};
+        string packetDecodeBuffer;
+        queue<string> tcpTransmitBuffers;
         bool tcpClientConnected{};
-        std::unordered_set<cref_t> breakpoints;
+        unordered_set<cref_t> breakpoints;
         bool halted{};
         bool singleStepping{};
         bool enabled{};
-        std::unordered_map<cref_t, uint16_t> breakpointReplacements;
+        unordered_map<cref_t, uint16> breakpointReplacements;
         bool wasAtBreakpoint{};
     };
 

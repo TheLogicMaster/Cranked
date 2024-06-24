@@ -5,9 +5,9 @@
 #include "../PlaydateTypes.hpp"
 #include "Utils.hpp"
 
-#define PLAYDATE_SDK_VERSION "2.4.2"
+#define PLAYDATE_SDK_VERSION "2.5.0"
 
-constexpr int FUNCTION_TABLE_SIZE = 495;
+constexpr int FUNCTION_TABLE_SIZE = 499;
 
 namespace cranked {
 
@@ -96,6 +96,9 @@ struct playdate_graphics_32 {
 	cref_t setStencilImage;
 	cref_t makeFontFromData;
 	cref_t getTextTracking;
+	cref_t setPixel;
+	cref_t getBitmapPixel;
+	cref_t getBitmapTableInfo;
 };
 
 struct PDDateTime_32 {
@@ -308,7 +311,7 @@ struct CollisionVector_32 {
 struct SpriteCollisionInfo_32 {
 	cref_t sprite;
 	cref_t other;
-	int32_t responseType;
+	int8_t responseType;
 	uint8_t overlaps;
 	float ti;
 	CollisionPoint_32 move;
@@ -579,7 +582,7 @@ struct playdate_sound_sequence_32 {
 	cref_t getTime;
 	cref_t setTime;
 	cref_t setLoops;
-	cref_t getTempo;
+	cref_t getTempo_deprecated;
 	cref_t setTempo;
 	cref_t getTrackCount;
 	cref_t addTrack;
@@ -592,6 +595,7 @@ struct playdate_sound_sequence_32 {
 	cref_t stop;
 	cref_t getCurrentStep;
 	cref_t setCurrentStep;
+	cref_t getTempo;
 };
 
 struct playdate_sound_effect_twopolefilter_32 {
@@ -849,7 +853,7 @@ LCDBitmap_32 * playdate_video_getContext(Cranked *cranked, LCDVideoPlayer_32 * p
 void playdate_graphics_clear(Cranked *cranked, uint32_t color);
 void playdate_graphics_setBackgroundColor(Cranked *cranked, int32_t color);
 void playdate_graphics_setStencil(Cranked *cranked, LCDBitmap_32 * stencil);
-void playdate_graphics_setDrawMode(Cranked *cranked, int32_t mode);
+int32_t playdate_graphics_setDrawMode(Cranked *cranked, int32_t mode);
 void playdate_graphics_setDrawOffset(Cranked *cranked, int32_t dx, int32_t dy);
 void playdate_graphics_setClipRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height);
 void playdate_graphics_clearClipRect(Cranked *cranked);
@@ -904,6 +908,9 @@ LCDBitmap_32 * playdate_graphics_getBitmapMask(Cranked *cranked, LCDBitmap_32 * 
 void playdate_graphics_setStencilImage(Cranked *cranked, LCDBitmap_32 * stencil, int32_t tile);
 LCDFont_32 * playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 * data, int32_t wide);
 int32_t playdate_graphics_getTextTracking(Cranked *cranked);
+void playdate_graphics_setPixel(Cranked *cranked, int32_t x, int32_t y, uint32_t c);
+int32_t playdate_graphics_getBitmapPixel(Cranked *cranked, LCDBitmap_32 * bitmap, int32_t x, int32_t y);
+void playdate_graphics_getBitmapTableInfo(Cranked *cranked, LCDBitmapTable_32 * table, int32_t * count, int32_t * width);
 void playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32_t flag);
 void playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRect);
 void playdate_sprite_drawSprites(Cranked *cranked);
@@ -1016,7 +1023,7 @@ void playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, FilePlayer_3
 AudioSample_32 * playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32_t byteCount);
 int32_t playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample_32 * sample, uint8_t * path);
 AudioSample_32 * playdate_sound_sample_load(Cranked *cranked, uint8_t * path);
-AudioSample_32 * playdate_sound_sample_newSampleFromData(Cranked *cranked, uint8_t * data, int32_t format, uint32_t sampleRate, int32_t byteCount);
+AudioSample_32 * playdate_sound_sample_newSampleFromData(Cranked *cranked, uint8_t * data, int32_t format, uint32_t sampleRate, int32_t byteCount, int32_t shouldFreeData);
 void playdate_sound_sample_getData(Cranked *cranked, AudioSample_32 * sample, cref_t * data, int32_t * format, uint32_t * sampleRate, uint32_t * bytelength);
 void playdate_sound_sample_freeSample(Cranked *cranked, AudioSample_32 * sample);
 float playdate_sound_sample_getLength(Cranked *cranked, AudioSample_32 * sample);
@@ -1073,7 +1080,7 @@ int32_t playdate_sound_sequence_loadMIDIFile(Cranked *cranked, SoundSequence_32 
 uint32_t playdate_sound_sequence_getTime(Cranked *cranked, SoundSequence_32 * seq);
 void playdate_sound_sequence_setTime(Cranked *cranked, SoundSequence_32 * seq, uint32_t time);
 void playdate_sound_sequence_setLoops(Cranked *cranked, SoundSequence_32 * seq, int32_t loopstart, int32_t loopend, int32_t loops);
-int32_t playdate_sound_sequence_getTempo(Cranked *cranked, SoundSequence_32 * seq);
+int32_t playdate_sound_sequence_getTempo_deprecated(Cranked *cranked, SoundSequence_32 * seq);
 void playdate_sound_sequence_setTempo(Cranked *cranked, SoundSequence_32 * seq, float stepsPerSecond);
 void playdate_sound_sequence_setTempo_int(Cranked *cranked, SoundSequence_32 * sequence, int32_t stepsPerSecond);
 int32_t playdate_sound_sequence_getTrackCount(Cranked *cranked, SoundSequence_32 * seq);
@@ -1087,6 +1094,7 @@ void playdate_sound_sequence_play(Cranked *cranked, SoundSequence_32 * seq, cref
 void playdate_sound_sequence_stop(Cranked *cranked, SoundSequence_32 * seq);
 int32_t playdate_sound_sequence_getCurrentStep(Cranked *cranked, SoundSequence_32 * seq, int32_t * timeOffset);
 void playdate_sound_sequence_setCurrentStep(Cranked *cranked, SoundSequence_32 * seq, int32_t step, int32_t timeOffset, int32_t playNotes);
+float playdate_sound_sequence_getTempo(Cranked *cranked, SoundSequence_32 * seq);
 SoundEffect_32 * playdate_sound_effect_newEffect(Cranked *cranked, cref_t proc, void * userdata);
 void playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect_32 * effect);
 void playdate_sound_effect_setMix(Cranked *cranked, SoundEffect_32 * effect, float level);

@@ -1,32 +1,31 @@
-#include <cstdarg>
-#include "jni.h"
 #include "Cranked.hpp"
+#include "jni.h"
 
 using namespace cranked;
 
 #if __ANDROID__
 #include <android/log.h>
 
-static void logVA(LogLevel level, const char *format, va_list args) {
-    __android_log_vprint(ANDROID_LOG_INFO, "Cranked", format, args);
+static void logVA(LogLevel level, const char *fmt, va_list args) {
+    __android_log_vprint(ANDROID_LOG_INFO, "Cranked", fmt, args);
 }
 
-static void log(LogLevel level, const char *format, ...) {
+static void log(LogLevel level, const char *fmt, ...) {
     va_list args;
-    va_start(args, format);
-    logVA(level, format, args);
+    va_start(args, fmt);
+    logVA(level, fmt, args);
     va_end(args);
 }
 #else
-static void logVA(LogLevel level, const char *format, va_list args) {
-    auto string = std::string("Cranked") + format;
-    vprintf(string.c_str(), args);
+static void logVA(LogLevel level, const char *fmt, va_list args) {
+    auto str = string("Cranked") + fmt;
+    vprintf(str.c_str(), args);
 }
 
-static void log(LogLevel level, const char *format, ...) {
+static void log(LogLevel level, const char *fmt, ...) {
     va_list args;
-    va_start(args, format);
-    logVA(level, format, args);
+    va_start(args, fmt);
+    logVA(level, fmt, args);
     va_end(args);
 }
 #endif
@@ -49,8 +48,8 @@ JNIEXPORT jlong JNICALL Java_com_thelogicmaster_cranked_Cranked_initialize(JNIEn
     cranked->config.updateCallback = [](Cranked &cranked) {
         environment->CallVoidMethod((jobject) cranked.config.userdata, updateCallbackMethodId);
     };
-    cranked->config.loggingCallback = [](Cranked &emulator, LogLevel logLevel, const char *format, va_list args){
-        logVA(logLevel, format, args);
+    cranked->config.loggingCallback = [](Cranked &emulator, LogLevel logLevel, const char *fmt, va_list args){
+        logVA(logLevel, fmt, args);
     };
 
     auto dataPathChars = env->GetStringUTFChars(appDataPath, nullptr);

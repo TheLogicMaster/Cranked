@@ -1,27 +1,9 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "Constants.hpp"
-#include "Rom.hpp"
 #include "HeapAllocator.hpp"
 #include "Debugger.hpp"
 #include "NativeResource.hpp"
-#include "Utils.hpp"
-
-#include "dynarmic/interface/A32/a32.h"
-#include "dynarmic/interface/A32/config.h"
-#include "unicorn/unicorn.h"
-#include "capstone/platform.h"
-#include "capstone/capstone.h"
-#include "lua.h"
-#include "lualib.h"
-#include "lauxlib.h"
-
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-#include <concepts>
 
 // Todo: Dynarmic implementation
 
@@ -35,15 +17,15 @@ namespace cranked {
     public:
         class NativeExecutionError : public CrankedError {
         public:
-            explicit NativeExecutionError(const char *message, std::string dump = "") : NativeExecutionError(std::string(message), std::move(dump)) {}
+            explicit NativeExecutionError(const char *message, string dump = "") : NativeExecutionError(string(message), std::move(dump)) {}
 
-            explicit NativeExecutionError(const std::string &message, std::string dump = "") : CrankedError(message), dump(std::move(dump)) {}
+            explicit NativeExecutionError(const string &message, string dump = "") : CrankedError(message), dump(std::move(dump)) {}
 
-            const std::string &getDump() {
+            const string &getDump() {
                 return dump;
             }
         private:
-            std::string dump;
+            string dump;
         };
 
         explicit NativeEngine(Cranked &cranked);
@@ -71,10 +53,10 @@ namespace cranked {
             return apiSize;
         }
 
-        cref_t getEmulatedStringLiteral(const std::string &message) {
+        cref_t getEmulatedStringLiteral(const string &message) {
             try { // Todo: Don't try-catch
                 return emulatedStringLiterals.at(message);
-            } catch (std::out_of_range &ex) {
+            } catch (out_of_range &ex) {
                 auto ref = toVirtualAddress(heap.allocateString(message.c_str()));
                 emulatedStringLiterals[message] = ref;
                 return ref;
@@ -132,58 +114,58 @@ namespace cranked {
         }
 
         template<typename S>
-        void virtualWrite(uint32_t address, S value) {
+        void virtualWrite(uint32 address, S value) {
             assertUC(uc_mem_write(nativeEngine, address, &value, sizeof(S)), "Mem write failed");
         }
 
         template<typename S>
-        S virtualRead(uint32_t address) {
+        S virtualRead(uint32 address) {
             S value;
             assertUC(uc_mem_read(nativeEngine, address, &value, sizeof(S)), "Mem read failed");
             return value;
         }
 
-        void writeRegister(int reg, uint32_t value) {
+        void writeRegister(int reg, uint32 value) {
             assertUC(uc_reg_write(nativeEngine, reg, &value), "Register write failed");
         }
 
-        void writeRegister64(int reg, uint64_t value) {
+        void writeRegister64(int reg, uint64 value) {
             assertUC(uc_reg_write(nativeEngine, reg, &value), "Register write failed");
         }
 
-        uint32_t readRegister(int reg) {
-            uint32_t value;
+        uint32 readRegister(int reg) {
+            uint32 value;
             assertUC(uc_reg_read(nativeEngine, reg, &value), "Register read failed");
             return value;
         }
 
-        uint64_t readRegister64(int reg) {
-            uint64_t value;
+        uint64 readRegister64(int reg) {
+            uint64 value;
             assertUC(uc_reg_read(nativeEngine, reg, &value), "Register read failed");
             return value;
         }
 
         void freeResource(void *ptr);
 
-        template<typename T, typename ...Args> requires std::derived_from<T, NativeResource>
+        template<typename T, typename ...Args> requires derived_from<T, NativeResource>
         T *createReferencedResource(Args ...args) {
             T *resource = heap.construct<T>(cranked, args...);
             resource->reference();
             return resource;
         }
 
-        int32_t invokeEventCallback(PDSystemEvent event, uint32_t arg) {
-            return invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                    (nativeEventCallback, toVirtualAddress(apiMemory.data()), (int32_t) event, (uint32_t) arg);
+        int32 invokeEventCallback(PDSystemEvent event, uint32 arg) {
+            return invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
+                    (nativeEventCallback, toVirtualAddress(apiMemory.data()), (int32) event, (uint32) arg);
         }
 
-        int32_t invokeUpdateCallback() {
+        int32 invokeUpdateCallback() {
             if (!nativeUpdateCallback)
                 throw CrankedError("Update callback not set");
-            return invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t>(nativeUpdateCallback, nativeUpdateUserdata);
+            return invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t>(nativeUpdateCallback, nativeUpdateUserdata);
         }
 
-        std::vector<uint8_t> &getCodeMemory() {
+        vector<uint8> &getCodeMemory() {
             return codeMemory;
         }
 
@@ -192,11 +174,12 @@ namespace cranked {
         }
 
         /**
-         * All passed args have to match the expected size exactly, so explicitly cast `int` literals to `int32_t`, for example
+         * All passed args have to match the expected size exactly, so explicitly cast `int` literals to `int32`, for example
          * The emulated CPU context must be preserved by the caller if already running emulated code (For Lua emulated native C functions and such)
          */
         template<typename R, ArgType N, ArgType... A, typename... P>
-        R invokeEmulatedFunction(uint32_t address, [[maybe_unused]] P... params) {
+        R invokeEmulatedFunction(uint32 address, [[maybe_unused]] P... params) {
+            // Todo: Is the `R` parameter needed if the return type is auto?
             if (!loaded)
                 throw CrankedError("Native binary not loaded");
 
@@ -230,10 +213,10 @@ namespace cranked {
                         currentFloatReg++;
                     if (type == ArgType::float_t) {
                         if (currentFloatReg >= 16) {
-                            sp -= sizeof(uint32_t);
-                            virtualWrite(sp, *(uint32_t *) &param);
+                            sp -= sizeof(uint32);
+                            virtualWrite(sp, *(uint32 *) &param);
                         } else
-                            writeRegister(UC_ARM_REG_S0 + currentFloatReg++, *(uint32_t *) &param);
+                            writeRegister(UC_ARM_REG_S0 + currentFloatReg++, *(uint32 *) &param);
                     } else if (type == ArgType::double_t) {
                         if (currentFloatReg >= 15) {
                             assertUC(uc_mem_write(nativeEngine, sp, &param, sizeof(double)), "Mem write failed");
@@ -242,68 +225,78 @@ namespace cranked {
                             assertUC(uc_reg_write(nativeEngine, UC_ARM_REG_D0 + currentFloatReg / 2, &param), "Register write failed");
                             currentFloatReg += 2;
                         }
+                    } else if (type == ArgType::struct4f_t) {
+                        for (int i = 0; i < 4; i++) {
+                            if (currentFloatReg >= 16) {
+                                sp -= sizeof(uint32);
+                                virtualWrite(sp, ((uint32 *) &param)[i]);
+                            } else
+                                writeRegister(UC_ARM_REG_S0 + currentFloatReg++, ((uint32 *) &param)[i]);
+                        }
                     } else if (currentReg >= 4 or (wide and currentReg > 2) or (type == ArgType::struct2_t and currentReg > 2) or (type == ArgType::struct4_t and currentReg > 0)) {
                         // Todo: Technically SP is required to be 8 byte aligned at the boundary here, so this may be an issue
                         if (type == ArgType::ptr_t) {
-                            sp -= sizeof(uint32_t);
+                            sp -= sizeof(uint32);
                             virtualWrite(sp, toVirtualAddress(*(void **) &param));
                         } else if (wide or type == ArgType::struct2_t) {
                             for (int i = 0; i < 2; i++) {
-                                sp -= sizeof(uint32_t);
-                                virtualWrite(sp, ((uint32_t *) &param)[i]);
+                                sp -= sizeof(uint32);
+                                virtualWrite(sp, ((uint32 *) &param)[i]);
                             }
                         } else if (type == ArgType::struct4_t) {
                             for (int i = 0; i < 4; i++) {
-                                sp -= sizeof(uint32_t);
-                                virtualWrite(sp, ((uint32_t *) &param)[i]);
+                                sp -= sizeof(uint32);
+                                virtualWrite(sp, ((uint32 *) &param)[i]);
                             }
                         } else {
-                            sp -= sizeof(uint32_t);
-                            virtualWrite(sp, *(uint32_t *) &param);
+                            sp -= sizeof(uint32);
+                            virtualWrite(sp, *(uint32 *) &param);
                         }
                     } else {
                         if (type == ArgType::ptr_t)
                             writeRegister(UC_ARM_REG_R0 + currentReg++, toVirtualAddress(*(void **) &param));
                         else if (wide or type == ArgType::struct2_t) {
                             for (int i = 0; i < 2; i++)
-                                writeRegister(UC_ARM_REG_R0 + currentReg + i, ((uint32_t *) &param)[i]);
+                                writeRegister(UC_ARM_REG_R0 + currentReg + i, ((uint32 *) &param)[i]);
                             currentReg += 2;
                         } else if (type == ArgType::struct4_t) {
                             for (int i = 0; i < 4; i++)
-                                writeRegister(UC_ARM_REG_R0 + currentReg + i, ((uint32_t *) &param)[i]);
+                                writeRegister(UC_ARM_REG_R0 + currentReg + i, ((uint32 *) &param)[i]);
                             currentReg += 4;
                         } else
-                            writeRegister(UC_ARM_REG_R0 + currentReg++, *(uint32_t *) &param);
+                            writeRegister(UC_ARM_REG_R0 + currentReg++, *(uint32 *) &param);
                     }
                     i++;
                 }(), ...);
 
-                auto returnAddress = CODE_PAGE_ADDRESS; // Todo: This could point to previous native stack PC to help with debugging
+                // Todo: PC could point to previous native stack PC to help with debugging
+                // Todo: Unicorn randomly segfaults when stopping execution, using zero for return address may help?
+                auto returnAddress = CODE_PAGE_ADDRESS + 2; // Unicorn freaks out if this is at the code page boundary
                 writeRegister(UC_ARM_REG_LR, returnAddress);
                 writeRegister(UC_ARM_REG_SP, sp);
 
                 writeRegister(UC_ARM_REG_PC, address | 0x1); // Todo: Helps debugging?
 
-                uint32_t pc = address;
+                uint32 pc = address;
                 while (true) {
                     bool shouldStep = debugger.handleInvocationDebugging();
-                    auto result = uc_emu_start(nativeEngine, pc | 0x1, returnAddress, 15000, shouldStep ? 1 : 0); // Todo: Verify/fix timing
+                    auto result = uc_emu_start(nativeEngine, pc | 0x1, returnAddress & ~0x1, 15000, shouldStep ? 1 : 0); // Todo: Verify/fix timing
                     pc = readRegister(UC_ARM_REG_PC);
                     if (result == UC_ERR_OK) {
                         if (pc == returnAddress)
                             break;
                         updateInternals();
                     } else if (result == UC_ERR_FETCH_UNMAPPED and pc >= FUNC_TABLE_ADDRESS and pc < FUNC_TABLE_ADDRESS + FUNCTION_TABLE_SIZE * 2) {
-                        uint32_t lr = readRegister(UC_ARM_REG_LR);
+                        uint32 lr = readRegister(UC_ARM_REG_LR);
                         nativeFunctionDispatch(int(pc - FUNC_TABLE_ADDRESS) / 2);
                         pc = lr;
                     } else if (result == UC_ERR_FETCH_UNMAPPED or result == UC_ERR_READ_UNMAPPED or result == UC_ERR_WRITE_UNMAPPED) {
-                        throw NativeExecutionError(std::format("Unmapped memory access at {}", lastBadAccessAddress), dumpCore());
+                        throw NativeExecutionError(format("Unmapped memory access at {}", lastBadAccessAddress), dumpCore());
                     } else {
                         assertUC(result, "Error invoking emulated function"); // Todo: Add more context for memory errors, probably need to store info from hooks, maybe full core dump
                     }
                 }
-            } catch (std::exception &ex) {
+            } catch (exception &ex) {
                 restoreContext();
                 throw;
             }
@@ -319,7 +312,7 @@ namespace cranked {
                 restoreContext();
                 return value;
             } else if constexpr (returnWide) {
-                auto value = (uint64_t) readRegister(UC_ARM_REG_R1) << 32 | readRegister(UC_ARM_REG_R0);
+                auto value = (uint64) readRegister(UC_ARM_REG_R1) << 32 | readRegister(UC_ARM_REG_R0);
                 restoreContext();
                 return *(R *) &value;
             } else if constexpr (N == ArgType::ptr_t) {
@@ -330,18 +323,24 @@ namespace cranked {
                 restoreContext();
                 return;
             } else if constexpr (N == ArgType::struct2_t) {
-                uint32_t value[2];
+                uint32 value[2];
                 for (int j = 0; j < 2; j++)
                     value[j] = readRegister(UC_ARM_REG_R0 + j);
                 restoreContext();
                 return *(R *) value;
             } else if constexpr (N == ArgType::struct4_t) {
-                uint32_t value[4];
+                uint32 value[4];
                 for (int j = 0; j < 4; j++)
                     value[j] = readRegister(UC_ARM_REG_R0 + j);
                 restoreContext();
                 return *(R *) value;
-            } else {
+            } else if constexpr (N == ArgType::struct4_t) {
+                uint32 value[4];
+                for (int j = 0; j < 4; j++)
+                    value[j] = readRegister(UC_ARM_REG_S0 + j);
+                restoreContext();
+                return *(R *) value;
+            }  else {
                 auto value = readRegister(UC_ARM_REG_R0);
                 restoreContext();
                 return *(R *) &value;
@@ -349,19 +348,19 @@ namespace cranked {
         }
 
     private:
-        static constexpr uint32_t BREAKPOINT_INTERRUPT = 7;
+        static constexpr uint32 BREAKPOINT_INTERRUPT = 7;
 
         void updateInternals();
 
-        static void handleInterrupt(uc_engine *uc, uint32_t interrupt, void *userdata);
+        static void handleInterrupt(uc_engine *uc, uint32 interrupt, void *userdata);
 
-        static void handleUnmappedAccess(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *userdata);
+        static bool handleUnmappedAccess(uc_engine *uc, uc_mem_type type, uint64 address, int size, int64 value, void *userdata);
 
         void nativeFunctionDispatch(int index);
 
-        std::string dumpCore();
+        string dumpCore();
 
-        void assertUC(uc_err result, const std::string &message = "Native engine operation failed") {
+        void assertUC(uc_err result, const string &message = "Native engine operation failed") {
             if (result != UC_ERR_OK)
                 throw NativeExecutionError(message + ": " + uc_strerror(result), dumpCore());
         }
@@ -373,20 +372,20 @@ namespace cranked {
         Debugger &debugger;
         uc_engine *nativeEngine{};
         uc_hook interruptHook{}, unmappedReadHook{}, unmappedWriteHook{};
-        std::array<uint8_t, API_MEM_SIZE> apiMemory{};
-        std::array<uint8_t, STACK_SIZE> stackMemory{};
-        std::vector<uint8_t> codeMemory;
+        array<uint8, API_MEM_SIZE> apiMemory{};
+        array<uint8, STACK_SIZE> stackMemory{};
+        vector<uint8> codeMemory;
         int nativeContextStackDepth{};
-        std::vector<uc_context *> nativeContextStack;
+        vector<uc_context *> nativeContextStack;
         int apiSize{};
         bool loaded{};
         cref_t nativeEventCallback{};
         cref_t nativeUpdateCallback{};
         cref_t nativeUpdateUserdata{};
-        std::unordered_map<std::string, cref_t> emulatedStringLiterals;
-        std::vector<cref_t> emulatedLuaFunctions;
+        unordered_map<string, cref_t> emulatedStringLiterals;
+        vector<cref_t> emulatedLuaFunctions;
         cref_t lastBadAccessAddress{};
-        std::unordered_set<NativeResource *> nativeResources;
+        unordered_set<NativeResource *> nativeResources;
     };
 
 }

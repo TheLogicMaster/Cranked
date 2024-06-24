@@ -42,7 +42,7 @@ void Menu::setImage(LCDBitmap_32 *bitmap, int xOffset) {
     image = bitmap ? cranked.heap.construct<LCDBitmap_32>(*bitmap) : nullptr; // Todo: Copy or just reference?
 }
 
-PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type, const std::vector<std::string> &options, int value, cref_t emulatedCallback, int luaCallback) {
+MenuItem Menu::addItem(const string &title, PDMenuItem_32::Type type, const vector<string> &options, int value, cref_t emulatedCallback, int luaCallback) {
     int index = -1;
     for (int i = 0; i < MAX_ITEMS; i++)
         if (!items[i]) {
@@ -58,6 +58,7 @@ PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type,
         item->options.emplace_back(option, cranked.heap.allocator<char>());
     item->value = value;
     item->emulatedCallback = emulatedCallback;
+    // Todo: A more generic way to handle Lua callbacks is needed
     if (luaCallback) {
         cranked.luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
         lua_pushvalue(cranked.getLuaContext(), luaCallback);
@@ -67,7 +68,7 @@ PDMenuItem_32 *Menu::addItem(const std::string &title, PDMenuItem_32::Type type,
     return item;
 }
 
-void Menu::removeItem(PDMenuItem_32 *item) {
+void Menu::removeItem(MenuItem item) {
     int index = findItem(item);
     if (index < 0)
         return;
@@ -82,13 +83,14 @@ void Menu::removeItem(PDMenuItem_32 *item) {
 }
 
 void Menu::clearItems() {
-    for (auto &item : std::vector(items))
+    for (auto &item : items)
         removeItem(item.get());
 }
 
-int Menu::findItem(PDMenuItem_32 *item) {
-    auto found = std::find(items.begin(), items.end(), item);
-    if (found == items.end())
-        return -1;
-    return int(found - items.begin());
+int Menu::findItem(MenuItem item) {
+    for (int i = 0; i < MAX_ITEMS; i++) {
+        if (items[i] == item)
+            return i;
+    }
+    return -1;
 }

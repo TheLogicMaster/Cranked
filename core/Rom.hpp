@@ -1,16 +1,6 @@
 #pragma once
 
 #include "PlaydateTypes.hpp"
-#include "Utils.hpp"
-
-#include "libzippp.h"
-
-#include <vector>
-#include <string>
-#include <map>
-#include <unordered_map>
-#include <memory>
-#include <filesystem>
 
 namespace cranked {
 
@@ -42,43 +32,43 @@ namespace cranked {
         };
 
         struct File {
-            std::string name;
+            string name;
             FileType type{};
             bool isDir{};
-            uint32_t size{};
-            uint32_t extra{}; // Used for audio
-            std::vector<uint8_t> data; // Populated for PDZ contents
-            std::time_t modTime;
+            uint32 size{};
+            uint32 extra{}; // Used for audio
+            vector<uint8> data; // Populated for PDZ contents
+            time_t modTime;
         };
 
         // Stored with one byte per pixel
         struct ImageCell {
             int width{};
             int height{};
-            std::vector<uint8_t> data;
-            std::vector<uint8_t> mask;
+            vector<uint8> data;
+            vector<uint8> mask;
         };
 
         struct Image {
             int width{};
             int height{};
-            uint32_t extra{}; // Probably unused
+            uint32 extra{}; // Probably unused
             ImageCell cell;
         };
 
         struct ImageTable {
             int cellsPerRow{};
-            std::vector<ImageCell> cells;
+            vector<ImageCell> cells;
         };
 
         struct StringTable {
-            std::map<std::string, std::string> strings;
+            map<string, string> strings;
         };
 
         struct FontGlyph {
             int advance{};
-            std::map<int, int8_t> shortKerningTable; // Page 0 entries
-            std::map<int, int8_t> longKerningTable;
+            map<int, int8> shortKerningTable; // Page 0 entries
+            map<int, int8> longKerningTable;
             ImageCell cell;
         };
 
@@ -86,25 +76,25 @@ namespace cranked {
             int tracking{};
             int glyphWidth{};
             int glyphHeight{};
-            std::unordered_map<int, std::unordered_map<int, FontGlyph>> glyphs; // Bottom 8 bits of codepoint is page number, upper 8? bits is page index
+            unordered_map<int, unordered_map<int, FontGlyph>> glyphs; // Bottom 8 bits of codepoint is page number, upper 8? bits is page index
         };
 
         struct Audio {
-            SoundFormat format;
+            SoundFormat soundFormat;
             bool stereo;
-            uint32_t sampleRate;
-            std::vector<int16_t> samples; // Not sure if this is even useful, since it needs to support playing raw data, anyway
-            std::vector<uint8_t> data;
+            uint32 sampleRate;
+            vector<int16> samples; // Not sure if this is even useful, since it needs to support playing raw data, anyway
+            vector<uint8> data;
         };
 
         struct Video {
             float framerate;
             int width;
             int height;
-            std::vector<std::vector<uint8_t>> frames;
+            vector<vector<uint8>> frames;
         };
 
-        explicit Rom(const std::string &path, Cranked *cranked = nullptr);
+        explicit Rom(const string &path, Cranked *cranked = nullptr);
 
         ~Rom();
 
@@ -112,133 +102,133 @@ namespace cranked {
 
         void unload();
 
-        std::vector<uint8_t> readRomFile(const std::string &name, const std::string &extension = "");
+        vector<uint8> readRomFile(const string &name, const string &extension = "");
 
-        File *findRomFile(const std::string &name);
+        File *findRomFile(const string &name);
 
-        std::vector<std::string> listRomFiles(std::string base, bool recursive); // Doesn't include PDZ contents
+        vector<string> listRomFiles(string base, bool recursive); // Doesn't include PDZ contents
 
-        inline std::string getName() {
+        inline string getName() {
             return manifest["name"];
         }
 
-        inline std::string getAuthor() {
+        inline string getAuthor() {
             return manifest["author"];
         }
 
-        inline std::string getDescription() {
+        inline string getDescription() {
             return manifest["description"];
         }
 
-        inline std::string getBundleID() {
+        inline string getBundleID() {
             return manifest["bundleID"];
         }
 
-        inline std::string getVersion() {
+        inline string getVersion() {
             return manifest["version"];
         }
 
         inline int getBuildNumber() {
             try {
-                return std::stoi(manifest["buildNumber"]);
-            } catch (std::exception &ex) {
+                return stoi(manifest["buildNumber"]);
+            } catch (exception &ex) {
                 return -1;
             }
         }
 
-        inline std::string getImagePath() {
+        inline string getImagePath() {
             return manifest["imagePath"];
         }
 
-        inline std::string getLaunchSoundPath() {
+        inline string getLaunchSoundPath() {
             return manifest["launchSoundPath"];
         }
 
-        inline std::string getContentWarning() {
+        inline string getContentWarning() {
             return manifest["contentWarning"];
         }
 
-        inline std::string getContentWarning2() {
+        inline string getContentWarning2() {
             return manifest["contentWarning2"];
         }
 
         inline Version getPdxVersion() {
             try {
-                return Version(std::stoi(manifest["pdxversion"]));
-            } catch (std::exception &ex) {
+                return Version(stoi(manifest["pdxversion"]));
+            } catch (exception &ex) {
                 return Version(0);
             }
         }
 
         inline int getBuildTime() {
             try {
-                return std::stoi(manifest["buildtime"]);
-            } catch (std::exception &ex) {
+                return stoi(manifest["buildtime"]);
+            } catch (exception &ex) {
                 return -1;
             }
         }
 
-        inline Image getImage(const std::string &name) {
+        inline Image getImage(const string &name) {
             auto data = readRomFile(name, ".pdi");
             return readImage(data.data(), data.size());
         }
 
-        inline ImageTable getImageTable(const std::string &name) {
+        inline ImageTable getImageTable(const string &name) {
             auto data = readRomFile(name, ".pdt");
             return readImageTable(data.data(), data.size());
         }
 
-        inline StringTable getStringTable(const std::string &name) {
+        inline StringTable getStringTable(const string &name) {
             auto data = readRomFile(name, ".pds");
             return readStringTable(data.data(), data.size());
         }
 
-        inline Font getFont(const std::string &name) {
+        inline Font getFont(const string &name) {
             auto data = readRomFile(name, ".pft");
             return readFont(data.data(), data.size());
         }
 
-        inline Audio getAudio(const std::string &name) {
+        inline Audio getAudio(const string &name) {
             auto data = readRomFile(name, ".pda");
             return readAudio(data.data(), data.size());
         }
 
-        inline Video getVideo(const std::string &name) {
+        inline Video getVideo(const string &name) {
             auto data = readRomFile(name, ".pdv");
             return readVideo(data.data(), data.size());
         }
 
-        void logMessage(LogLevel level, const char *format, ...) const;
+        void logMessage(LogLevel level, const char *fmt, ...) const;
 
-        static std::vector<File> loadPDZ(const std::vector<uint8_t> &data);
+        static vector<File> loadPDZ(const vector<uint8> &data);
 
-        static StringTable readStringTable(const uint8_t *data, size_t dataSize);
+        static StringTable readStringTable(const uint8 *data, size_t dataSize);
 
-        static Font readFont(const uint8_t *data, size_t dataSize);
+        static Font readFont(const uint8 *data, size_t dataSize);
 
-        static Font readFontData(const uint8_t *data, bool wide);
+        static Font readFontData(const uint8 *data, bool wide);
 
-        static Image readImage(const uint8_t *data, size_t dataSize);
+        static Image readImage(const uint8 *data, size_t dataSize);
 
-        static ImageTable readImageTable(const uint8_t *data, size_t dataSize);
+        static ImageTable readImageTable(const uint8 *data, size_t dataSize);
 
-        static Audio readAudio(const uint8_t *data, size_t dataSize);
+        static Audio readAudio(const uint8 *data, size_t dataSize);
 
-        static Video readVideo(const uint8_t *data, size_t dataSize);
+        static Video readVideo(const uint8 *data, size_t dataSize);
 
-        static FileType getFileType(const uint8_t *header);
+        static FileType getFileType(const uint8 *header);
 
         Cranked *cranked; // Only present for logging, so optional
         bool loaded{};
-        std::unique_ptr<libzippp::ZipArchive> zip;
-        std::filesystem::path path;
-        std::map<std::string, std::string> manifest{};
-        std::vector<File> outerFiles;
-        std::vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?
-        std::vector<uint8_t> binary;
-        uint32_t binarySize{};
-        uint32_t combinedProgramSize{};
-        uint32_t eventHandlerAddress{};
+        unique_ptr<libzippp::ZipArchive> zip;
+        filesystem::path path;
+        map<string, string> manifest{};
+        vector<File> outerFiles;
+        vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?
+        vector<uint8> binary;
+        uint32 binarySize{};
+        uint32 combinedProgramSize{};
+        uint32 eventHandlerAddress{};
         bool hasLua{};
         Version sdkVersion{};
 
@@ -255,7 +245,7 @@ namespace cranked {
 
         void loadManifest();
 
-        static ImageCell readImageCell(const uint8_t *start);
+        static ImageCell readImageCell(const uint8 *start);
     };
 
 }

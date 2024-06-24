@@ -1,17 +1,11 @@
 #include "NativeEngine.hpp"
 #include "Cranked.hpp"
 
-#include <chrono>
-#include <thread>
-
 using namespace cranked;
 
 NativeEngine::NativeEngine(Cranked &cranked) : cranked(cranked), debugger(cranked.debugger), heap(cranked.heap) {
     assertUC(uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &nativeEngine), "Failed to initialize unicorn");
-
-    // Enable VFP
-    writeRegister(UC_ARM_REG_C1_C0_2, readRegister(UC_ARM_REG_C1_C0_2) | (0xF << 20));
-    writeRegister(UC_ARM_REG_FPEXC, 0x40000000);
+    assertUC(uc_ctl_set_cpu_model(nativeEngine, UC_CPU_ARM_CORTEX_M7));
 
     // Register hooks
     assertUC(uc_hook_add(nativeEngine, &interruptHook, UC_HOOK_INTR, (void *) handleInterrupt, &cranked, 1, 0), "Failed to add interrupt hook");
@@ -82,7 +76,7 @@ void NativeEngine::freeResource(void *ptr) {
 }
 
 void NativeEngine::pushEmulatedLuaFunction(cref_t func) {
-    auto it = std::find(emulatedLuaFunctions.begin(), emulatedLuaFunctions.end(), func);
+    auto it = find(emulatedLuaFunctions.begin(), emulatedLuaFunctions.end(), func);
     int index;
     if (it != emulatedLuaFunctions.end())
         index = int(it - emulatedLuaFunctions.begin());
@@ -98,7 +92,7 @@ void NativeEngine::updateInternals() {
     cranked.updateInternals();
 }
 
-void NativeEngine::handleInterrupt(uc_engine *uc, uint32_t interrupt, void *userdata) {
+void NativeEngine::handleInterrupt(uc_engine *uc, uint32 interrupt, void *userdata) {
     if (interrupt != BREAKPOINT_INTERRUPT)
         throw NativeExecutionError("Unknown interrupt");
     auto cranked = (Cranked *) userdata;
@@ -106,17 +100,18 @@ void NativeEngine::handleInterrupt(uc_engine *uc, uint32_t interrupt, void *user
     cranked->nativeEngine.assertUC(uc_emu_stop(uc), "Failed to stop unicorn emulation");
     while (cranked->debugger.isHalted()) {
         cranked->updateInternals();
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        this_thread::sleep_for(chrono::milliseconds(15));
     }
 }
 
-void NativeEngine::handleUnmappedAccess(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *userdata) {
+bool NativeEngine::handleUnmappedAccess(uc_engine *uc, uc_mem_type type, uint64 address, int size, int64 value, void *userdata) {
     ((Cranked *) userdata)->nativeEngine.lastBadAccessAddress = (cref_t) address;
+    return false;
 }
 
 void NativeEngine::nativeFunctionDispatch(int index) {
     struct ArgBuffer {
-        uint32_t data[4]; // This must hold enough data to store any native argument
+        uint32 data[4]; // This must hold enough data to store any native argument
     };
 
     if (index >= FUNCTION_TABLE_SIZE)
@@ -129,17 +124,6 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         return type == ArgType::int64_t or type == ArgType::uint64_t or type == ArgType::double_t;
     };
 
-    // Substitute struct args with 2 or 4 integers, which is sufficient for the current structs
-    for (int i = 0; i < argTypes.size(); i++) {
-        auto arg = argTypes[i];
-        if (arg != ArgType::struct2_t and arg != ArgType::struct4_t)
-            continue;
-        auto it = argTypes.begin() + i;
-        argTypes.erase(it);
-        for (int j = 0; j < (arg == ArgType::struct2_t ? 2 : 4); j++)
-            argTypes.insert(it, ArgType::int32_t);
-    }
-
     // Varargs only works with format string parameter
     bool isVarargs = false;
     bool isVaList = false;
@@ -150,7 +134,7 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         isVaList = lastType == ArgType::va_list_t;
     }
     bool isVariadic = isVarargs or isVaList;
-    std::vector<ArgType> varargsTypes{};
+    vector<ArgType> varargsTypes{};
     const char *formatString;
     if (isVariadic) {
         int offset = 0;
@@ -165,11 +149,11 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         offset -= 1;
         argTypes.pop_back();
 
-        uint32_t virtualAddress;
+        uint32 virtualAddress;
         if (offset < 4)
             virtualAddress = readRegister(UC_ARM_REG_R0 + offset);
         else
-            virtualAddress = virtualRead<uint32_t>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
+            virtualAddress = virtualRead<uint32>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
         formatString = fromVirtualAddress<const char>(virtualAddress);
         offset++;
 
@@ -177,7 +161,7 @@ void NativeEngine::nativeFunctionDispatch(int index) {
             if (offset < 4)
                 vaListPtr = readRegister(UC_ARM_REG_R0 + offset);
             else
-                vaListPtr = virtualRead<uint32_t>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
+                vaListPtr = virtualRead<uint32>(readRegister(UC_ARM_REG_SP) + 4 * (offset - 4));
         }
 
         const char *c = formatString;
@@ -189,19 +173,19 @@ void NativeEngine::nativeFunctionDispatch(int index) {
                     c++;
                     continue;
                 }
-                while (*c and (*c == 'h' or *c == 'l' or *c == 'j' or *c == 'z' or *c == 't' or *c == 'L' or not std::isalpha(*c)))
+                while (*c and (*c == 'h' or *c == 'l' or *c == 'j' or *c == 'z' or *c == 't' or *c == 'L' or not isalpha(*c)))
                     c++;
                 if (!*c)
                     break;
                 // %[flags][width][.precision][length]specifier
-                static std::regex regex(R"(%([-+ #0]*)((?:[\d*]+)?)((?:\.[\d*]+)?)([hljztL]*)[diuoxXfFeEgGaAcspn%])");
-                std::cmatch match;
-                if (std::regex_match(start, c + 1, match, regex)) {
+                static regex regex(R"(%([-+ #0]*)((?:[\d*]+)?)((?:\.[\d*]+)?)([hljztL]*)[diuoxXfFeEgGaAcspn%])");
+                cmatch match;
+                if (regex_match(start, c + 1, match, regex)) {
                     auto &width = match[2];
                     auto &precision = match[3];
-                    if (width.str().find('*') != std::string::npos)
+                    if (width.str().find('*') != string::npos)
                         varargsTypes.push_back(ArgType::int32_t);
-                    if (precision.str().find('*') != std::string::npos)
+                    if (precision.str().find('*') != string::npos)
                         varargsTypes.push_back(ArgType::int32_t);
                 }
                 if (*c == 'c')
@@ -246,9 +230,9 @@ void NativeEngine::nativeFunctionDispatch(int index) {
     }
 
     auto argCount = argTypes.size() + 1 + (isVaList ? (int)varargsTypes.size() : 0);
-    std::vector<ffi_type *> ffiArgTypes(argCount);
-    std::vector<ArgBuffer> argValues(argCount - 1);
-    std::vector<void *> ffiArgs(argCount);
+    vector<ffi_type *> ffiArgTypes(argCount);
+    vector<ArgBuffer> argValues(argCount - 1);
+    vector<void *> ffiArgs(argCount);
 
     // Pass `this` as first arg
     ffiArgTypes[0] = &ffi_type_pointer;
@@ -259,14 +243,17 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         ffiArgs[i + 1] = argValues[i].data;
 
     auto argTypeToFFI = [](ArgType type){
-        static ffi_type struct2Type, struct4Type;
+        static ffi_type struct2Type, struct4Type, struct4fType;
         if (!struct2Type.elements) {
             static ffi_type *struct2Elements[]{ &ffi_type_sint32, &ffi_type_sint32, nullptr };
             static ffi_type *struct4Elements[]{ &ffi_type_sint32, &ffi_type_sint32, &ffi_type_sint32, &ffi_type_sint32, nullptr };
+            static ffi_type *struct4fElements[]{ &ffi_type_float, &ffi_type_float, &ffi_type_float, &ffi_type_float, nullptr };
             struct2Type.type = FFI_TYPE_STRUCT;
             struct2Type.elements = struct2Elements;
             struct4Type.type = FFI_TYPE_STRUCT;
             struct4Type.elements = struct4Elements;
+            struct4fType.type = FFI_TYPE_STRUCT;
+            struct4fType.elements = struct4fElements;
         }
         switch (type) {
             case ArgType::uint8_t: return &ffi_type_uint8;
@@ -283,11 +270,12 @@ void NativeEngine::nativeFunctionDispatch(int index) {
             case ArgType::ptr_t: return &ffi_type_pointer;
             case ArgType::struct2_t: return &struct2Type;
             case ArgType::struct4_t: return &struct4Type;
+            case ArgType::struct4f_t: return &struct4fType;
             default: throw CrankedError("Invalid function arg");
         }
     };
 
-    // Todo: Variadic parameters should be either converted to native sizes or use emulated sizes with custom string formatting implementations
+    // Todo: Variadic parameters should be either converted to native sizes or use emulated sizes with custom string formatting implementations (Passing too many parameters seems to be problematic at present)
 
     // Read args from registers and stack and set types
     int currentReg = 0;
@@ -300,12 +288,32 @@ void NativeEngine::nativeFunctionDispatch(int index) {
             currentReg++;
         if (type == ArgType::double_t and currentFloatReg < 16 and currentFloatReg % 2 != 0)
             currentFloatReg++;
-        if (type == ArgType::float_t and !isVarargs) {
+        if (type == ArgType::struct2_t or type == ArgType::struct4_t) {
+            for (int j = 0; j < (type == ArgType::struct2_t ? 2 : 4); j++) {
+                uint32 value;
+                if (currentReg >= 4) {
+                    value = virtualRead<uint32>(sp);
+                    sp += 4;
+                } else
+                    value = readRegister(UC_ARM_REG_R0 + currentReg++);
+                argValues[i].data[j] = value;
+            }
+        } else if (type == ArgType::struct4f_t) {
+            for (int j = 0; j < 4; j++) {
+                uint32 value;
+                if (currentFloatReg >= 16) {
+                    value = virtualRead<uint32>(sp);
+                    sp += 4;
+                } else
+                    value = readRegister(UC_ARM_REG_S0 + currentFloatReg++);
+                argValues[i].data[j] = value;
+            }
+        } else if (type == ArgType::float_t and !isVarargs) {
             if (currentFloatReg >= 16) {
                 *(float *) &argValues[i] = virtualRead<float>(sp);
                 sp += 4;
             } else
-                *(uint32_t *) &argValues[i] = readRegister(UC_ARM_REG_S0 + currentFloatReg++);
+                *(uint32 *) &argValues[i] = readRegister(UC_ARM_REG_S0 + currentFloatReg++);
         } else if (type == ArgType::double_t and !isVarargs) {
             if (currentFloatReg >= 15) {
                 *(double *) &argValues[i] = virtualRead<double>(sp);
@@ -317,23 +325,23 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         } else if (currentReg >= 4 or (wide and currentReg >= 3)) {
             // Stack accesses are 4 byte aligned, so there may be garbage in upper bytes, but FFI only reads required bytes, so it's fine to copy full 32-bit values
             if (wide) {
-                *(uint64_t *) &argValues[i] = virtualRead<uint64_t>(sp);
+                *(uint64 *) &argValues[i] = virtualRead<uint64>(sp);
                 sp += 8;
             } else if (type == ArgType::ptr_t) {
-                *(void **) &argValues[i] = fromVirtualAddress(virtualRead<uint32_t>(sp)); // Pass pointers in native address space
+                *(void **) &argValues[i] = fromVirtualAddress(virtualRead<uint32>(sp)); // Pass pointers in native address space
                 sp += 4;
             } else {
-                *(uint32_t *) &argValues[i] = virtualRead<uint32_t>(sp);
+                *(uint32 *) &argValues[i] = virtualRead<uint32>(sp);
                 sp += 4;
             }
         } else {
-            // Upper bytes will always be zeroed/sign-extended, so there's no distinction between uint32_t and smaller
+            // Upper bytes will always be zeroed/sign-extended, so there's no distinction between uint32 and smaller
             if (wide)
-                *(uint64_t *) &argValues[i] = uint64_t(readRegister(UC_ARM_REG_R0 + currentReg + 1)) << 32 | readRegister(UC_ARM_REG_R0 + currentReg);
+                *(uint64 *) &argValues[i] = uint64(readRegister(UC_ARM_REG_R0 + currentReg + 1)) << 32 | readRegister(UC_ARM_REG_R0 + currentReg);
             else if (type == ArgType::ptr_t)
                 *(void **) &argValues[i] = fromVirtualAddress(readRegister(UC_ARM_REG_R0 + currentReg));
             else
-                *(uint32_t *) &argValues[i] = readRegister(UC_ARM_REG_R0 + currentReg);
+                *(uint32 *) &argValues[i] = readRegister(UC_ARM_REG_R0 + currentReg);
             currentReg += wide ? 2 : 1;
         }
 
@@ -348,25 +356,25 @@ void NativeEngine::nativeFunctionDispatch(int index) {
             switch (type) {
                 case ArgType::uint8_t:
                 case ArgType::int8_t:
-                    *(uint8_t *) &argValues[valueIndex] = virtualRead<uint8_t>(vaListPtr);
+                    *(uint8 *) &argValues[valueIndex] = virtualRead<uint8>(vaListPtr);
                     vaListPtr += 1;
                     break;
                 case ArgType::uint16_t:
                 case ArgType::int16_t:
-                    *(uint16_t *) &argValues[valueIndex] = virtualRead<uint16_t>(vaListPtr);
+                    *(uint16 *) &argValues[valueIndex] = virtualRead<uint16>(vaListPtr);
                     vaListPtr += 2;
                     break;
                 case ArgType::uint32_t:
                 case ArgType::int32_t:
                 case ArgType::float_t:
                 case ArgType::ptr_t:
-                    *(uint32_t *) &argValues[valueIndex] = virtualRead<uint32_t>(vaListPtr);
+                    *(uint32 *) &argValues[valueIndex] = virtualRead<uint32>(vaListPtr);
                     vaListPtr += 4;
                     break;
                 case ArgType::uint64_t:
                 case ArgType::int64_t:
                 case ArgType::double_t:
-                    *(uint64_t *) &argValues[valueIndex] = virtualRead<uint64_t>(vaListPtr);
+                    *(uint64 *) &argValues[valueIndex] = virtualRead<uint64>(vaListPtr);
                     vaListPtr += 8;
                     break;
                 default:
@@ -384,7 +392,6 @@ void NativeEngine::nativeFunctionDispatch(int index) {
         throw CrankedError("Failed to prep FFI CIF");
     ArgBuffer returnValue{};
     ffi_call(&cif, (void (*)()) metadata.func, returnValue.data, ffiArgs.data());
-    // Todo: Exception handling to restore state?
 
     // Push return type
     if (returnType == ArgType::float_t and !isVarargs)
@@ -399,34 +406,37 @@ void NativeEngine::nativeFunctionDispatch(int index) {
     else if (returnType == ArgType::struct2_t or returnType == ArgType::struct4_t) {
         for (int i = 0; i < (returnType == ArgType::struct2_t ? 2 : 4); i++)
             writeRegister(UC_ARM_REG_R0 + i, returnValue.data[i]);
+    } else if (returnType == ArgType::struct4f_t) {
+        for (int i = 0; i < 4; i++)
+            writeRegister(UC_ARM_REG_S0 + i, returnValue.data[i]);
     } else if (returnType != ArgType::void_t)
         writeRegister(UC_ARM_REG_R0, returnValue.data[0]);
 }
 
-std::string NativeEngine::dumpCore() {
+string NativeEngine::dumpCore() {
     if (!nativeEngine)
         return "<Native engine not initialized>";
-    std::string dump;
-    uint32_t pc, reg;
+    string dump;
+    uint32 pc, reg;
     // Don't bother checking results here
     uc_reg_read(nativeEngine, UC_ARM_REG_PC, &pc);
-    dump += std::format(" PC={:08X} ", pc);
+    dump += format(" PC={:08X} ", pc);
     uc_reg_read(nativeEngine, UC_ARM_REG_SP, &reg);
-    dump += std::format(" SP={:08X} ", reg);
+    dump += format(" SP={:08X} ", reg);
     uc_reg_read(nativeEngine, UC_ARM_REG_LR, &reg);
-    dump += std::format(" LR={:08X} ", reg);
+    dump += format(" LR={:08X} ", reg);
     uc_reg_read(nativeEngine, UC_ARM_REG_XPSR, &reg);
-    dump += std::format(" SR={:08X}\n", reg);
+    dump += format(" SR={:08X}\n", reg);
     for (int i = 0; i < 13; i++) {
         uc_reg_read(nativeEngine, UC_ARM_REG_R0 + i, &reg);
-        dump += std::format("R{:02}={:08X} ", i, reg);
+        dump += format("R{:02}={:08X} ", i, reg);
         if (i % 4 == 3)
             dump += '\n';
     }
     dump += '\n';
     for (int i = 0; i < 32; i++) {
         uc_reg_read(nativeEngine, UC_ARM_REG_S0 + i, &reg);
-        dump += std::format("S{:02}={:08X} ", i, reg);
+        dump += format("S{:02}={:08X} ", i, reg);
         if (i % 4 == 3)
             dump += '\n';
     }
@@ -438,7 +448,7 @@ std::string NativeEngine::dumpCore() {
         for (int j = 0; j < disassemblySize; j++) {
             auto inst = disassembly[j];
             if (inst.address == address) {
-                dump += std::format("{:08X}: {} {}\n", address, inst.mnemonic, inst.op_str);
+                dump += format("{:08X}: {} {}\n", address, inst.mnemonic, inst.op_str);
                 break;
             }
         }
@@ -452,8 +462,8 @@ int NativeEngine::luaEmulatedFunctionDispatch(lua_State *luaContext) {
     int result;
     try {
         // Pass null for lua context param since it isn't used, with `setSpriteDrawFunction` being a lie and no linkage existing for C Lua functions, anyway
-        result = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t>(cranked->nativeEngine.emulatedLuaFunctions[index], 0);
-    } catch (std::exception &ex) {
+        result = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t>(cranked->nativeEngine.emulatedLuaFunctions[index], 0);
+    } catch (exception &ex) {
         result = luaL_error(luaContext, "Failed to invoke native Lua function: %s", ex.what());
     }
     return result;

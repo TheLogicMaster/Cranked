@@ -32,9 +32,10 @@ endforeach()
 
 file(GLOB cranked_sources
         Audio.cpp
+        Bump.cpp
         Cranked.cpp
         Debugger.cpp
-        File.cpp
+        Files.cpp
         Graphics.cpp
         HeapAllocator.cpp
         LuaEngine.cpp
@@ -64,4 +65,3 @@ endfunction()
 
 embed_resource("Asheville-Sans-24-Light.pft" "SystemFont.hpp" "SYSTEM_FONT" "")
 embed_resource("runtime.lua" "LuaRuntimeSource.hpp" "LUA_RUNTIME_SOURCE" "-t")
-embed_resource("bump.lua" "LuaBumpSource.hpp" "LUA_BUMP_SOURCE" "-t")

@@ -5,7 +5,7 @@ using namespace cranked;
 Cranked::~Cranked() {
     try {
         reset();
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         logMessage(LogLevel::Error, "Failed to clean up: %s", ex.what());
     }
 }
@@ -17,13 +17,13 @@ void Cranked::init() {
     nativeEngine.init();
     luaEngine.init();
     debugger.init();
-    startTime = elapsedTimeStart = std::chrono::system_clock::now();
+    startTime = elapsedTimeStart = chrono::system_clock::now();
     initialized = true;
 }
 
-void Cranked::load(const std::string &path) {
+void Cranked::load(const string &path) {
     unload();
-    rom = std::make_unique<Rom>(path, this);
+    rom = make_unique<Rom>(path, this);
     rom->load();
     nativeEngine.load();
 }
@@ -47,6 +47,7 @@ void Cranked::reset() {
     graphics.reset();
     menu.reset();
     files.reset();
+    bump.reset();
     nativeEngine.reset();
 
     currentInputs = previousInputs = pressedInputs = releasedInputs = 0;
@@ -64,17 +65,17 @@ void Cranked::update() {
         return;
     }
 
-    auto currentMillisStart = std::chrono::system_clock::now();
+    auto currentMillisStart = chrono::system_clock::now();
 
-    auto currentTime = std::chrono::system_clock::now();
-    if (currentTime > lastFrameTime + std::chrono::milliseconds(int(1 / graphics.framerate))) {
+    auto currentTime = chrono::system_clock::now();
+    if (currentTime > lastFrameTime + chrono::milliseconds(int(1 / graphics.framerate))) {
         pressedInputs = currentInputs & ~previousInputs;
         releasedInputs = ~currentInputs & previousInputs;
 
         if (pressedInputs & int(PDButtons::A))
-            buttonDownTimeA = std::chrono::system_clock::now();
+            buttonDownTimeA = chrono::system_clock::now();
         if (pressedInputs & int(PDButtons::B))
-            buttonDownTimeB = std::chrono::system_clock::now();
+            buttonDownTimeB = chrono::system_clock::now();
         if (releasedInputs & int(PDButtons::A))
             buttonDownTimeA = {};
         if (releasedInputs & int(PDButtons::B))
@@ -91,9 +92,9 @@ void Cranked::update() {
                 for (int i = 0; i < 6; i++) {
                     auto bit = 1 << i;
                     if (pressedInputs & bit)
-                        nativeEngine.invokeEventCallback(PDSystemEvent::KeyPressed, (uint32_t)bit);
+                        nativeEngine.invokeEventCallback(PDSystemEvent::KeyPressed, (uint32)bit);
                     if (releasedInputs & bit)
-                        nativeEngine.invokeEventCallback(PDSystemEvent::KeyReleased, (uint32_t)bit);
+                        nativeEngine.invokeEventCallback(PDSystemEvent::KeyReleased, (uint32)bit);
                 }
             }
 
@@ -125,11 +126,11 @@ void Cranked::update() {
                 if (releasedInputs & int(PDButtons::Up))
                     luaEngine.invokeLuaInputCallback("upButtonUp");
 
-                if (buttonDownTimeA.time_since_epoch() != std::chrono::system_clock::time_point::duration::zero() and currentTime > buttonDownTimeA + std::chrono::seconds(1)) {
+                if (buttonDownTimeA.time_since_epoch() != chrono::system_clock::time_point::duration::zero() and currentTime > buttonDownTimeA + chrono::seconds(1)) {
                     luaEngine.invokeLuaInputCallback("AButtonHeld");
                     buttonDownTimeA = {};
                 }
-                if (buttonDownTimeB.time_since_epoch() != std::chrono::system_clock::time_point::duration::zero() and currentTime > buttonDownTimeB + std::chrono::seconds(1)) {
+                if (buttonDownTimeB.time_since_epoch() != chrono::system_clock::time_point::duration::zero() and currentTime > buttonDownTimeB + chrono::seconds(1)) {
                     luaEngine.invokeLuaInputCallback("BButtonHeld");
                     buttonDownTimeB = {};
                 }
@@ -164,7 +165,7 @@ void Cranked::update() {
 
     updateInternals();
 
-    currentMillis += duration_cast<std::chrono::milliseconds>((std::chrono::system_clock::now() - currentMillisStart)).count(); // Todo: Does this increase while locked/in-menu?
+    currentMillis += duration_cast<chrono::milliseconds>((chrono::system_clock::now() - currentMillisStart)).count(); // Todo: Does this increase while locked/in-menu?
 }
 
 void Cranked::start() {

@@ -4,17 +4,12 @@
 #include "NativeResource.hpp"
 #include "HeapAllocator.hpp"
 
-#include <string>
-#include <vector>
-
 namespace cranked {
 
     class Cranked;
 
     class Menu;
 
-// Todo: Cleanup with emulator reference
-// Virtual heap strings must be manually freed (To avoid needing emulator reference)
     struct PDMenuItem_32 : NativeResource {
         enum class Type {
             Button,
@@ -29,7 +24,7 @@ namespace cranked {
 
         vheap_vector<vheap_string> options;
         vheap_string title{};
-        int32_t value{};
+        int32 value{};
         cref_t emulatedCallback{};
         cref_t userdata{};
     };
@@ -46,20 +41,20 @@ namespace cranked {
 
         void render();
 
-        void setImage(LCDBitmap_32 *bitmap, int xOffset);
+        void setImage(Bitmap bitmap, int xOffset);
 
-        PDMenuItem_32 *addItem(const std::string &title, PDMenuItem_32::Type type, const std::vector<std::string> &options, int value, cref_t emulatedCallback, int luaCallback);
+        MenuItem addItem(const string &title, PDMenuItem_32::Type type, const vector<string> &options, int value, cref_t emulatedCallback, int luaCallback);
 
-        void removeItem(PDMenuItem_32 *item);
+        void removeItem(MenuItem item);
 
         void clearItems();
 
-        int findItem(PDMenuItem_32 *item);
+        int findItem(MenuItem item);
 
         Cranked &cranked;
         bool isOpen{};
-        std::vector<ResourcePtr<PDMenuItem_32>> items{MAX_ITEMS};
-        ResourcePtr<LCDBitmap_32> image;
+        MenuItemRef items[MAX_ITEMS];
+        BitmapRef image;
         int imageXOffset{};
     };
 

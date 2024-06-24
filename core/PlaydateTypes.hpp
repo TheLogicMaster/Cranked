@@ -1,18 +1,10 @@
 #pragma once
 
-#include "Constants.hpp"
-#include "Utils.hpp"
-
-#include <cstdint>
-#include <vector>
-#include <string>
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
+#include "NativeResource.hpp"
 
 namespace cranked {
 
-    typedef uint32_t cref_t;
+    typedef uint32 cref_t;
     typedef float MIDINote;
 
     enum class ArgType {
@@ -30,10 +22,11 @@ namespace cranked {
         ptr_t, // Translation from virtual to native addresses is done
         varargs_t, // Requires format string parameter proceeding it
         va_list_t, // Requires format string parameter proceeding it
-        // Structs of N 32-bit integers (For parameters, it's passed in consecutive registers then overflows into stack, extra param for pointer as return value)
+        // Structs of N 32-bit integers or floats (For parameters, it's passed in consecutive registers then overflows into stack, extra param for pointer as return value)
         // Smaller types work fine so long as they are padded to be 32-bit (Two consecutive char types would be an issue)
         struct2_t,
         struct4_t,
+        struct4f_t,
     };
 
     struct NativeFunctionMetadata {
@@ -43,7 +36,7 @@ namespace cranked {
         const ArgType returnType;
     };
 
-    enum class PDSystemEvent : int32_t {
+    enum class PDSystemEvent : int32 {
         Init,
         InitLua,
         Lock,
@@ -56,7 +49,7 @@ namespace cranked {
         LowPower,
     };
 
-    enum class PDButtons : int32_t {
+    enum class PDButtons : int32 {
         Left = 1 << 0,
         Right = 1 << 1,
         Up = 1 << 2,
@@ -67,19 +60,19 @@ namespace cranked {
         Menu = 1 << 7,
     };
 
-    enum class PDLanguage : int32_t {
+    enum class PDLanguage : int32 {
         English,
         Japanese,
         Unknown,
     };
 
-    enum class PDPeripherals : int32_t {
+    enum class PDPeripherals : int32 {
         None,
         Accelerometer,
         All = 0xFFFF,
     };
 
-    enum class JsonValueType : int32_t {
+    enum class JsonValueType : int32 {
         Null,
         True,
         False,
@@ -90,7 +83,7 @@ namespace cranked {
         Table,
     };
 
-    enum class FileOptions : int32_t {
+    enum class FileOptions : int32 {
         Read = 1 << 0, // Only read ROM
         ReadData = 1 << 1, // Only read data
         Write = 1 << 2,
@@ -98,7 +91,7 @@ namespace cranked {
         ReadDataFallback = Read | ReadData, // Read data then fallback to ROM
     };
 
-    enum class DitherType : int32_t {
+    enum class DitherType : int32 {
         None,
         DiagonalLine,
         VerticalLine,
@@ -112,7 +105,7 @@ namespace cranked {
         Atkinson,
     };
 
-    enum class LCDBitmapDrawMode : int32_t {
+    enum class LCDBitmapDrawMode : int32 {
         Copy,
         WhiteTransparent,
         BlackTransparent,
@@ -123,50 +116,50 @@ namespace cranked {
         Inverted,
     };
 
-    enum class LCDBitmapFlip : int32_t {
+    enum class LCDBitmapFlip : int32 {
         Unflipped,
         FlippedX,
         FlippedY,
         FlippedXY,
     };
 
-    enum class LCDSolidColor : int32_t {
+    enum class LCDSolidColor : int32 {
         Black,
         White,
         Clear,
         XOR,
     };
 
-    enum class LCDLineCapStyle : int32_t {
+    enum class LCDLineCapStyle : int32 {
         Butt,
         Square,
         Round,
     };
 
-    enum class LCDFontLanguage : int32_t {
+    enum class LCDFontLanguage : int32 {
         English,
         Japanese,
         Unknown,
     };
 
-    enum class PDStringEncoding : int32_t {
+    enum class PDStringEncoding : int32 {
         ASCII,
         UFT8,
         LE16Bit,
     };
 
-    enum class LCDPolygonFillRule : int32_t {
+    enum class LCDPolygonFillRule : int32 {
         NonZero,
         EvenOdd,
     };
 
-    enum class StrokeLocation : int32_t {
+    enum class StrokeLocation : int32 {
         Centered,
         Outside,
         Inside,
     };
 
-    enum class SoundFormat : int32_t {
+    enum class SoundFormat : int32 {
         Mono8bit,
         Stereo8bit,
         Mono16bit,
@@ -175,7 +168,7 @@ namespace cranked {
         StereoADPCM,
     };
 
-    enum class LFOType : int32_t {
+    enum class LFOType : int32 {
         Square,
         Triangle,
         Sine,
@@ -186,7 +179,7 @@ namespace cranked {
         Function,
     };
 
-    enum class SoundWaveform : int32_t {
+    enum class SoundWaveform : int32 {
         Square,
         Triangle,
         Sine,
@@ -197,7 +190,7 @@ namespace cranked {
         POVosim,
     };
 
-    enum class TwoPoleFilterType : int32_t {
+    enum class TwoPoleFilterType : int32 {
         LowPass,
         HighPass,
         BandPass,
@@ -207,79 +200,140 @@ namespace cranked {
         HighShelf,
     };
 
-    enum class MicSource : int32_t {
+    enum class MicSource : int32 {
         Autodetect,
         Internal,
         Headset
     };
 
     struct LCDVideoPlayer_32;
+    typedef LCDVideoPlayer_32 *VideoPlayer;
+    typedef ResourceRef<LCDVideoPlayer_32> VideoPlayerRef;
 
     struct LCDBitmap_32;
+    typedef LCDBitmap_32 *Bitmap;
+    typedef ResourceRef<LCDBitmap_32> BitmapRef;
 
     struct LCDBitmapTable_32;
+    typedef LCDBitmapTable_32 *BitmapTable;
+    typedef ResourceRef<LCDBitmapTable_32> BitmapTableRef;
 
     struct LCDFont_32;
+    typedef LCDFont_32 *Font;
+    typedef ResourceRef<LCDFont_32> FontRef;
 
     struct LCDFontPage_32;
+    typedef LCDFontPage_32 *FontPage;
+    typedef ResourceRef<LCDFontPage_32> FontPageRef;
 
-    struct LCDFontData_32 {
-    }; // Presumably this is just a plain data buffer
+    struct LCDFontData_32 {}; // Presumably this is just a plain data buffer
 
     struct LCDFontGlyph_32;
+    typedef LCDFontGlyph_32 *FontGlyph;
+    typedef ResourceRef<LCDFontGlyph_32> FontGlyphRef;
 
     struct PDMenuItem_32;
+    typedef PDMenuItem_32 *MenuItem;
+    typedef ResourceRef<PDMenuItem_32> MenuItemRef;
 
     struct SDFile_32;
+    typedef SDFile_32 *File;
+    typedef ResourceRef<SDFile_32> FileRef;
 
     struct LuaUDObject_32 {
         // Todo: Possibly void* equivalent, maybe holds either a stack index or a global table key, maybe a structure that can point to a global table
     };
 
     struct LCDSprite_32;
+    typedef LCDSprite_32 *Sprite;
+    typedef ResourceRef<LCDSprite_32> SpriteRef;
 
     struct SoundSource_32;
+    typedef SoundSource_32 *SoundSource;
+    typedef ResourceRef<SoundSource_32> SoundSourceRef;
 
     struct FilePlayer_32;
+    typedef FilePlayer_32 *FilePlayer;
+    typedef ResourceRef<FilePlayer_32> FilePlayerRef;
 
     struct AudioSample_32;
+    typedef AudioSample_32 *AudioSample;
+    typedef ResourceRef<AudioSample_32> AudioSampleRef;
 
     struct SamplePlayer_32;
+    typedef SamplePlayer_32 *SamplePlayer;
+    typedef ResourceRef<SamplePlayer_32> SamplePlayerRef;
 
     struct PDSynthSignal_32;
+    typedef PDSynthSignal_32 *SynthSignal;
+    typedef ResourceRef<PDSynthSignal_32> SynthSignalRef;
 
     struct PDSynthLFO_32;
+    typedef PDSynthLFO_32 *SynthLFO;
+    typedef ResourceRef<PDSynthLFO_32> SynthLFORef;
 
     struct PDSynthEnvelope_32;
+    typedef PDSynthEnvelope_32 *SynthEnvelope;
+    typedef ResourceRef<PDSynthEnvelope_32> SynthEnvelopeRef;
 
     struct PDSynth_32;
+    typedef PDSynth_32 *Synth;
+    typedef ResourceRef<PDSynth_32> SynthRef;
 
     struct ControlSignal_32;
+    typedef ControlSignal_32 *ControlSignal;
+    typedef ResourceRef<ControlSignal_32> ControlSignalRef;
 
     struct PDSynthInstrument_32;
+    typedef PDSynthInstrument_32 *SynthInstrument;
+    typedef ResourceRef<PDSynthInstrument_32> SynthInstrumentRef;
 
     struct SequenceTrack_32;
+    typedef SequenceTrack_32 *SequenceTrack;
+    typedef ResourceRef<SequenceTrack_32> SequenceTrackRef;
 
     struct SoundSequence_32;
+    typedef SoundSequence_32 *SoundSequence;
+    typedef ResourceRef<SoundSequence_32> SoundSequenceRef;
 
     struct TwoPoleFilter_32;
+    typedef TwoPoleFilter_32 *TwoPoleFilter;
+    typedef ResourceRef<TwoPoleFilter_32> TwoPoleFilterRef;
 
     struct PDSynthSignalValue_32;
+    typedef PDSynthSignalValue_32 *SynthSignalValue;
+    typedef ResourceRef<PDSynthSignalValue_32> SynthSignalValueRef;
 
     struct OnePoleFilter_32;
+    typedef OnePoleFilter_32 *OnePoleFilter;
+    typedef ResourceRef<OnePoleFilter_32> OnePoleFilterRef;
 
     struct BitCrusher_32;
+    typedef BitCrusher_32 *BitCrusher;
+    typedef ResourceRef<BitCrusher_32> BitCrusherRef;
 
     struct RingModulator_32;
+    typedef RingModulator_32 *RingModulator;
+    typedef ResourceRef<RingModulator_32> RingModularRef;
 
     struct DelayLine_32;
+    typedef DelayLine_32 *DelayLine;
+    typedef ResourceRef<DelayLine_32> DelayLineRef;
 
     struct DelayLineTap_32;
+    typedef DelayLineTap_32 *DelayLineTap;
+    typedef ResourceRef<DelayLineTap_32> DelayLineTapRef;
 
     struct Overdrive_32;
+    typedef Overdrive_32 *Overdrive;
+    typedef ResourceRef<Overdrive_32> OverdriveRef;
 
     struct SoundEffect_32;
+    typedef SoundEffect_32 *SoundEffect;
+    typedef ResourceRef<SoundEffect_32> SoundEffectRef;
 
     struct SoundChannel_32;
+    typedef SoundChannel_32 *SoundChannel;
+    typedef ResourceRef<SoundChannel_32> SoundChannelRef;
 
 }

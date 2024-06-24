@@ -1,13 +1,10 @@
 #include "HeapAllocator.hpp"
 #include "Utils.hpp"
 
-#include <cstdlib>
-#include <cstring>
-
 using namespace cranked;
 
 HeapAllocator::HeapAllocator(size_t size) : totalSize(size), freeList(nullptr) {
-    startPtr = std::aligned_alloc(4096, size);
+    startPtr = aligned_alloc(4096, size);
     reset();
 }
 
@@ -22,7 +19,7 @@ void *HeapAllocator::allocate(size_t size) {
     Node *node, *previous;
     find(blockSize, previous, node);
     if (!node)
-        throw std::bad_alloc();
+        throw bad_alloc();
 
     auto remaining = node->size - blockSize;
 

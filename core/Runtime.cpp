@@ -1,68 +1,72 @@
 #include "Cranked.hpp"
 #include "gen/PlaydateAPI.hpp"
 
-#include <filesystem>
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "readability-non-const-parameter"
 
 using namespace cranked;
 
-LCDVideoPlayer_32 *cranked::playdate_video_loadVideo(Cranked *cranked, uint8_t *path) {
+VideoPlayer cranked::playdate_video_loadVideo(Cranked *cranked, uint8 *path) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_video_freePlayer(Cranked *cranked, LCDVideoPlayer_32 *p) {
+void cranked::playdate_video_freePlayer(Cranked *cranked, VideoPlayer p) {
     // Todo
 }
 
-int32_t cranked::playdate_video_setContext(Cranked *cranked, LCDVideoPlayer_32 *p, LCDBitmap_32 *context) {
+int32 cranked::playdate_video_setContext(Cranked *cranked, VideoPlayer p, Bitmap context) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_video_useScreenContext(Cranked *cranked, LCDVideoPlayer_32 *p) {
+void cranked::playdate_video_useScreenContext(Cranked *cranked, VideoPlayer p) {
     // Todo
 }
 
-int32_t cranked::playdate_video_renderFrame(Cranked *cranked, LCDVideoPlayer_32 *p, int32_t n) {
+int32 cranked::playdate_video_renderFrame(Cranked *cranked, VideoPlayer p, int32 n) {
     // Todo
     return 0;
 }
 
-uint8_t *cranked::playdate_video_getError(Cranked *cranked, LCDVideoPlayer_32 *p) {
+uint8 *cranked::playdate_video_getError(Cranked *cranked, VideoPlayer p) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_video_getInfo(Cranked *cranked, LCDVideoPlayer_32 *p, int32_t *outWidth, int32_t *outHeight, float *outFrameRate, int32_t *outFrameCount, int32_t *outCurrentFrame) {
+void cranked::playdate_video_getInfo(Cranked *cranked, VideoPlayer p, int32 *outWidth, int32 *outHeight, float *outFrameRate, int32 *outFrameCount, int32 *outCurrentFrame) {
     // Todo
 }
 
-LCDBitmap_32 *cranked::playdate_video_getContext(Cranked *cranked, LCDVideoPlayer_32 *p) {
+Bitmap cranked::playdate_video_getContext(Cranked *cranked, VideoPlayer p) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_graphics_clear(Cranked *cranked, uint32_t color) {
+void cranked::playdate_graphics_clear(Cranked *cranked, uint32 color) {
     cranked->graphics.frameBufferContext.bitmap->clear(color);
 }
 
-void cranked::playdate_graphics_setBackgroundColor(Cranked *cranked, int32_t color) {
+void cranked::playdate_graphics_setBackgroundColor(Cranked *cranked, int32 color) {
     cranked->graphics.getCurrentDisplayContext().backgroundColor = LCDSolidColor(color);
 }
 
-void cranked::playdate_graphics_setStencil(Cranked *cranked, LCDBitmap_32 *stencil) {
+void cranked::playdate_graphics_setStencil(Cranked *cranked, Bitmap stencil) {
     cranked->graphics.getCurrentDisplayContext().stencilImage = stencil;
 }
 
-void cranked::playdate_graphics_setDrawMode(Cranked *cranked, int32_t mode) {
-    cranked->graphics.getCurrentDisplayContext().bitmapDrawMode = LCDBitmapDrawMode(mode);
+int32 cranked::playdate_graphics_setDrawMode(Cranked *cranked, int32 mode) {
+    auto &context = cranked->graphics.getCurrentDisplayContext();
+    auto prev = context.bitmapDrawMode;
+    context.bitmapDrawMode = LCDBitmapDrawMode(mode);
+    return (int32)prev;
 }
 
-void cranked::playdate_graphics_setDrawOffset(Cranked *cranked, int32_t dx, int32_t dy) {
+void cranked::playdate_graphics_setDrawOffset(Cranked *cranked, int32 dx, int32 dy) {
     cranked->graphics.getCurrentDisplayContext().drawOffset = {dx, dy};
 }
 
-void cranked::playdate_graphics_setClipRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height) {
+void cranked::playdate_graphics_setClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
     cranked->graphics.getCurrentDisplayContext().clipRect = {x, y, width, height};
 }
 
@@ -70,19 +74,19 @@ void cranked::playdate_graphics_clearClipRect(Cranked *cranked) {
     cranked->graphics.getCurrentDisplayContext().clipRect = {};
 }
 
-void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32_t endCapStyle) {
+void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32 endCapStyle) {
     cranked->graphics.getCurrentDisplayContext().lineEndCapStyle = LCDLineCapStyle(endCapStyle);
 }
 
-void cranked::playdate_graphics_setFont(Cranked *cranked, LCDFont_32 *font) {
+void cranked::playdate_graphics_setFont(Cranked *cranked, Font font) {
     cranked->graphics.getCurrentDisplayContext().font = font;
 }
 
-void cranked::playdate_graphics_setTextTracking(Cranked *cranked, int32_t tracking) {
+void cranked::playdate_graphics_setTextTracking(Cranked *cranked, int32 tracking) {
     cranked->graphics.getCurrentDisplayContext().textTracking = tracking;
 }
 
-void cranked::playdate_graphics_pushContext(Cranked *cranked, LCDBitmap_32 *target) {
+void cranked::playdate_graphics_pushContext(Cranked *cranked, Bitmap target) {
     cranked->graphics.pushContext(target);
 }
 
@@ -90,82 +94,82 @@ void cranked::playdate_graphics_popContext(Cranked *cranked) {
     cranked->graphics.popContext();
 }
 
-void cranked::playdate_graphics_drawBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t x, int32_t y, int32_t flip) {
+void cranked::playdate_graphics_drawBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, int32 flip) {
     cranked->graphics.drawBitmap(bitmap, x, y, LCDBitmapFlip(flip));
 }
 
-void cranked::playdate_graphics_tileBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t x, int32_t y, int32_t width, int32_t height, int32_t flip) {
+void cranked::playdate_graphics_tileBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, int32 width, int32 height, int32 flip) {
     // Todo
 }
 
-void cranked::playdate_graphics_drawLine(Cranked *cranked, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t width, uint32_t color) {
+void cranked::playdate_graphics_drawLine(Cranked *cranked, int32 x1, int32 y1, int32 x2, int32 y2, int32 width, uint32 color) {
     cranked->graphics.drawLine(x1, y1, x2, y2, width, color);
 }
 
-void cranked::playdate_graphics_fillTriangle(Cranked *cranked, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, uint32_t color) {
+void cranked::playdate_graphics_fillTriangle(Cranked *cranked, int32 x1, int32 y1, int32 x2, int32 y2, int32 x3, int32 y3, uint32 color) {
     cranked->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, color);
 }
 
-void cranked::playdate_graphics_drawRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, uint32_t color) {
+void cranked::playdate_graphics_drawRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, uint32 color) {
     cranked->graphics.drawRect(x, y, width, height, color);
 }
 
-void cranked::playdate_graphics_fillRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, uint32_t color) {
+void cranked::playdate_graphics_fillRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, uint32 color) {
     cranked->graphics.fillRect(x, y, width, height, color);
 }
 
-void cranked::playdate_graphics_drawEllipse(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, int32_t lineWidth, float startAngle, float endAngle, uint32_t color) {
+void cranked::playdate_graphics_drawEllipse(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, int32 lineWidth, float startAngle, float endAngle, uint32 color) {
     cranked->graphics.drawEllipse(x, y, width, height, lineWidth, startAngle, endAngle, color, false);
 }
 
-void cranked::playdate_graphics_fillEllipse(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, float startAngle, float endAngle, uint32_t color) {
+void cranked::playdate_graphics_fillEllipse(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, float startAngle, float endAngle, uint32 color) {
     cranked->graphics.drawEllipse(x, y, width, height, 0, startAngle, endAngle, color, true);
 }
 
-void cranked::playdate_graphics_drawScaledBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t x, int32_t y, float xscale, float yscale) {
+void cranked::playdate_graphics_drawScaledBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, float xscale, float yscale) {
     // Todo
 }
 
-int32_t cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32_t len, int32_t encoding, int32_t x, int32_t y) {
-    cranked->graphics.drawText(text, len, PDStringEncoding(encoding), x, y);
+int32 cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32 len, int32 encoding, int32 x, int32 y) {
+    cranked->graphics.drawText(text, (int)len, PDStringEncoding(encoding), x, y);
     return 0; // Todo: Return value?
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_newBitmap(Cranked *cranked, int32_t width, int32_t height, uint32_t bgcolor) {
+Bitmap cranked::playdate_graphics_newBitmap(Cranked *cranked, int32 width, int32 height, uint32 bgcolor) {
     auto bitmap = cranked->graphics.createBitmap(width, height);
     bitmap->reference();
     bitmap->clear(bgcolor);
     return bitmap;
 }
 
-void cranked::playdate_graphics_freeBitmap(Cranked *cranked, LCDBitmap_32 *ptr) {
+void cranked::playdate_graphics_freeBitmap(Cranked *cranked, Bitmap ptr) {
     ptr->dereference();
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_loadBitmap(Cranked *cranked, uint8_t *path, cref_t *outerr) {
+Bitmap cranked::playdate_graphics_loadBitmap(Cranked *cranked, uint8 *path, cref_t *outerr) {
     try {
         return cranked->graphics.getImage((const char *) path);
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
     }
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_copyBitmap(Cranked *cranked, LCDBitmap_32 *bitmap) {
+Bitmap cranked::playdate_graphics_copyBitmap(Cranked *cranked, Bitmap bitmap) {
     return cranked->heap.construct<LCDBitmap_32>(*bitmap);
 }
 
-void cranked::playdate_graphics_loadIntoBitmap(Cranked *cranked, uint8_t *path, LCDBitmap_32 *bitmap, cref_t *outerr) {
+void cranked::playdate_graphics_loadIntoBitmap(Cranked *cranked, uint8 *path, Bitmap bitmap, cref_t *outerr) {
     try {
-        ResourcePtr<LCDBitmap_32> loaded(cranked->graphics.getImage((const char *) path));
+        ResourceRef<LCDBitmap_32> loaded(cranked->graphics.getImage((const char *) path));
         *bitmap = *loaded;
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         if (outerr)
             *outerr = cranked->getEmulatedStringLiteral(ex.what());
     }
 }
 
-void cranked::playdate_graphics_getBitmapData(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t *width, int32_t *height, int32_t *rowbytes, cref_t *mask, cref_t *data) {
+void cranked::playdate_graphics_getBitmapData(Cranked *cranked, Bitmap bitmap, int32 *width, int32 *height, int32 *rowbytes, cref_t *mask, cref_t *data) {
     *width = bitmap->width;
     *height = bitmap->height;
     *rowbytes = 1 + bitmap->width / 8;
@@ -173,90 +177,90 @@ void cranked::playdate_graphics_getBitmapData(Cranked *cranked, LCDBitmap_32 *bi
     *mask = cranked->toVirtualAddress(bitmap->mask ? bitmap->mask->data.data() : nullptr);
 }
 
-void cranked::playdate_graphics_clearBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, uint32_t bgcolor) {
+void cranked::playdate_graphics_clearBitmap(Cranked *cranked, Bitmap bitmap, uint32 bgcolor) {
     bitmap->clear(bgcolor);
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_rotatedBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, float rotation, float xscale, float yscale, int32_t *allocedSize) {
+Bitmap cranked::playdate_graphics_rotatedBitmap(Cranked *cranked, Bitmap bitmap, float rotation, float xscale, float yscale, int32 *allocedSize) {
     // Todo
     return nullptr;
 }
 
-LCDBitmapTable_32 *cranked::playdate_graphics_newBitmapTable(Cranked *cranked, int32_t count, int32_t width, int32_t height) {
+BitmapTable cranked::playdate_graphics_newBitmapTable(Cranked *cranked, int32 count, int32 width, int32 height) {
     auto table = cranked->graphics.createBitmapTable(count);
     table->reference();
     return table;
 }
 
-void cranked::playdate_graphics_freeBitmapTable(Cranked *cranked, LCDBitmapTable_32 *table) {
+void cranked::playdate_graphics_freeBitmapTable(Cranked *cranked, BitmapTable table) {
     table->dereference();
 }
 
-LCDBitmapTable_32 *cranked::playdate_graphics_loadBitmapTable(Cranked *cranked, uint8_t *path, cref_t *outerr) {
+BitmapTable cranked::playdate_graphics_loadBitmapTable(Cranked *cranked, uint8 *path, cref_t *outerr) {
     try {
         auto table = cranked->graphics.getBitmapTable((const char *) path);
         table->reference();
         return table;
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
     }
 }
 
-void cranked::playdate_graphics_loadIntoBitmapTable(Cranked *cranked, uint8_t *path, LCDBitmapTable_32 *table, cref_t *outerr) {
+void cranked::playdate_graphics_loadIntoBitmapTable(Cranked *cranked, uint8 *path, BitmapTable table, cref_t *outerr) {
     try {
-        ResourcePtr<LCDBitmapTable_32> loaded(cranked->graphics.getBitmapTable((const char *) path));
+        ResourceRef<LCDBitmapTable_32> loaded(cranked->graphics.getBitmapTable((const char *) path));
         *table = *loaded;
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
     }
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_getTableBitmap(Cranked *cranked, LCDBitmapTable_32 *table, int32_t idx) {
+Bitmap cranked::playdate_graphics_getTableBitmap(Cranked *cranked, BitmapTable table, int32 idx) {
     return idx < table->bitmaps.size() ? table->bitmaps[idx].get() : nullptr;
 }
 
-LCDFont_32 *cranked::playdate_graphics_loadFont(Cranked *cranked, uint8_t *path, cref_t *outerr) {
+Font cranked::playdate_graphics_loadFont(Cranked *cranked, uint8 *path, cref_t *outerr) {
     try {
         auto font = cranked->graphics.getFont((const char *) path);
         font->reference();
         return font;
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
     }
 }
 
-LCDFontPage_32 *cranked::playdate_graphics_getFontPage(Cranked *cranked, LCDFont_32 *font, uint32_t c) {
+FontPage cranked::playdate_graphics_getFontPage(Cranked *cranked, Font font, uint32 c) {
     try {
-        return font->pages.at(c / 256).get();
-    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
+        return font->pages.at((int)c / 256).get();
+    } catch (out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
 
-LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, LCDFontPage_32 *page, uint32_t c, cref_t *bitmap, int32_t *advance) {
+LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, FontPage page, uint32 c, cref_t *bitmap, int32 *advance) {
     try {
-        auto &glyph = page->glyphs.at(c % 256);
+        auto &glyph = page->glyphs.at((int)c % 256);
         if (bitmap)
             *bitmap = cranked->toVirtualAddress(glyph->bitmap.get());
         if (advance)
             *advance = glyph->advance;
         return glyph.get();
-    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
+    } catch (out_of_range &ex) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
 
-int32_t cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_32 *glyph, uint32_t glyphcode, uint32_t nextcode) {
+int32 cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_32 *glyph, uint32 glyphcode, uint32 nextcode) {
     try {
         return nextcode < 256 ? glyph->shortKerningTable.at((int)nextcode) : glyph->longKerningTable.at((int)nextcode);
-    } catch (std::out_of_range &ex) { // Todo: Don't use exceptions
+    } catch (out_of_range &ex) { // Todo: Don't use exceptions
         return 0;
     }
 }
 
-int32_t cranked::playdate_graphics_getTextWidth(Cranked *cranked, LCDFont_32 *font, void *text, uint32_t len, int32_t encoding, int32_t tracking) {
+int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void *text, uint32 len, int32 encoding, int32 tracking) {
     // Todo: Support other encodings
     int size = 0;
     auto string = (const char *) text;
@@ -266,7 +270,7 @@ int32_t cranked::playdate_graphics_getTextWidth(Cranked *cranked, LCDFont_32 *fo
         size += font->glyphWidth;
         try {
             glyph = font->pages.at(character / 256)->glyphs.at(character % 256).get();
-        } catch (std::out_of_range &ex) {}
+        } catch (out_of_range &ex) {}
         if (glyph) {
             size += glyph->advance;
             // Todo: Kerning
@@ -278,19 +282,19 @@ int32_t cranked::playdate_graphics_getTextWidth(Cranked *cranked, LCDFont_32 *fo
     return size;
 }
 
-uint8_t *cranked::playdate_graphics_getFrame(Cranked *cranked) {
-    return (uint8_t *) cranked->graphics.frameBuffer->data.data();
+uint8 *cranked::playdate_graphics_getFrame(Cranked *cranked) {
+    return (uint8 *) cranked->graphics.frameBuffer->data.data();
 }
 
-uint8_t *cranked::playdate_graphics_getDisplayFrame(Cranked *cranked) {
-    return (uint8_t *) cranked->graphics.previousFrameBuffer->data.data();
+uint8 *cranked::playdate_graphics_getDisplayFrame(Cranked *cranked) {
+    return (uint8 *) cranked->graphics.previousFrameBuffer->data.data();
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_copyFrameBufferBitmap(Cranked *cranked) {
+Bitmap cranked::playdate_graphics_copyFrameBufferBitmap(Cranked *cranked) {
     return cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer);
 }
 
-void cranked::playdate_graphics_markUpdatedRows(Cranked *cranked, int32_t start, int32_t end) {
+void cranked::playdate_graphics_markUpdatedRows(Cranked *cranked, int32 start, int32 end) {
     // Not needed, since getFrame() returns the actual frame buffer
 }
 
@@ -298,66 +302,79 @@ void cranked::playdate_graphics_display(Cranked *cranked) {
     cranked->graphics.flushDisplayBuffer();
 }
 
-void cranked::playdate_graphics_setColorToPattern(Cranked *cranked, uint32_t *color, LCDBitmap_32 *bitmap, int32_t x, int32_t y) {
+void cranked::playdate_graphics_setColorToPattern(Cranked *cranked, uint32 *color, Bitmap bitmap, int32 x, int32 y) {
     // Todo
 }
 
-int32_t cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, LCDBitmap_32 *bitmap1, int32_t x1, int32_t y1, int32_t flip1, LCDBitmap_32 *bitmap2, int32_t x2, int32_t y2, int32_t flip2, LCDRect_32 rect) {
+int32 cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, Bitmap bitmap1, int32 x1, int32 y1, int32 flip1, Bitmap bitmap2, int32 x2, int32 y2, int32 flip2, LCDRect_32 rect) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_graphics_setScreenClipRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height) {
+void cranked::playdate_graphics_setScreenClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
     cranked->graphics.getCurrentDisplayContext().clipRect = {x, y, width, height};
 }
 
-void cranked::playdate_graphics_fillPolygon(Cranked *cranked, int32_t nPoints, int32_t *coords, uint32_t color, int32_t fillrule) {
+void cranked::playdate_graphics_fillPolygon(Cranked *cranked, int32 nPoints, int32 *coords, uint32 color, int32 fillrule) {
     // Todo
 }
 
-uint8_t cranked::playdate_graphics_getFontHeight(Cranked *cranked, LCDFont_32 *font) {
+uint8 cranked::playdate_graphics_getFontHeight(Cranked *cranked, Font font) {
     // Todo
     return 0;
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
+Bitmap cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
     return cranked->graphics.frameBuffer.get();
 }
 
-void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t x, int32_t y, float rotation, float centerx, float centery, float xscale, float yscale) {
+void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, float rotation, float centerx, float centery, float xscale, float yscale) {
     // Todo
 }
 
-void cranked::playdate_graphics_setTextLeading(Cranked *cranked, int32_t lineHeightAdustment) {
+void cranked::playdate_graphics_setTextLeading(Cranked *cranked, int32 lineHeightAdustment) {
     cranked->graphics.getCurrentDisplayContext().textLeading = lineHeightAdustment;
 }
 
-int32_t cranked::playdate_graphics_setBitmapMask(Cranked *cranked, LCDBitmap_32 *bitmap, LCDBitmap_32 *mask) {
+int32 cranked::playdate_graphics_setBitmapMask(Cranked *cranked, Bitmap bitmap, Bitmap mask) {
     bitmap->mask = mask;
     return 0; // Todo: Return value?
 }
 
-LCDBitmap_32 *cranked::playdate_graphics_getBitmapMask([[maybe_unused]] Cranked *cranked, LCDBitmap_32 *bitmap) {
+Bitmap cranked::playdate_graphics_getBitmapMask([[maybe_unused]] Cranked *cranked, Bitmap bitmap) {
     if (!bitmap->mask)
         return nullptr;
     bitmap->mask->reference();
     return bitmap->mask.get();
 }
 
-void cranked::playdate_graphics_setStencilImage(Cranked *cranked, LCDBitmap_32 *stencil, int32_t tile) {
+void cranked::playdate_graphics_setStencilImage(Cranked *cranked, Bitmap stencil, int32 tile) {
     cranked->graphics.getCurrentDisplayContext().stencilImage = stencil;
     cranked->graphics.getCurrentDisplayContext().stencilTiled = tile;
 }
 
-LCDFont_32 *cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 *data, int32_t wide) {
-    return cranked->graphics.getFont((uint8_t *) data, wide);
+Font cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 *data, int32 wide) {
+    return cranked->graphics.getFont((uint8 *) data, wide);
 }
 
-int32_t cranked::playdate_graphics_getTextTracking(Cranked *cranked) {
+int32 cranked::playdate_graphics_getTextTracking(Cranked *cranked) {
     return cranked->graphics.getCurrentDisplayContext().textTracking;
 }
 
-void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32_t size) {
+void cranked::playdate_graphics_setPixel(Cranked *cranked, int32 x, int32 y, uint32 c) {
+    // Todo
+}
+
+int32 cranked::playdate_graphics_getBitmapPixel(Cranked *cranked, Bitmap bitmap, int32 x, int32 y) {
+    // Todo
+    return 0;
+}
+
+void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable table, int32 *count, int32 *width) {
+    // Todo
+}
+
+void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32 size) {
     // Todo: Check for objects that need to be user freed and call destructors
     if (size == 0) {
         cranked->nativeEngine.freeResource(ptr);
@@ -366,11 +383,11 @@ void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32_t size) 
         return cranked->heap.reallocate(ptr, size);
 }
 
-int32_t cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8_t *fmt, ...) {
+int32 cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8 *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     auto size = vsnprintf(nullptr, 0, (const char *) fmt, args);
-    auto buffer = (uint8_t *) cranked->heap.allocate(size + 1);
+    auto buffer = (uint8 *) cranked->heap.allocate(size + 1);
     *ret = cranked->toVirtualAddress(buffer);
     vsprintf((char *) buffer, (const char *) fmt, args);
     va_end(args);
@@ -379,7 +396,7 @@ int32_t cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8_
 
 // Todo: Args are passed as emulated sizes, which will cause issues when `int` size is different, and such
 // Todo: Probably needs conversion when calling vararg functions
-void cranked::playdate_sys_logToConsole([[maybe_unused]] Cranked *cranked, uint8_t *fmt, ...) {
+void cranked::playdate_sys_logToConsole([[maybe_unused]] Cranked *cranked, uint8 *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
@@ -387,7 +404,7 @@ void cranked::playdate_sys_logToConsole([[maybe_unused]] Cranked *cranked, uint8
     printf("\n");// Doesn't depend on Lua setNewlinePrinted flag
 }
 
-void cranked::playdate_sys_error(Cranked *cranked, uint8_t *fmt, ...) {
+void cranked::playdate_sys_error(Cranked *cranked, uint8 *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
@@ -395,26 +412,26 @@ void cranked::playdate_sys_error(Cranked *cranked, uint8_t *fmt, ...) {
     cranked->stop();
 }
 
-int32_t cranked::playdate_sys_getLanguage([[maybe_unused]] Cranked *cranked) {
+int32 cranked::playdate_sys_getLanguage([[maybe_unused]] Cranked *cranked) {
     return (int) PDLanguage::English;
 }
 
-uint32_t cranked::playdate_sys_getCurrentTimeMilliseconds(Cranked *cranked) {
+uint32 cranked::playdate_sys_getCurrentTimeMilliseconds(Cranked *cranked) {
     return cranked->currentMillis;
 }
 
-uint32_t cranked::playdate_sys_getSecondsSinceEpoch([[maybe_unused]] Cranked *cranked, uint32_t *milliseconds) {
-    return duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+uint32 cranked::playdate_sys_getSecondsSinceEpoch([[maybe_unused]] Cranked *cranked, uint32 *milliseconds) {
+    return duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count();
 }
 
-void cranked::playdate_sys_drawFPS(Cranked *cranked, int32_t x, int32_t y) {
-    // Todo: Fix (There's probably a memory bug involved here...)
-    auto delta = duration_cast<std::chrono::milliseconds>((std::chrono::system_clock::now() - cranked->lastFrameTime)).count();
-    auto string = std::to_string(int(1000.0f / delta));
-    cranked->graphics.fillRect(x - 2, y - 2, 14 * string.size() + 2, 30, LCDSolidColor::White);
-    cranked->graphics.pushContext(cranked->graphics.getTargetBitmap());
+void cranked::playdate_sys_drawFPS(Cranked *cranked, int32 x, int32 y) {
+    // Todo: Why does this not work?
+    auto delta = duration_cast<chrono::milliseconds>((chrono::system_clock::now() - cranked->lastFrameTime)).count();
+    auto string = to_string(int(1000.0f / (float)delta));
+    cranked->graphics.fillRect(x - 2, y - 2, 14 * (int)string.size() + 2, 30, LCDSolidColor::White);
+    cranked->graphics.pushContext(cranked->graphics.frameBuffer.get());
     cranked->graphics.getCurrentDisplayContext().bitmapDrawMode = LCDBitmapDrawMode::Copy;
-    cranked->graphics.drawText(string.c_str(), string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont.get());
+    cranked->graphics.drawText(string.c_str(), (int)string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont.get());
     cranked->graphics.popContext();
 }
 
@@ -422,13 +439,13 @@ void cranked::playdate_sys_setUpdateCallback(Cranked *cranked, cref_t update, vo
     cranked->nativeEngine.setUpdateCallback(update, cranked->toVirtualAddress(userdata));
 }
 
-void cranked::playdate_sys_getButtonState(Cranked *cranked, int32_t *current, int32_t *pushed, int32_t *released) {
+void cranked::playdate_sys_getButtonState(Cranked *cranked, int32 *current, int32 *pushed, int32 *released) {
     *current = cranked->currentInputs;
     *pushed = cranked->pressedInputs;
     *released = cranked->releasedInputs;
 }
 
-void cranked::playdate_sys_setPeripheralsEnabled(Cranked *cranked, int32_t mask) {
+void cranked::playdate_sys_setPeripheralsEnabled(Cranked *cranked, int32 mask) {
     // Not needed
 }
 
@@ -446,38 +463,38 @@ float cranked::playdate_sys_getCrankAngle(Cranked *cranked) {
     return cranked->crankAngle;
 }
 
-int32_t cranked::playdate_sys_isCrankDocked(Cranked *cranked) {
+int32 cranked::playdate_sys_isCrankDocked(Cranked *cranked) {
     return cranked->crankDocked;
 }
 
-int32_t cranked::playdate_sys_setCrankSoundsDisabled(Cranked *cranked, int32_t flag) {
+int32 cranked::playdate_sys_setCrankSoundsDisabled(Cranked *cranked, int32 flag) {
     auto prev = cranked->crankSoundsEnabled;
     cranked->crankSoundsEnabled = flag;
     return prev;
 }
 
-int32_t cranked::playdate_sys_getFlipped(Cranked *cranked) {
+int32 cranked::playdate_sys_getFlipped(Cranked *cranked) {
     return cranked->systemFlipped;
 }
 
-void cranked::playdate_sys_setAutoLockDisabled(Cranked *cranked, int32_t disable) {
+void cranked::playdate_sys_setAutoLockDisabled(Cranked *cranked, int32 disable) {
     cranked->autoLockDisabled = disable;
 }
 
-void cranked::playdate_sys_setMenuImage(Cranked *cranked, LCDBitmap_32 *bitmap, int32_t xOffset) {
+void cranked::playdate_sys_setMenuImage(Cranked *cranked, Bitmap bitmap, int32 xOffset) {
     cranked->menu.setImage(bitmap, xOffset);
 }
 
-PDMenuItem_32 *cranked::playdate_sys_addMenuItem(Cranked *cranked, uint8_t *title, cref_t callback, void *userdata) {
+MenuItem cranked::playdate_sys_addMenuItem(Cranked *cranked, uint8 *title, cref_t callback, void *userdata) {
     return cranked->menu.addItem((char *) title, PDMenuItem_32::Type::Button, {}, 0, callback, 0);
 }
 
-PDMenuItem_32 *cranked::playdate_sys_addCheckmarkMenuItem(Cranked *cranked, uint8_t *title, int32_t value, cref_t callback, void *userdata) {
+MenuItem cranked::playdate_sys_addCheckmarkMenuItem(Cranked *cranked, uint8 *title, int32 value, cref_t callback, void *userdata) {
     return cranked->menu.addItem((char *) title, PDMenuItem_32::Type::Checkmark, {}, value, callback, 0);
 }
 
-PDMenuItem_32 *cranked::playdate_sys_addOptionsMenuItem(Cranked *cranked, uint8_t *title, cref_t *optionTitles, int32_t optionsCount, cref_t f, void *userdata) {
-    std::vector<std::string> options;
+MenuItem cranked::playdate_sys_addOptionsMenuItem(Cranked *cranked, uint8 *title, cref_t *optionTitles, int32 optionsCount, cref_t f, void *userdata) {
+    vector<string> options;
     for (int i = 0; i < optionsCount; i++)
         options.emplace_back((char *) cranked->fromVirtualAddress(optionTitles[i]));
     return cranked->menu.addItem((char *) title, PDMenuItem_32::Type::Options, options, 0, f, 0);
@@ -487,44 +504,44 @@ void cranked::playdate_sys_removeAllMenuItems(Cranked *cranked) {
     cranked->menu.clearItems();
 }
 
-void cranked::playdate_sys_removeMenuItem(Cranked *cranked, PDMenuItem_32 *menuItem) {
+void cranked::playdate_sys_removeMenuItem(Cranked *cranked, MenuItem menuItem) {
     cranked->menu.removeItem(menuItem);
 }
 
-int32_t cranked::playdate_sys_getMenuItemValue(Cranked *cranked, PDMenuItem_32 *menuItem) {
+int32 cranked::playdate_sys_getMenuItemValue(Cranked *cranked, MenuItem menuItem) {
     return menuItem->value;
 }
 
-void cranked::playdate_sys_setMenuItemValue(Cranked *cranked, PDMenuItem_32 *menuItem, int32_t value) {
+void cranked::playdate_sys_setMenuItemValue(Cranked *cranked, MenuItem menuItem, int32 value) {
     menuItem->value = value;
 }
 
-uint8_t *cranked::playdate_sys_getMenuItemTitle(Cranked *cranked, PDMenuItem_32 *menuItem) {
-    return (uint8_t *) menuItem->title.c_str();
+uint8 *cranked::playdate_sys_getMenuItemTitle(Cranked *cranked, MenuItem menuItem) {
+    return (uint8 *) menuItem->title.c_str();
 }
 
-void cranked::playdate_sys_setMenuItemTitle(Cranked *cranked, PDMenuItem_32 *menuItem, uint8_t *title) {
+void cranked::playdate_sys_setMenuItemTitle(Cranked *cranked, MenuItem menuItem, uint8 *title) {
     menuItem->title = (char *)title;
 }
 
-void *cranked::playdate_sys_getMenuItemUserdata(Cranked *cranked, PDMenuItem_32 *menuItem) {
+void *cranked::playdate_sys_getMenuItemUserdata(Cranked *cranked, MenuItem menuItem) {
     return cranked->fromVirtualAddress(menuItem->userdata);
 }
 
-void cranked::playdate_sys_setMenuItemUserdata(Cranked *cranked, PDMenuItem_32 *menuItem, void *ud) {
+void cranked::playdate_sys_setMenuItemUserdata(Cranked *cranked, MenuItem menuItem, void *ud) {
     menuItem->userdata = cranked->toVirtualAddress(ud);
 }
 
-int32_t cranked::playdate_sys_getReduceFlashing(Cranked *cranked) {
+int32 cranked::playdate_sys_getReduceFlashing(Cranked *cranked) {
     return cranked->tryReduceFlashing;
 }
 
 float cranked::playdate_sys_getElapsedTime(Cranked *cranked) {
-    return duration_cast<std::chrono::microseconds>((std::chrono::system_clock::now() - cranked->elapsedTimeStart)).count() / 1000000.0f;
+    return (float)duration_cast<chrono::microseconds>((chrono::system_clock::now() - cranked->elapsedTimeStart)).count() / 1000000.0f;
 }
 
 void cranked::playdate_sys_resetElapsedTime(Cranked *cranked) {
-    cranked->elapsedTimeStart = std::chrono::system_clock::now();
+    cranked->elapsedTimeStart = chrono::system_clock::now();
 }
 
 float cranked::playdate_sys_getBatteryPercentage(Cranked *cranked) {
@@ -535,19 +552,19 @@ float cranked::playdate_sys_getBatteryVoltage(Cranked *cranked) {
     return cranked->batteryVoltage;
 }
 
-int32_t cranked::playdate_sys_getTimezoneOffset(Cranked *cranked) {
+int32 cranked::playdate_sys_getTimezoneOffset(Cranked *cranked) {
     return cranked->timezoneOffset;
 }
 
-int32_t cranked::playdate_sys_shouldDisplay24HourTime(Cranked *cranked) {
+int32 cranked::playdate_sys_shouldDisplay24HourTime(Cranked *cranked) {
     return cranked->use24HourTime;
 }
 
-void cranked::playdate_sys_convertEpochToDateTime(Cranked *cranked, uint32_t epoch, PDDateTime_32 *datetime) {
+void cranked::playdate_sys_convertEpochToDateTime(Cranked *cranked, uint32 epoch, PDDateTime_32 *datetime) {
     // Todo
 }
 
-uint32_t cranked::playdate_sys_convertDateTimeToEpoch(Cranked *cranked, PDDateTime_32 *datetime) {
+uint32 cranked::playdate_sys_convertDateTimeToEpoch(Cranked *cranked, PDDateTime_32 *datetime) {
     // Todo
     return 0;
 }
@@ -556,7 +573,7 @@ void cranked::playdate_sys_clearICache(Cranked *cranked) {
     // Todo
 }
 
-void cranked::playdate_sys_setButtonCallback(Cranked *cranked, cref_t cb, void *buttonud, int32_t queuesize) {
+void cranked::playdate_sys_setButtonCallback(Cranked *cranked, cref_t cb, void *buttonud, int32 queuesize) {
     cranked->buttonCallback = cb;
     cranked->buttonCallbackUserdata = cranked->toVirtualAddress(buttonud);
     cranked->buttonCallbackQueueSize = queuesize;
@@ -566,7 +583,7 @@ void cranked::playdate_sys_setSerialMessageCallback(Cranked *cranked, cref_t cal
     cranked->serialMessageCallback = callback;
 }
 
-int32_t cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, uint8_t *fmt, ...) {
+int32 cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, uint8 *fmt, ...) {
     char *buffer{};
     va_list list{};
     va_start(list, fmt);
@@ -578,7 +595,7 @@ int32_t cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, u
         void *string = cranked->heap.allocate(size);
         memcpy(string, buffer, size);
         *outstr = cranked->toVirtualAddress(string);
-    } catch (std::bad_alloc &ex) {
+    } catch (bad_alloc &ex) {
         size = -1;
     } catch (...) {
         free(buffer);
@@ -588,22 +605,22 @@ int32_t cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, u
     return size;
 }
 
-int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_t *fmt, ...) {
+int32 cranked::playdate_sys_parseString(Cranked *cranked, uint8 *str, uint8 *fmt, ...) {
     va_list list{};
     va_start(list, fmt);
     auto string = (const char *) str;
-    auto format = (const char *) fmt;
+    auto fmtStr = (const char *) fmt;
     int stringIndex = 0;
     int formatIndex = 0;
-    int stringLen = strlen(string);
-    int formatLen = strlen(format);
+    int stringLen = (int)strlen(string);
+    int formatLen = (int)strlen(fmtStr);
     int matches = 0;
 
     while (formatIndex < formatLen) {
-        char c = format[formatIndex++];
+        char c = fmtStr[formatIndex++];
 
         if (isspace(c)) {
-            while (formatIndex < formatLen and isspace(format[formatIndex]))
+            while (formatIndex < formatLen and isspace(fmtStr[formatIndex]))
                 formatIndex++;
             if (stringIndex >= stringLen or !isspace(string[stringIndex++]))
                 break;
@@ -618,23 +635,23 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
 
         if (formatIndex >= formatLen)
             break;
-        c = format[formatIndex++];
+        c = fmtStr[formatIndex++];
 
         bool ignored = false;
         if (c == '*') {
             ignored = true;
             if (formatIndex >= formatLen)
                 break;
-            c = format[formatIndex++];
+            c = fmtStr[formatIndex++];
         }
 
         int widthStart = formatIndex - 1;
         int width = 0;
         if (isdigit(c)) {
             char *end{};
-            strtol(format + widthStart, &end, 10);
-            width = formatIndex = (end - format) - widthStart; // Todo: Verify
-            c = format[formatIndex++];
+            strtol(fmtStr + widthStart, &end, 10);
+            width = formatIndex = int(end - fmtStr) - widthStart; // Todo: Verify
+            c = fmtStr[formatIndex++];
         }
 
         bool failed = false;
@@ -677,12 +694,12 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
             }
             case '[': { // Not supporting `-` ranges
                 bool inverted = false;
-                if (formatIndex < formatLen and format[formatIndex] == '^') {
+                if (formatIndex < formatLen and fmtStr[formatIndex] == '^') {
                     inverted = true;
                     formatIndex++;
                 }
-                std::set<char> set;
-                if (formatIndex < formatLen and format[formatIndex] == ']') {
+                set<char> set;
+                if (formatIndex < formatLen and fmtStr[formatIndex] == ']') {
                     set.emplace(']');
                     formatIndex++;
                 }
@@ -691,7 +708,7 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
                         failed = true;
                         break;
                     }
-                    c = format[formatIndex++];
+                    c = fmtStr[formatIndex++];
                     if (c == ']')
                         break;
                     set.emplace(c);
@@ -729,8 +746,8 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
                     stringIndex++;
                 }
                 int modifierCount = stringIndex - start;
-                int64_t result{};
-                uint64_t uresult{};
+                int64 result{};
+                uint64 uresult{};
                 char *end{};
                 switch (c) {
                     default:
@@ -793,38 +810,38 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
                     switch (type) {
                         default:
                         case ArgType::int8_t:
-                            *va_arg(list, int8_t *) = result;
+                            *va_arg(list, int8 *) = (int8)result;
                             break;
                         case ArgType::uint8_t:
-                            *va_arg(list, uint8_t *) = result;
+                            *va_arg(list, uint8 *) = result;
                             break;
                         case ArgType::int16_t:
-                            *va_arg(list, int16_t *) = result;
+                            *va_arg(list, int16 *) = (int16)result;
                             break;
                         case ArgType::uint16_t:
-                            *va_arg(list, uint16_t *) = result;
+                            *va_arg(list, uint16 *) = result;
                             break;
                         case ArgType::int32_t:
-                            *va_arg(list, int32_t *) = result;
+                            *va_arg(list, int32 *) = (int32)result;
                             break;
                         case ArgType::uint32_t:
-                            *va_arg(list, uint32_t *) = result;
+                            *va_arg(list, uint32 *) = result;
                             break;
                         case ArgType::int64_t:
-                            *va_arg(list, int64_t *) = result;
+                            *va_arg(list, int64 *) = result;
                             break;
                         case ArgType::uint64_t:
-                            *va_arg(list, uint64_t *) = result;
+                            *va_arg(list, uint64 *) = result;
                             break;
                     }
                 }
-                stringIndex = end - string;
+                stringIndex = int(end - string);
                 matches++;
                 break;
             }
             case 'n':
                 if (!ignored)
-                    *va_arg(list, int32_t *) = stringIndex;
+                    *va_arg(list, int32 *) = stringIndex;
                 break;
             case 'a':
             case 'A':
@@ -857,7 +874,7 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
                     if (!ignored)
                         *va_arg(list, float *) = value;
                 }
-                stringIndex = end - string;
+                stringIndex = int(end - string);
                 matches++;
                 break;
             }
@@ -870,7 +887,7 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
                 }
                 if (!ignored)
                     *va_arg(list, cref_t *) = ptr;
-                stringIndex = end - string;
+                stringIndex = int(end - string);
                 matches++;
                 break;
             }
@@ -887,7 +904,7 @@ int32_t cranked::playdate_sys_parseString(Cranked *cranked, uint8_t *str, uint8_
     return matches;
 }
 
-int32_t cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8_t *name, cref_t *outErr) {
+int32 cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8 *name, cref_t *outErr) {
     if (!cranked->getLuaContext()) {
         if (outErr)
             *outErr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
@@ -900,7 +917,7 @@ int32_t cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8_t *n
     return 1;
 }
 
-int32_t cranked::playdate_lua_registerClass(Cranked *cranked, uint8_t *name, lua_reg_32 *reg, lua_val_32 *vals, int32_t isstatic, cref_t *outErr) {
+int32 cranked::playdate_lua_registerClass(Cranked *cranked, uint8 *name, lua_reg_32 *reg, lua_val_32 *vals, int32 isstatic, cref_t *outErr) {
     if (!cranked->getLuaContext()) {
         if (outErr)
             *outErr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
@@ -915,7 +932,7 @@ void cranked::playdate_lua_pushFunction(Cranked *cranked, cref_t f) {
         cranked->nativeEngine.pushEmulatedLuaFunction(f);
 }
 
-int32_t cranked::playdate_lua_indexMetatable(Cranked *cranked) {
+int32 cranked::playdate_lua_indexMetatable(Cranked *cranked) {
     // Todo
     return 0;
 }
@@ -928,72 +945,72 @@ void cranked::playdate_lua_start(Cranked *cranked) {
     cranked->disableUpdateLoop = false;
 }
 
-int32_t cranked::playdate_lua_getArgCount(Cranked *cranked) {
+int32 cranked::playdate_lua_getArgCount(Cranked *cranked) {
     if (!cranked->getLuaContext())
         return 0;
     return lua_gettop(cranked->getLuaContext());
 }
 
-int32_t cranked::playdate_lua_getArgType(Cranked *cranked, int32_t pos, cref_t *outClass) {
+int32 cranked::playdate_lua_getArgType(Cranked *cranked, int32 pos, cref_t *outClass) {
     if (!cranked->getLuaContext())
         return 0;
     return 0;
 }
 
-int32_t cranked::playdate_lua_argIsNil(Cranked *cranked, int32_t pos) {
+int32 cranked::playdate_lua_argIsNil(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return 0;
     return lua_isnil(cranked->getLuaContext(), pos);
 }
 
-int32_t cranked::playdate_lua_getArgBool(Cranked *cranked, int32_t pos) {
+int32 cranked::playdate_lua_getArgBool(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return 0;
     return lua_toboolean(cranked->getLuaContext(), pos);
 }
 
-int32_t cranked::playdate_lua_getArgInt(Cranked *cranked, int32_t pos) {
+int32 cranked::playdate_lua_getArgInt(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return 0;
     return lua_tointeger(cranked->getLuaContext(), pos);
 }
 
-float cranked::playdate_lua_getArgFloat(Cranked *cranked, int32_t pos) {
+float cranked::playdate_lua_getArgFloat(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return 0;
     return lua_tonumber(cranked->getLuaContext(), pos);
 }
 
-uint8_t *cranked::playdate_lua_getArgString(Cranked *cranked, int32_t pos) {
+uint8 *cranked::playdate_lua_getArgString(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
-    return (uint8_t *) lua_tostring(cranked->getLuaContext(), pos);
+    return (uint8 *) lua_tostring(cranked->getLuaContext(), pos);
 }
 
-uint8_t *cranked::playdate_lua_getArgBytes(Cranked *cranked, int32_t pos, uint32_t *outlen) {
+uint8 *cranked::playdate_lua_getArgBytes(Cranked *cranked, int32 pos, uint32 *outlen) {
     if (!cranked->getLuaContext())
         return nullptr;
     size_t len;
     auto string = lua_tolstring(cranked->getLuaContext(), pos, &len);
     *outlen = len;
-    return (uint8_t *) string;
+    return (uint8 *) string;
 }
 
-void *cranked::playdate_lua_getArgObject(Cranked *cranked, int32_t pos, uint8_t *type, cref_t *outud) {
+void *cranked::playdate_lua_getArgObject(Cranked *cranked, int32 pos, uint8 *type, cref_t *outud) {
     if (!cranked->getLuaContext())
         return nullptr;
     // Todo
     return nullptr;
 }
 
-LCDBitmap_32 *cranked::playdate_lua_getBitmap(Cranked *cranked, int32_t pos) {
+Bitmap cranked::playdate_lua_getBitmap(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
     // Todo
     return nullptr;
 }
 
-LCDSprite_32 *cranked::playdate_lua_getSprite(Cranked *cranked, int32_t pos) {
+Sprite cranked::playdate_lua_getSprite(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
     // Todo
@@ -1006,13 +1023,13 @@ void cranked::playdate_lua_pushNil(Cranked *cranked) {
     lua_pushnil(cranked->getLuaContext());
 }
 
-void cranked::playdate_lua_pushBool(Cranked *cranked, int32_t val) {
+void cranked::playdate_lua_pushBool(Cranked *cranked, int32 val) {
     if (!cranked->getLuaContext())
         return;
     lua_pushboolean(cranked->getLuaContext(), val);
 }
 
-void cranked::playdate_lua_pushInt(Cranked *cranked, int32_t val) {
+void cranked::playdate_lua_pushInt(Cranked *cranked, int32 val) {
     if (!cranked->getLuaContext())
         return;
     lua_pushinteger(cranked->getLuaContext(), val);
@@ -1024,31 +1041,31 @@ void cranked::playdate_lua_pushFloat(Cranked *cranked, float val) {
     lua_pushnumber(cranked->getLuaContext(), val);
 }
 
-void cranked::playdate_lua_pushString(Cranked *cranked, uint8_t *str) {
+void cranked::playdate_lua_pushString(Cranked *cranked, uint8 *str) {
     if (!cranked->getLuaContext())
         return;
     lua_pushstring(cranked->getLuaContext(), (const char *) str);
 }
 
-void cranked::playdate_lua_pushBytes(Cranked *cranked, uint8_t *str, uint32_t len) {
+void cranked::playdate_lua_pushBytes(Cranked *cranked, uint8 *str, uint32 len) {
     if (!cranked->getLuaContext())
         return;
     lua_pushlstring(cranked->getLuaContext(), (const char *) str, len);
 }
 
-void cranked::playdate_lua_pushBitmap(Cranked *cranked, LCDBitmap_32 *bitmap) {
+void cranked::playdate_lua_pushBitmap(Cranked *cranked, Bitmap bitmap) {
     if (!cranked->getLuaContext())
         return;
     // Todo: Ownership?
 }
 
-void cranked::playdate_lua_pushSprite(Cranked *cranked, LCDSprite_32 *sprite) {
+void cranked::playdate_lua_pushSprite(Cranked *cranked, Sprite sprite) {
     if (!cranked->getLuaContext())
         return;
     // Todo: Ownership?
 }
 
-LuaUDObject_32 *cranked::playdate_lua_pushObject(Cranked *cranked, void* obj, uint8_t * type, int32_t nValues) {
+LuaUDObject_32 *cranked::playdate_lua_pushObject(Cranked *cranked, void* obj, uint8 *type, int32 nValues) {
     if (!cranked->getLuaContext())
         return nullptr;
     // Todo
@@ -1068,27 +1085,27 @@ void cranked::playdate_lua_releaseObject(Cranked *cranked, LuaUDObject_32 *obj) 
     // Todo
 }
 
-void cranked::playdate_lua_setUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32_t slot) {
+void cranked::playdate_lua_setUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32 slot) {
     if (!cranked->getLuaContext())
         return;
     // Todo
 }
 
-int32_t cranked::playdate_lua_getUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32_t slot) {
+int32 cranked::playdate_lua_getUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32 slot) {
     if (!cranked->getLuaContext())
         return 0;
     // Todo
     return 0;
 }
 
-void cranked::playdate_lua_callFunction_deprecated(Cranked *cranked, uint8_t *name, int32_t nargs) {
+void cranked::playdate_lua_callFunction_deprecated(Cranked *cranked, uint8 *name, int32 nargs) {
     if (!cranked->getLuaContext())
         return;
     cranked->luaEngine.getQualifiedLuaGlobal((const char *) name);
     lua_pcall(cranked->getLuaContext(), nargs, LUA_MULTRET, 0);
 }
 
-int32_t cranked::playdate_lua_callFunction(Cranked *cranked, uint8_t *name, int32_t nargs, cref_t *outerr) {
+int32 cranked::playdate_lua_callFunction(Cranked *cranked, uint8 *name, int32 nargs, cref_t *outerr) {
     if (!cranked->getLuaContext()) {
         if (outerr)
             *outerr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
@@ -1105,13 +1122,13 @@ int32_t cranked::playdate_lua_callFunction(Cranked *cranked, uint8_t *name, int3
     }
     if (int result = lua_pcall(cranked->getLuaContext(), nargs, LUA_MULTRET, 0); result != LUA_OK) {
         if (outerr)
-            *outerr = cranked->getEmulatedStringLiteral(std::string("Error calling function: ") + cranked->luaEngine.getLuaError(result));
+            *outerr = cranked->getEmulatedStringLiteral(string("Error calling function: ") + cranked->luaEngine.getLuaError(result));
         return 0;
     }
     return 1;
 }
 
-void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encoder, cref_t write, void *userdata, int32_t pretty) {
+void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encoder, cref_t write, void *userdata, int32 pretty) {
     // Encoder API is stored directly after Playdate API, as subtract json_encoder_32 struct size from API size to get address
     *encoder = *cranked->fromVirtualAddress<json_encoder_32>(API_ADDRESS + cranked->nativeEngine.getApiSize() - sizeof(json_encoder_32));
     encoder->writeStringFunc = write;
@@ -1120,16 +1137,16 @@ void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encod
 }
 
 // Todo: Fix this mess
-static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_32 *outval, const std::string &data) {
+static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_32 *outval, const string &data) {
     struct JsonContext {
-        inline JsonContext(Cranked *emu, json_decoder_32 *decoder, const std::vector<char> &path) : decoder(*decoder), path(path.begin(), path.end(), emu->heap.allocator<char>()) {}
+        inline JsonContext(Cranked *emu, json_decoder_32 *decoder, const vector<char> &path) : decoder(*decoder), path(path.begin(), path.end(), emu->heap.allocator<char>()) {}
         json_decoder_32 decoder;
         vheap_vector<char> path;
         bool inArray{};
         int arrayIndex{};
-        std::string lastKey;
+        string lastKey;
     };
-    const std::string rootString = "_root";
+    const string rootString = "_root";
     vheap_vector<JsonContext> stack(cranked->heap.allocator<JsonContext>());
     nlohmann::json::parser_callback_t cb = [&](int depth, nlohmann::json::parse_event_t event, nlohmann::json &parsed) -> bool {
         switch (event) {
@@ -1138,13 +1155,13 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 bool isRoot = stack.empty();
                 bool isArray = event == nlohmann::json::parse_event_t::array_start;
                 if (isRoot)
-                    stack.emplace_back(cranked, functions, std::vector<char>(rootString.begin(), rootString.end() + 1));
+                    stack.emplace_back(cranked, functions, vector<char>(rootString.begin(), rootString.end() + 1));
                 auto &context = stack.back();
                 bool inArray = context.inArray;
                 bool willDecode = not inArray;
                 if (inArray and context.decoder.shouldDecodeArrayValueAtIndex) {
                     context.arrayIndex++;
-                    willDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
+                    willDecode = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
                             (context.decoder.shouldDecodeArrayValueAtIndex, &context.decoder, context.arrayIndex);
                 }
                 if (not willDecode)
@@ -1152,14 +1169,13 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 if (!isRoot and willDecode) {
                     if (inArray) {
 //                        stack.back().arrayIndex++;
-                        std::string path(context.path.begin(), context.path.end());
-                        path += "[" + std::to_string(context.arrayIndex) + "]";
-                        stack.emplace_back(cranked, &context.decoder,
-                                           std::vector<char>(path.begin(), path.end() + 1)); // Todo: Does this copy the original or the current context?
+                        string path(context.path.begin(), context.path.end());
+                        path += "[" + to_string(context.arrayIndex) + "]";
+                        stack.emplace_back(cranked, &context.decoder, vector<char>(path.begin(), path.end() + 1)); // Todo: Does this copy the original or the current context?
                     } else {
-                        std::string path(context.path.begin(), context.path.end());
+                        string path(context.path.begin(), context.path.end());
                         path += "." + context.lastKey;
-                        stack.emplace_back(cranked, &context.decoder, std::vector<char>(path.begin(), path.end() + 1));
+                        stack.emplace_back(cranked, &context.decoder, vector<char>(path.begin(), path.end() + 1));
                     }
                 }
                 auto &newContext = stack.back();
@@ -1183,13 +1199,13 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                     value = cranked->nativeEngine.invokeEmulatedFunction<void *, ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t>
                             (context.decoder.didDecodeSublist, &context.decoder, context.path.data(), type);
                 if (context.decoder.returnString) { // Todo: How does memory ownership work here? User freed?
-                    auto string = parsed.get<std::string>();
-                    value = cranked->heap.allocate(string.size());
-                    memcpy(value, string.data(), string.size());
+                    auto str = parsed.get<string>();
+                    value = cranked->heap.allocate(str.size());
+                    memcpy(value, str.data(), str.size());
                 }
                 stack.pop_back();
                 auto &parentContext = stack.back();
-                auto sublist = json_value_32{uint8_t(type), {.tableval = cranked->toVirtualAddress(value)}};
+                auto sublist = json_value_32{uint8(type), {.tableval = cranked->toVirtualAddress(value)}};
                 if (stack.empty()) {
                     *outval = sublist;
                 } else {
@@ -1207,7 +1223,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
 //                if (context.decoder.returnString)
 //                    stack.back().lastStringResult = ;
 //                else
-//                    stack.back().lastResult = {uint8_t(type), {.tableval = cranked->toVirtualAddress(value)}}; // Todo: What is value when didDecodeSublist isn't set?
+//                    stack.back().lastResult = {uint8(type), {.tableval = cranked->toVirtualAddress(value)}}; // Todo: What is value when didDecodeSublist isn't set?
 //                printf("End %i %s\n", (int) event, parsed.dump().c_str());
                 break;
             }
@@ -1215,15 +1231,15 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 auto &context = stack.back();
                 if (context.decoder.returnString)
                     return true;
-                auto key = parsed.get<std::string>();
+                auto key = parsed.get<string>();
                 auto keyData = vheap_vector<char>(key.begin(), key.end(), cranked->heap.allocator<char>());
                 bool shouldDecode = true;
                 context.lastKey = key;
                 if (context.decoder.shouldDecodeTableValueForKey)
-                    shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
+                    shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
                             (context.decoder.shouldDecodeTableValueForKey, &stack.back().decoder, keyData.data());
 //                if (shouldDecode)
-//                    stack.emplace_back(cranked, functions, std::vector<char>(keyData.begin(), keyData.end())); // Todo: Does this copy the original or the current context?
+//                    stack.emplace_back(cranked, functions, vector<char>(keyData.begin(), keyData.end())); // Todo: Does this copy the original or the current context?
 //                printf("Key %i %s\n", (int) event, parsed.dump().c_str());
                 return shouldDecode;
             }
@@ -1241,9 +1257,9 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                         value.type = (int) (value.data.intval ? JsonValueType::True : JsonValueType::False);
                     } else if (parsed.is_string()) {
                         value.type = (int) JsonValueType::String;
-                        auto string = parsed.get<std::string>();
-                        stringValue.resize(string.size());
-                        memcpy(stringValue.data(), string.c_str(), string.size());
+                        auto str = parsed.get<string>();
+                        stringValue.resize(str.size());
+                        memcpy(stringValue.data(), str.c_str(), str.size());
                         value.data.stringval = cranked->toVirtualAddress(stringValue.data());
                     } else if (parsed.is_number_integer()) {
                         value.data.intval = parsed.get<int>();
@@ -1259,7 +1275,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                     bool shouldDecode = true;
                     context.arrayIndex++; // Indices start at 1...
                     if (context.decoder.shouldDecodeArrayValueAtIndex)
-                        shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
+                        shouldDecode = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::ptr_t, ArgType::int32_t>
                                 (context.decoder.shouldDecodeArrayValueAtIndex, &stack.back().decoder, context.arrayIndex);
                     if (shouldDecode) {
                         if (context.decoder.didDecodeArrayValue)
@@ -1281,7 +1297,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
     try {
         auto result [[maybe_unused]] = nlohmann::json::parse(data, cb);
         return 1;
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         if (functions->decodeError)
             cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::int32_t>
                     (functions->decodeError, functions, cranked->getEmulatedStringLiteral(ex.what()), -1); // Todo: Is line number retreivable?
@@ -1289,12 +1305,12 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
     }
 }
 
-int32_t cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functions, json_reader_32 reader, json_value_32 *outval) {
+int32 cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functions, json_reader_32 reader, json_value_32 *outval) {
     constexpr int BUFFER_SEGMENT = 512;
     int size = 0;
     vheap_vector<char> buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
     while (true) {
-        int returned = cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
+        int returned = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
                 (reader.read, reader.userdata, buffer.data() + size, buffer.size() - size);
         if (returned < BUFFER_SEGMENT)
             break;
@@ -1304,7 +1320,7 @@ int32_t cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functio
     return json_decode(cranked, functions, outval, buffer.data());
 }
 
-int32_t cranked::playdate_json_decodeString(Cranked *cranked, json_decoder_32 *functions, uint8_t *jsonString, json_value_32 *outval) {
+int32 cranked::playdate_json_decodeString(Cranked *cranked, json_decoder_32 *functions, uint8 *jsonString, json_value_32 *outval) {
     return json_decode(cranked, functions, outval, (const char *) jsonString);
 }
 
@@ -1314,13 +1330,13 @@ inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, cref
 }
 
 inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const char *string) {
-    encoderWrite(cranked, encoder, cranked->getEmulatedStringLiteral(string), strlen(string));
+    encoderWrite(cranked, encoder, cranked->getEmulatedStringLiteral(string), (int)strlen(string));
 }
 
-inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, std::string string) {
+inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const string &string) {
     // Use vector rather than heap_string to prevent non-heap addresses for small strings
     auto data = vheap_vector<char>(string.c_str(), string.c_str() + string.size(), cranked->heap.allocator<char>());
-    encoderWrite(cranked, encoder, cranked->toVirtualAddress(data.data()), string.length());
+    encoderWrite(cranked, encoder, cranked->toVirtualAddress(data.data()), (int)string.length());
 }
 
 void cranked::json_encoder_startArray(Cranked *cranked, json_encoder_32 *encoder) {
@@ -1360,7 +1376,7 @@ void cranked::json_encoder_startTable(Cranked *cranked, json_encoder_32 *encoder
     encoderWrite(cranked, encoder, "{");
 }
 
-void cranked::json_encoder_addTableMember(Cranked *cranked, json_encoder_32 *encoder, uint8_t *name, int32_t len) {
+void cranked::json_encoder_addTableMember(Cranked *cranked, json_encoder_32 *encoder, uint8 *name, int32 len) {
     if (!encoder->startedTable)
         encoderWrite(cranked, encoder, ",");
     if (encoder->pretty) {
@@ -1368,7 +1384,7 @@ void cranked::json_encoder_addTableMember(Cranked *cranked, json_encoder_32 *enc
         for (int i = 0; i < encoder->depth; i++)
             encoderWrite(cranked, encoder, "\t");
     }
-    encoderWrite(cranked, encoder, nlohmann::json(std::string((const char *) name, len)).dump());
+    encoderWrite(cranked, encoder, nlohmann::json(string((const char *) name, len)).dump());
     encoderWrite(cranked, encoder, ":");
     encoder->startedTable = false;
 }
@@ -1395,24 +1411,24 @@ void cranked::json_encoder_writeTrue(Cranked *cranked, json_encoder_32 *encoder)
     encoderWrite(cranked, encoder, "true");
 }
 
-void cranked::json_encoder_writeInt(Cranked *cranked, json_encoder_32 *encoder, int32_t num) {
-    encoderWrite(cranked, encoder, std::to_string(num));
+void cranked::json_encoder_writeInt(Cranked *cranked, json_encoder_32 *encoder, int32 num) {
+    encoderWrite(cranked, encoder, to_string(num));
 }
 
 void cranked::json_encoder_writeDouble(Cranked *cranked, json_encoder_32 *encoder, double num) {
-    encoderWrite(cranked, encoder, std::to_string(num));
+    encoderWrite(cranked, encoder, to_string(num));
 }
 
-void cranked::json_encoder_writeString(Cranked *cranked, json_encoder_32 *encoder, uint8_t *str, int32_t len) {
-    encoderWrite(cranked, encoder, nlohmann::json(std::string((const char *) str, len)).dump());
+void cranked::json_encoder_writeString(Cranked *cranked, json_encoder_32 *encoder, uint8 *str, int32 len) {
+    encoderWrite(cranked, encoder, nlohmann::json(string((const char *) str, len)).dump());
 }
 
-uint8_t *cranked::playdate_file_geterr(Cranked *cranked) {
-    return cranked->fromVirtualAddress<uint8_t>(cranked->files.lastError); // This conversion is redundant, but simplifies things
+uint8 *cranked::playdate_file_geterr(Cranked *cranked) {
+    return cranked->fromVirtualAddress<uint8>(cranked->files.lastError); // This conversion is redundant, but simplifies things
 }
 
-int32_t cranked::playdate_file_listfiles(Cranked *cranked, uint8_t *path, cref_t callback, void *userdata, int32_t showhidden) {
-    std::vector<std::string> files;
+int32 cranked::playdate_file_listfiles(Cranked *cranked, uint8 *path, cref_t callback, void *userdata, int32 showhidden) {
+    vector<string> files;
     if (cranked->files.listFiles((const char *) path, showhidden, files))
         return -1;
     for (auto &file : files)
@@ -1420,51 +1436,51 @@ int32_t cranked::playdate_file_listfiles(Cranked *cranked, uint8_t *path, cref_t
     return 0;
 }
 
-int32_t cranked::playdate_file_stat(Cranked *cranked, uint8_t *path, FileStat_32 *stats) {
+int32 cranked::playdate_file_stat(Cranked *cranked, uint8 *path, FileStat_32 *stats) {
     return cranked->files.stat((const char *) path, *stats);
 }
 
-int32_t cranked::playdate_file_mkdir(Cranked *cranked, uint8_t *path) {
+int32 cranked::playdate_file_mkdir(Cranked *cranked, uint8 *path) {
     return cranked->files.mkdir((const char *) path);
 }
 
-int32_t cranked::playdate_file_unlink(Cranked *cranked, uint8_t *name, int32_t recursive) {
+int32 cranked::playdate_file_unlink(Cranked *cranked, uint8 *name, int32 recursive) {
     return cranked->files.unlink((const char *) name, recursive);
 }
 
-int32_t cranked::playdate_file_rename(Cranked *cranked, uint8_t *from, uint8_t *to) {
+int32 cranked::playdate_file_rename(Cranked *cranked, uint8 *from, uint8 *to) {
     return cranked->files.rename((const char *) from, (const char *) to);
 }
 
-SDFile_32 *cranked::playdate_file_open(Cranked *cranked, uint8_t *name, int32_t mode) {
+File cranked::playdate_file_open(Cranked *cranked, uint8 *name, int32 mode) {
     return cranked->files.open((const char *) name, FileOptions(mode));
 }
 
-int32_t cranked::playdate_file_close(Cranked *cranked, SDFile_32 *file) {
+int32 cranked::playdate_file_close(Cranked *cranked, File file) {
     return cranked->files.close(file);
 }
 
-int32_t cranked::playdate_file_read(Cranked *cranked, SDFile_32 *file, void *buf, uint32_t len) {
-    return cranked->files.read(file, buf, len);
+int32 cranked::playdate_file_read(Cranked *cranked, File file, void *buf, uint32 len) {
+    return cranked->files.read(file, buf, (int)len);
 }
 
-int32_t cranked::playdate_file_write(Cranked *cranked, SDFile_32 *file, void *buf, uint32_t len) {
-    return cranked->files.write(file, buf, len);
+int32 cranked::playdate_file_write(Cranked *cranked, File file, void *buf, uint32 len) {
+    return cranked->files.write(file, buf, (int)len);
 }
 
-int32_t cranked::playdate_file_flush(Cranked *cranked, SDFile_32 *file) {
+int32 cranked::playdate_file_flush(Cranked *cranked, File file) {
     return cranked->files.flush(file);
 }
 
-int32_t cranked::playdate_file_tell(Cranked *cranked, SDFile_32 *file) {
+int32 cranked::playdate_file_tell(Cranked *cranked, File file) {
     return cranked->files.tell(file);
 }
 
-int32_t cranked::playdate_file_seek(Cranked *cranked, SDFile_32 *file, int32_t pos, int32_t whence) {
+int32 cranked::playdate_file_seek(Cranked *cranked, File file, int32 pos, int32 whence) {
     return cranked->files.seek(file, pos, whence);
 }
 
-void cranked::playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32_t flag) {
+void cranked::playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32 flag) {
     cranked->graphics.alwaysRedrawSprites = flag;
 }
 
@@ -1473,663 +1489,719 @@ void cranked::playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRec
 }
 
 void cranked::playdate_sprite_drawSprites(Cranked *cranked) {
-    // Todo
+    cranked->graphics.drawSprites();
 }
 
 void cranked::playdate_sprite_updateAndDrawSprites(Cranked *cranked) {
-    // Todo
+    cranked->graphics.updateSprites();
+    cranked->graphics.drawSprites();
 }
 
-LCDSprite_32 *cranked::playdate_sprite_newSprite(Cranked *cranked) {
-    // Todo
-    return nullptr;
+Sprite cranked::playdate_sprite_newSprite(Cranked *cranked) {
+    return cranked->nativeEngine.createReferencedResource<LCDSprite_32>();
 }
 
-void cranked::playdate_sprite_freeSprite(Cranked *cranked, LCDSprite_32 *sprite) {
+void cranked::playdate_sprite_freeSprite(Cranked *cranked, Sprite sprite) {
     sprite->dereference();
 }
 
-LCDSprite_32 *cranked::playdate_sprite_copy(Cranked *cranked, LCDSprite_32 *sprite) {
+Sprite cranked::playdate_sprite_copy(Cranked *cranked, Sprite sprite) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sprite_addSprite(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
+void cranked::playdate_sprite_addSprite(Cranked *cranked, Sprite sprite) {
+    cranked->graphics.spriteDrawList.emplace(sprite);
 }
 
-void cranked::playdate_sprite_removeSprite(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
+void cranked::playdate_sprite_removeSprite(Cranked *cranked, Sprite sprite) {
+    eraseByEquivalentKey(cranked->graphics.spriteDrawList, sprite);
 }
 
-void cranked::playdate_sprite_removeSprites(Cranked *cranked, cref_t *sprites, int32_t count) {
-    // Todo
+void cranked::playdate_sprite_removeSprites(Cranked *cranked, cref_t *sprites, int32 count) {
+    auto &drawList = cranked->graphics.spriteDrawList;
+    for (int i = 0; i < count; i++) {
+        auto *sprite = cranked->nativeEngine.fromVirtualAddress<LCDSprite_32>(sprites[i]);
+        eraseByEquivalentKey(cranked->graphics.spriteDrawList, sprite);
+    }
 }
 
 void cranked::playdate_sprite_removeAllSprites(Cranked *cranked) {
-    // Todo
+    cranked->graphics.spriteDrawList.clear();
 }
 
-int32_t cranked::playdate_sprite_getSpriteCount(Cranked *cranked) {
-    return (int32_t ) cranked->graphics.spriteDrawList.size();
+int32 cranked::playdate_sprite_getSpriteCount(Cranked *cranked) {
+    return (int32 ) cranked->graphics.spriteDrawList.size();
 }
 
-void cranked::playdate_sprite_setBounds(Cranked *cranked, LCDSprite_32 *sprite, PDRect_32 bounds) {
-    // Todo
+void cranked::playdate_sprite_setBounds(Cranked *cranked, Sprite sprite, PDRect_32 bounds) {
+    sprite->setBounds(toRect(bounds));
 }
 
-PDRect_32 cranked::playdate_sprite_getBounds(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
-    return {};
+PDRect_32 cranked::playdate_sprite_getBounds(Cranked *cranked, Sprite sprite) {
+    return fromRect(sprite->bounds);
 }
 
-void cranked::playdate_sprite_moveTo(Cranked *cranked, LCDSprite_32 *sprite, float x, float y) {
-    // Todo
+void cranked::playdate_sprite_moveTo(Cranked *cranked, Sprite sprite, float x, float y) {
+    sprite->setPosition({ x, y });
 }
 
-void cranked::playdate_sprite_moveBy(Cranked *cranked, LCDSprite_32 *sprite, float dx, float dy) {
-    // Todo
+void cranked::playdate_sprite_moveBy(Cranked *cranked, Sprite sprite, float dx, float dy) {
+    sprite->setPosition(sprite->getPosition() + Vec2{ dx, dy });
 }
 
-void cranked::playdate_sprite_setImage(Cranked *cranked, LCDSprite_32 *sprite, LCDBitmap_32 *image, int32_t flip) {
-    // Todo
+void cranked::playdate_sprite_setImage(Cranked *cranked, Sprite sprite, Bitmap image, int32 flip) {
+    sprite->setImage(image, (LCDBitmapFlip)flip);
 }
 
-LCDBitmap_32 *cranked::playdate_sprite_getImage(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
-    return nullptr;
+Bitmap cranked::playdate_sprite_getImage(Cranked *cranked, Sprite sprite) {
+    return sprite->image.get();
 }
 
-void cranked::playdate_sprite_setSize(Cranked *cranked, LCDSprite_32 *s, float width, float height) {
-    s->size = Vec2(width, height);
+void cranked::playdate_sprite_setSize(Cranked *cranked, Sprite s, float width, float height) {
+    s->bounds.size = Vec2(width, height);
 }
 
-void cranked::playdate_sprite_setZIndex(Cranked *cranked, LCDSprite_32 *sprite, int16_t zIndex) {
+void cranked::playdate_sprite_setZIndex(Cranked *cranked, Sprite sprite, int16 zIndex) {
     sprite->zIndex = zIndex;
 }
 
-int16_t cranked::playdate_sprite_getZIndex(Cranked *cranked, LCDSprite_32 *sprite) {
+int16 cranked::playdate_sprite_getZIndex(Cranked *cranked, Sprite sprite) {
     return sprite->zIndex;
 }
 
-void cranked::playdate_sprite_setDrawMode(Cranked *cranked, LCDSprite_32 *sprite, int32_t mode) {
+void cranked::playdate_sprite_setDrawMode(Cranked *cranked, Sprite sprite, int32 mode) {
     sprite->drawMode = (LCDBitmapDrawMode) mode;
 }
 
-void cranked::playdate_sprite_setImageFlip(Cranked *cranked, LCDSprite_32 *sprite, int32_t flip) {
+void cranked::playdate_sprite_setImageFlip(Cranked *cranked, Sprite sprite, int32 flip) {
     sprite->flip = (LCDBitmapFlip) flip;
 }
 
-int32_t cranked::playdate_sprite_getImageFlip(Cranked *cranked, LCDSprite_32 *sprite) {
-    return (int32_t)sprite->flip;
+int32 cranked::playdate_sprite_getImageFlip(Cranked *cranked, Sprite sprite) {
+    return (int32)sprite->flip;
 }
 
-void cranked::playdate_sprite_setStencil(Cranked *cranked, LCDSprite_32 *sprite, LCDBitmap_32 *stencil) {
-    // Todo
+void cranked::playdate_sprite_setStencil(Cranked *cranked, Sprite sprite, Bitmap stencil) {
+    sprite->stencil = stencil;
 }
 
-void cranked::playdate_sprite_setClipRect(Cranked *cranked, LCDSprite_32 *sprite, LCDRect_32 clipRect) {
-    // Todo
+void cranked::playdate_sprite_setClipRect(Cranked *cranked, Sprite sprite, LCDRect_32 clipRect) {
+    sprite->clipRect = toRect(clipRect);
 }
 
-void cranked::playdate_sprite_clearClipRect(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
+void cranked::playdate_sprite_clearClipRect(Cranked *cranked, Sprite sprite) {
+    sprite->clipRect = {};
 }
 
-void cranked::playdate_sprite_setClipRectsInRange(Cranked *cranked, LCDRect_32 clipRect, int32_t startZ, int32_t endZ) {
-    // Todo
+void cranked::playdate_sprite_setClipRectsInRange(Cranked *cranked, LCDRect_32 clipRect, int32 startZ, int32 endZ) {
+    for (auto sprite : cranked->graphics.allocatedSprites) {
+        if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
+            sprite->clipRect = toRect(clipRect);
+    }
 }
 
-void cranked::playdate_sprite_clearClipRectsInRange(Cranked *cranked, int32_t startZ, int32_t endZ) {
-    // Todo
+void cranked::playdate_sprite_clearClipRectsInRange(Cranked *cranked, int32 startZ, int32 endZ) {
+    for (auto sprite : cranked->graphics.allocatedSprites) {
+        if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
+            sprite->clipRect = {};
+    }
 }
 
-void cranked::playdate_sprite_setUpdatesEnabled(Cranked *cranked, LCDSprite_32 *sprite, int32_t flag) {
+void cranked::playdate_sprite_setUpdatesEnabled(Cranked *cranked, Sprite sprite, int32 flag) {
     sprite->updatesEnabled = flag;
 }
 
-int32_t cranked::playdate_sprite_updatesEnabled(Cranked *cranked, LCDSprite_32 *sprite) {
+int32 cranked::playdate_sprite_updatesEnabled(Cranked *cranked, Sprite sprite) {
     return sprite->updatesEnabled;
 }
 
-void cranked::playdate_sprite_setCollisionsEnabled(Cranked *cranked, LCDSprite_32 *sprite, int32_t flag) {
-    sprite->collisionsEnabled = flag;
+void cranked::playdate_sprite_setCollisionsEnabled(Cranked *cranked, Sprite sprite, int32 flag) {
+    sprite->setCollisionsEnabled(flag);
 }
 
-int32_t cranked::playdate_sprite_collisionsEnabled(Cranked *cranked, LCDSprite_32 *sprite) {
+int32 cranked::playdate_sprite_collisionsEnabled(Cranked *cranked, Sprite sprite) {
     return sprite->collisionsEnabled;
 }
 
-void cranked::playdate_sprite_setVisible(Cranked *cranked, LCDSprite_32 *sprite, int32_t flag) {
+void cranked::playdate_sprite_setVisible(Cranked *cranked, Sprite sprite, int32 flag) {
     sprite->visible = flag;
 }
 
-int32_t cranked::playdate_sprite_isVisible(Cranked *cranked, LCDSprite_32 *sprite) {
+int32 cranked::playdate_sprite_isVisible(Cranked *cranked, Sprite sprite) {
     return sprite->visible;
 }
 
-void cranked::playdate_sprite_setOpaque(Cranked *cranked, LCDSprite_32 *sprite, int32_t flag) {
+void cranked::playdate_sprite_setOpaque(Cranked *cranked, Sprite sprite, int32 flag) {
     sprite->opaque = flag;
 }
 
-void cranked::playdate_sprite_markDirty(Cranked *cranked, LCDSprite_32 *sprite) {
+void cranked::playdate_sprite_markDirty(Cranked *cranked, Sprite sprite) {
     sprite->dirty = true;
 }
 
-void cranked::playdate_sprite_setTag(Cranked *cranked, LCDSprite_32 *sprite, uint8_t tag) {
+void cranked::playdate_sprite_setTag(Cranked *cranked, Sprite sprite, uint8 tag) {
     sprite->tag = tag;
 }
 
-uint8_t cranked::playdate_sprite_getTag(Cranked *cranked, LCDSprite_32 *sprite) {
+uint8 cranked::playdate_sprite_getTag(Cranked *cranked, Sprite sprite) {
     return sprite->tag;
 }
 
-void cranked::playdate_sprite_setIgnoresDrawOffset(Cranked *cranked, LCDSprite_32 *sprite, int32_t flag) {
+void cranked::playdate_sprite_setIgnoresDrawOffset(Cranked *cranked, Sprite sprite, int32 flag) {
     sprite->ignoresDrawOffset = flag;
 }
 
-void cranked::playdate_sprite_setUpdateFunction(Cranked *cranked, LCDSprite_32 *sprite, cref_t func) {
+void cranked::playdate_sprite_setUpdateFunction(Cranked *cranked, Sprite sprite, cref_t func) {
     sprite->updateFunction = func;
 }
 
-void cranked::playdate_sprite_setDrawFunction(Cranked *cranked, LCDSprite_32 *sprite, cref_t func) {
+void cranked::playdate_sprite_setDrawFunction(Cranked *cranked, Sprite sprite, cref_t func) {
     sprite->drawFunction = func;
 }
 
-void cranked::playdate_sprite_getPosition(Cranked *cranked, LCDSprite_32 *sprite, float *x, float *y) {
-    *x = sprite->pos.x;
-    *y = sprite->pos.y;
+void cranked::playdate_sprite_getPosition(Cranked *cranked, Sprite sprite, float *x, float *y) {
+    auto pos = sprite->getPosition();
+    if (x)
+        *x = pos.x;
+    if(y)
+        *y = pos.y;
 }
 
 void cranked::playdate_sprite_resetCollisionWorld(Cranked *cranked) {
-    // Todo
+    cranked->bump.resetWorld();
 }
 
-void cranked::playdate_sprite_setCollideRect(Cranked *cranked, LCDSprite_32 *sprite, PDRect_32 collideRect) {
-    // Todo
+void cranked::playdate_sprite_setCollideRect(Cranked *cranked, Sprite sprite, PDRect_32 collideRect) {
+    sprite->setCollisionRect(toRect(collideRect));
 }
 
-PDRect_32 cranked::playdate_sprite_getCollideRect(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
-    return {};
+PDRect_32 cranked::playdate_sprite_getCollideRect(Cranked *cranked, Sprite sprite) {
+    return fromRect(sprite->collideRect);
 }
 
-void cranked::playdate_sprite_clearCollideRect(Cranked *cranked, LCDSprite_32 *sprite) {
-    // Todo
+void cranked::playdate_sprite_clearCollideRect(Cranked *cranked, Sprite sprite) {
+    sprite->setCollisionRect({});
 }
 
-void cranked::playdate_sprite_setCollisionResponseFunction(Cranked *cranked, LCDSprite_32 *sprite, cref_t func) {
-    // Todo
+void cranked::playdate_sprite_setCollisionResponseFunction(Cranked *cranked, Sprite sprite, cref_t func) {
+    sprite->collideResponseFunction = func;
 }
 
-SpriteCollisionInfo_32 *cranked::playdate_sprite_checkCollisions(Cranked *cranked, LCDSprite_32 *sprite, float goalX, float goalY, float *actualX, float *actualY, int32_t *len) {
+static SpriteCollisionInfo_32 *moveOrCheckCollisions(Cranked *cranked, Sprite sprite, float goalX, float goalY, float *actualX, float *actualY, int32 *len, bool sim) {
+    Vec2 goal = Vec2{ goalX, goalY } - sprite->getCenterOffset();
+    auto [actual, collisions] = cranked->bump.move(sprite, goal, sim, [&](Sprite a, Sprite b){
+        if (sprite->collideResponseFunction)
+            return (Bump::ResponseType) cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
+                    (sprite->collideResponseFunction, a, b);
+        return Bump::ResponseType::Freeze;
+    });
+    actual += sprite->getCenterOffset();
+    int count = (int)collisions.size();
+    if (len)
+        *len = count;
+    if (actualX)
+        *actualX = actual.x;
+    if (actualY)
+        *actualY = actual.y;
+    if (count == 0)
+        return nullptr;
+    auto results = (SpriteCollisionInfo_32 *)cranked->heap.allocate(sizeof(SpriteCollisionInfo_32) * count);
+    for (int i = 0; i < count; i++) {
+        auto &col = collisions[i];
+        results[i] = {
+            cranked->nativeEngine.toVirtualAddress(col.sprite),
+            cranked->nativeEngine.toVirtualAddress(col.other),
+            (int8)col.type,
+            col.overlaps,
+            col.ti,
+            col.move.asCollisionPoint(),
+            col.normal.asCollisionVector(),
+            col.touch.asCollisionPoint(),
+            fromRect(col.entityRect),
+            fromRect(col.otherRect)
+        };
+    }
+    return results;
+}
+
+SpriteCollisionInfo_32 *cranked::playdate_sprite_checkCollisions(Cranked *cranked, Sprite sprite, float goalX, float goalY, float *actualX, float *actualY, int32 *len) {
+    return moveOrCheckCollisions(cranked, sprite, goalX, goalY, actualX, actualY, len, true);
+}
+
+SpriteCollisionInfo_32 *cranked::playdate_sprite_moveWithCollisions(Cranked *cranked, Sprite sprite, float goalX, float goalY, float *actualX, float *actualY, int32 *len) {
+    return moveOrCheckCollisions(cranked, sprite, goalX, goalY, actualX, actualY, len, false);
+}
+
+cref_t *cranked::playdate_sprite_querySpritesAtPoint(Cranked *cranked, float x, float y, int32 *len) {
     // Todo
     return nullptr;
 }
 
-SpriteCollisionInfo_32 *cranked::playdate_sprite_moveWithCollisions(Cranked *cranked, LCDSprite_32 *sprite, float goalX, float goalY, float *actualX, float *actualY, int32_t *len) {
+cref_t *cranked::playdate_sprite_querySpritesInRect(Cranked *cranked, float x, float y, float width, float height, int32 *len) {
     // Todo
     return nullptr;
 }
 
-cref_t *cranked::playdate_sprite_querySpritesAtPoint(Cranked *cranked, float x, float y, int32_t *len) {
+cref_t *cranked::playdate_sprite_querySpritesAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32 *len) {
     // Todo
     return nullptr;
 }
 
-cref_t *cranked::playdate_sprite_querySpritesInRect(Cranked *cranked, float x, float y, float width, float height, int32_t *len) {
+SpriteQueryInfo_32 *cranked::playdate_sprite_querySpriteInfoAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32 *len) {
+    auto segmentInfo = cranked->bump.querySegmentInfo(LineSeg{x1, y1, x2, y2});
+    int count = (int)segmentInfo.size();
+    if (len)
+        *len = count;
+    if (count == 0)
+        return nullptr;
+    auto results = (SpriteQueryInfo_32 *)cranked->heap.allocate(sizeof(SpriteQueryInfo_32) * count);
+    for (int i = 0; i < count; i++) {
+        auto &info = segmentInfo[i];
+        auto entry = info.seg.start.asCollisionPoint();
+        auto exit = info.seg.end.asCollisionPoint();
+        results[i] = { cranked->nativeEngine.toVirtualAddress(info.sprite), info.ti1, info.ti2, entry, exit };
+    }
+    return results;
+}
+
+cref_t *cranked::playdate_sprite_overlappingSprites(Cranked *cranked, Sprite sprite, int32 *len) {
     // Todo
     return nullptr;
 }
 
-cref_t *cranked::playdate_sprite_querySpritesAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32_t *len) {
+cref_t *cranked::playdate_sprite_allOverlappingSprites(Cranked *cranked, int32 *len) {
     // Todo
     return nullptr;
 }
 
-SpriteQueryInfo_32 *cranked::playdate_sprite_querySpriteInfoAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32_t *len) {
-    // Todo
-    return nullptr;
-}
-
-cref_t *cranked::playdate_sprite_overlappingSprites(Cranked *cranked, LCDSprite_32 *sprite, int32_t *len) {
-    // Todo
-    return nullptr;
-}
-
-cref_t *cranked::playdate_sprite_allOverlappingSprites(Cranked *cranked, int32_t *len) {
-    // Todo
-    return nullptr;
-}
-
-void cranked::playdate_sprite_setStencilPattern(Cranked *cranked, LCDSprite_32 *sprite, uint8_t pattern) {
+void cranked::playdate_sprite_setStencilPattern(Cranked *cranked, Sprite sprite, uint8 pattern) {
     // Todo
 }
 
-void cranked::playdate_sprite_clearStencil(Cranked *cranked, LCDSprite_32 *sprite) {
+void cranked::playdate_sprite_clearStencil(Cranked *cranked, Sprite sprite) {
     // Todo
 }
 
-void cranked::playdate_sprite_setUserdata(Cranked *cranked, LCDSprite_32 *sprite, void *userdata) {
+void cranked::playdate_sprite_setUserdata(Cranked *cranked, Sprite sprite, void *userdata) {
     sprite->userdata = cranked->toVirtualAddress(userdata);
 }
 
-void *cranked::playdate_sprite_getUserdata(Cranked *cranked, LCDSprite_32 *sprite) {
+void *cranked::playdate_sprite_getUserdata(Cranked *cranked, Sprite sprite) {
     return cranked->fromVirtualAddress(sprite->userdata);
 }
 
-void cranked::playdate_sprite_setStencilImage(Cranked *cranked, LCDSprite_32 *sprite, LCDBitmap_32 *stencil, int32_t tile) {
+void cranked::playdate_sprite_setStencilImage(Cranked *cranked, Sprite sprite, Bitmap stencil, int32 tile) {
     // Todo
 }
 
-void cranked::playdate_sprite_setCenter(Cranked *cranked, LCDSprite_32 *s, float x, float y) {
-    s->centerX = x;
-    s->centerY = y;
+void cranked::playdate_sprite_setCenter(Cranked *cranked, Sprite s, float x, float y) {
+    s->center = {x, y};
 }
 
-void cranked::playdate_sprite_getCenter(Cranked *cranked, LCDSprite_32 *s, float * x, float * y) {
+void cranked::playdate_sprite_getCenter(Cranked *cranked, Sprite s, float *x, float *y) {
     if (x)
-        *x = s->centerX;
+        *x = s->center.x;
     if (y)
-        *y = s->centerY;
+        *y = s->center.y;
 }
 
-void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource_32 *c, float lvol, float rvol) {
+void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource c, float lvol, float rvol) {
     c->leftVolume = lvol;
     c->rightVolume = rvol;
 }
 
-void cranked::playdate_sound_source_getVolume(Cranked *cranked, SoundSource_32 *c, float *outl, float *outr) {
+void cranked::playdate_sound_source_getVolume(Cranked *cranked, SoundSource c, float *outl, float *outr) {
     *outl = c->leftVolume;
     *outr = c->rightVolume;
 }
 
-int32_t cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource_32 *c) {
+int32 cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource c) {
     return c->playing;
 }
 
-void cranked::playdate_sound_source_setFinishCallback(Cranked *cranked, SoundSource_32 *c, cref_t callback, void *userdata) {
+void cranked::playdate_sound_source_setFinishCallback(Cranked *cranked, SoundSource c, cref_t callback, void *userdata) {
     c->completionCallback = callback;
     c->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
-FilePlayer_32 *cranked::playdate_sound_fileplayer_newPlayer(Cranked *cranked) {
+FilePlayer cranked::playdate_sound_fileplayer_newPlayer(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<FilePlayer_32>();
 }
 
-void cranked::playdate_sound_fileplayer_freePlayer(Cranked *cranked, FilePlayer_32 *player) {
+void cranked::playdate_sound_fileplayer_freePlayer(Cranked *cranked, FilePlayer player) {
     player->dereference();
 }
 
-int32_t cranked::playdate_sound_fileplayer_loadIntoPlayer(Cranked *cranked, FilePlayer_32 *player, uint8_t *path) {
+int32 cranked::playdate_sound_fileplayer_loadIntoPlayer(Cranked *cranked, FilePlayer player, uint8 *path) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_fileplayer_setBufferLength(Cranked *cranked, FilePlayer_32 *player, float bufferLen) {
+void cranked::playdate_sound_fileplayer_setBufferLength(Cranked *cranked, FilePlayer player, float bufferLen) {
     // Todo
 }
 
-int32_t cranked::playdate_sound_fileplayer_play(Cranked *cranked, FilePlayer_32 *player, int32_t repeat) {
+int32 cranked::playdate_sound_fileplayer_play(Cranked *cranked, FilePlayer player, int32 repeat) {
     // Todo
     return 0;
 }
 
-int32_t cranked::playdate_sound_fileplayer_isPlaying(Cranked *cranked, FilePlayer_32 *player) {
+int32 cranked::playdate_sound_fileplayer_isPlaying(Cranked *cranked, FilePlayer player) {
     return player->playing; // Todo: Does pausing affect this
 }
 
-void cranked::playdate_sound_fileplayer_pause(Cranked *cranked, FilePlayer_32 *player) {
+void cranked::playdate_sound_fileplayer_pause(Cranked *cranked, FilePlayer player) {
     player->paused = true;
 }
 
-void cranked::playdate_sound_fileplayer_stop(Cranked *cranked, FilePlayer_32 *player) {
+void cranked::playdate_sound_fileplayer_stop(Cranked *cranked, FilePlayer player) {
     player->playing = false;
     player->sampleOffset = 0;
 }
 
-void cranked::playdate_sound_fileplayer_setVolume(Cranked *cranked, FilePlayer_32 *player, float left, float right) {
+void cranked::playdate_sound_fileplayer_setVolume(Cranked *cranked, FilePlayer player, float left, float right) {
     player->leftVolume = left;
     player->rightVolume = right;
 }
 
-void cranked::playdate_sound_fileplayer_getVolume(Cranked *cranked, FilePlayer_32 *player, float *left, float *right) {
+void cranked::playdate_sound_fileplayer_getVolume(Cranked *cranked, FilePlayer player, float *left, float *right) {
     *left = player->leftVolume;
     *right = player->rightVolume;
 }
 
-float cranked::playdate_sound_fileplayer_getLength(Cranked *cranked, FilePlayer_32 *player) {
+float cranked::playdate_sound_fileplayer_getLength(Cranked *cranked, FilePlayer player) {
     return player->file ? framesToSeconds((int) player->file->romData->size()) : 0;
 }
 
-void cranked::playdate_sound_fileplayer_setOffset(Cranked *cranked, FilePlayer_32 *player, float offset) {
+void cranked::playdate_sound_fileplayer_setOffset(Cranked *cranked, FilePlayer player, float offset) {
     // Todo
 }
 
-void cranked::playdate_sound_fileplayer_setRate(Cranked *cranked, FilePlayer_32 *player, float rate) {
+void cranked::playdate_sound_fileplayer_setRate(Cranked *cranked, FilePlayer player, float rate) {
     player->rate = rate;
 }
 
-void cranked::playdate_sound_fileplayer_setLoopRange(Cranked *cranked, FilePlayer_32 *player, float start, float end) {
+void cranked::playdate_sound_fileplayer_setLoopRange(Cranked *cranked, FilePlayer player, float start, float end) {
     player->loopStart = framesFromSeconds(start);
     player->loopEnd = framesFromSeconds(end);
 }
 
-int32_t cranked::playdate_sound_fileplayer_didUnderrun(Cranked *cranked, FilePlayer_32 *player) {
+int32 cranked::playdate_sound_fileplayer_didUnderrun(Cranked *cranked, FilePlayer player) {
     return player->underran;
 }
 
-void cranked::playdate_sound_fileplayer_setFinishCallback(Cranked *cranked, FilePlayer_32 *player, cref_t callback, void *userdata) {
+void cranked::playdate_sound_fileplayer_setFinishCallback(Cranked *cranked, FilePlayer player, cref_t callback, void *userdata) {
     player->completionCallback = callback;
     player->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
-void cranked::playdate_sound_fileplayer_setLoopCallback(Cranked *cranked, FilePlayer_32 *player, cref_t callback, void *userdata) {
+void cranked::playdate_sound_fileplayer_setLoopCallback(Cranked *cranked, FilePlayer player, cref_t callback, void *userdata) {
     player->loopCallback = callback;
     player->loopCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
-float cranked::playdate_sound_fileplayer_getOffset(Cranked *cranked, FilePlayer_32 *player) {
+float cranked::playdate_sound_fileplayer_getOffset(Cranked *cranked, FilePlayer player) {
     return framesToSeconds(player->sampleOffset);
 }
 
-float cranked::playdate_sound_fileplayer_getRate(Cranked *cranked, FilePlayer_32 *player) {
+float cranked::playdate_sound_fileplayer_getRate(Cranked *cranked, FilePlayer player) {
     return player->rate;
 }
 
-void cranked::playdate_sound_fileplayer_setStopOnUnderrun(Cranked *cranked, FilePlayer_32 *player, int32_t flag) {
+void cranked::playdate_sound_fileplayer_setStopOnUnderrun(Cranked *cranked, FilePlayer player, int32 flag) {
     player->stopOnUnderrun = flag;
 }
-void cranked::playdate_sound_fileplayer_fadeVolume(Cranked *cranked, FilePlayer_32 *player, float left, float right, int32_t len, cref_t finishCallback, void * userdata) {
+void cranked::playdate_sound_fileplayer_fadeVolume(Cranked *cranked, FilePlayer player, float left, float right, int32 len, cref_t finishCallback, void *userdata) {
     // Todo (userdata was added in VERSION_2_4_1, otherwise use 0)
 }
 
-void cranked::playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, FilePlayer_32 *player, cref_t dataSource, void *userdata, float bufferLen) {
+void cranked::playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, FilePlayer player, cref_t dataSource, void *userdata, float bufferLen) {
     // Todo
 }
 
-AudioSample_32 *cranked::playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32_t byteCount) {
+AudioSample cranked::playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32 byteCount) {
     return cranked->nativeEngine.createReferencedResource<AudioSample_32>(byteCount);
 }
 
-int32_t cranked::playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample_32 *sample, uint8_t *path) {
+int32 cranked::playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample sample, uint8 *path) {
     // Todo
     return 0;
 }
 
-AudioSample_32 *cranked::playdate_sound_sample_load(Cranked *cranked, uint8_t *path) {
+AudioSample cranked::playdate_sound_sample_load(Cranked *cranked, uint8 *path) {
     // Todo
     return nullptr;
 }
 
-AudioSample_32 *cranked::playdate_sound_sample_newSampleFromData(Cranked *cranked, uint8_t *data, int32_t format, uint32_t sampleRate, int32_t byteCount) {
+AudioSample cranked::playdate_sound_sample_newSampleFromData(Cranked *cranked, uint8 *data, int32 format, uint32 sampleRate, int32 byteCount, int32 shouldFreeData) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_sample_getData(Cranked *cranked, AudioSample_32 *sample, cref_t *data, int32_t *format, uint32_t *sampleRate, uint32_t *bytelength) {
+void cranked::playdate_sound_sample_getData(Cranked *cranked, AudioSample sample, cref_t *data, int32 *soundFormat, uint32 *sampleRate, uint32 *bytelength) {
     if (data)
         *data = cranked->toVirtualAddress(sample->data.data());
-    if (format)
-        *format = (int32_t )sample->format;
+    if (soundFormat)
+        *soundFormat = (int32 )sample->soundFormat;
     if (sampleRate)
         *sampleRate = sample->sampleRate;
     if (bytelength)
-        *bytelength = (int32_t)sample->data.size();
+        *bytelength = (int32)sample->data.size();
 }
 
-void cranked::playdate_sound_sample_freeSample(Cranked *cranked, AudioSample_32 *sample) {
+void cranked::playdate_sound_sample_freeSample(Cranked *cranked, AudioSample sample) {
     sample->dereference();
 }
 
-float cranked::playdate_sound_sample_getLength(Cranked *cranked, AudioSample_32 *sample) {
+float cranked::playdate_sound_sample_getLength(Cranked *cranked, AudioSample sample) {
     return framesToSeconds((int) sample->data.size());
 }
 
-int32_t cranked::playdate_sound_sample_decompress(Cranked *cranked, AudioSample_32 *sample) {
+int32 cranked::playdate_sound_sample_decompress(Cranked *cranked, AudioSample sample) {
     return 0; // Todo
 }
 
-SamplePlayer_32 *cranked::playdate_sound_sampleplayer_newPlayer(Cranked *cranked) {
+SamplePlayer cranked::playdate_sound_sampleplayer_newPlayer(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<SamplePlayer_32>();
 }
 
-void cranked::playdate_sound_sampleplayer_freePlayer(Cranked *cranked, SamplePlayer_32 *player) {
+void cranked::playdate_sound_sampleplayer_freePlayer(Cranked *cranked, SamplePlayer player) {
     player->dereference();
 }
 
-void cranked::playdate_sound_sampleplayer_setSample(Cranked *cranked, SamplePlayer_32 *player, AudioSample_32 *sample) {
+void cranked::playdate_sound_sampleplayer_setSample(Cranked *cranked, SamplePlayer player, AudioSample sample) {
     player->sample = sample;
 }
 
-int32_t cranked::playdate_sound_sampleplayer_play(Cranked *cranked, SamplePlayer_32 *player, int32_t repeat, float rate) {
+int32 cranked::playdate_sound_sampleplayer_play(Cranked *cranked, SamplePlayer player, int32 repeat, float rate) {
     player->playing = true;
     player->repeat = repeat;
     player->rate = rate;
     return true;
 }
 
-int32_t cranked::playdate_sound_sampleplayer_isPlaying(Cranked *cranked, SamplePlayer_32 *player) {
+int32 cranked::playdate_sound_sampleplayer_isPlaying(Cranked *cranked, SamplePlayer player) {
     return player->playing; // Todo: Does pausing affect this?
 }
 
-void cranked::playdate_sound_sampleplayer_stop(Cranked *cranked, SamplePlayer_32 *player) {
+void cranked::playdate_sound_sampleplayer_stop(Cranked *cranked, SamplePlayer player) {
     player->playing = false;
     player->sampleOffset = 0;
 }
 
-void cranked::playdate_sound_sampleplayer_setVolume(Cranked *cranked, SamplePlayer_32 *player, float left, float right) {
+void cranked::playdate_sound_sampleplayer_setVolume(Cranked *cranked, SamplePlayer player, float left, float right) {
     player->leftVolume = left;
     player->rightVolume = right;
 }
 
-void cranked::playdate_sound_sampleplayer_getVolume(Cranked *cranked, SamplePlayer_32 *player, float *left, float *right) {
+void cranked::playdate_sound_sampleplayer_getVolume(Cranked *cranked, SamplePlayer player, float *left, float *right) {
     *left = player->leftVolume;
     *right = player->rightVolume;
 }
 
-float cranked::playdate_sound_sampleplayer_getLength(Cranked *cranked, SamplePlayer_32 *player) {
+float cranked::playdate_sound_sampleplayer_getLength(Cranked *cranked, SamplePlayer player) {
     return player->sample ? framesToSeconds((int) player->sample->data.size()) : 0;
 }
 
-void cranked::playdate_sound_sampleplayer_setOffset(Cranked *cranked, SamplePlayer_32 *player, float offset) {
+void cranked::playdate_sound_sampleplayer_setOffset(Cranked *cranked, SamplePlayer player, float offset) {
     player->sampleOffset = framesFromSeconds(offset);
 }
 
-void cranked::playdate_sound_sampleplayer_setRate(Cranked *cranked, SamplePlayer_32 *player, float rate) {
+void cranked::playdate_sound_sampleplayer_setRate(Cranked *cranked, SamplePlayer player, float rate) {
     player->rate = rate;
 }
 
-void cranked::playdate_sound_sampleplayer_setPlayRange(Cranked *cranked, SamplePlayer_32 *player, int32_t start, int32_t end) {
+void cranked::playdate_sound_sampleplayer_setPlayRange(Cranked *cranked, SamplePlayer player, int32 start, int32 end) {
     player->loopStart = start;
     player->loopEnd = end;
 }
 
-void cranked::playdate_sound_sampleplayer_setFinishCallback(Cranked *cranked, SamplePlayer_32 *player, cref_t callback, void *userdata) {
+void cranked::playdate_sound_sampleplayer_setFinishCallback(Cranked *cranked, SamplePlayer player, cref_t callback, void *userdata) {
     player->completionCallback = callback;
     player->completionCallbackUserdata = cranked->toVirtualAddress(userdata);
 }
 
-void cranked::playdate_sound_sampleplayer_setLoopCallback(Cranked *cranked, SamplePlayer_32 *player, cref_t callback, void *userdata) {
+void cranked::playdate_sound_sampleplayer_setLoopCallback(Cranked *cranked, SamplePlayer player, cref_t callback, void *userdata) {
     player->loopCallback = callback;
     player->loopCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
-float cranked::playdate_sound_sampleplayer_getOffset(Cranked *cranked, SamplePlayer_32 *player) {
+float cranked::playdate_sound_sampleplayer_getOffset(Cranked *cranked, SamplePlayer player) {
     return framesToSeconds(player->sampleOffset);
 }
 
-float cranked::playdate_sound_sampleplayer_getRate(Cranked *cranked, SamplePlayer_32 *player) {
+float cranked::playdate_sound_sampleplayer_getRate(Cranked *cranked, SamplePlayer player) {
     return player->rate;
 }
 
-void cranked::playdate_sound_sampleplayer_setPaused(Cranked *cranked, SamplePlayer_32 *player, int32_t flag) {
+void cranked::playdate_sound_sampleplayer_setPaused(Cranked *cranked, SamplePlayer player, int32 flag) {
     player->paused = flag;
 }
 
-PDSynthSignal_32 *cranked::playdate_sound_signal_newSignal(Cranked *cranked, cref_t step, cref_t noteOn, cref_t noteOff, cref_t dealloc, void *userdata) {
+SynthSignal cranked::playdate_sound_signal_newSignal(Cranked *cranked, cref_t step, cref_t noteOn, cref_t noteOff, cref_t dealloc, void *userdata) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_signal_freeSignal(Cranked *cranked, PDSynthSignal_32 *signal) {
+void cranked::playdate_sound_signal_freeSignal(Cranked *cranked, SynthSignal signal) {
     signal->dereference();
 }
 
-float cranked::playdate_sound_signal_getValue(Cranked *cranked, PDSynthSignal_32 *signal) {
+float cranked::playdate_sound_signal_getValue(Cranked *cranked, SynthSignal signal) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_signal_setValueScale(Cranked *cranked, PDSynthSignal_32 *signal, float scale) {
+void cranked::playdate_sound_signal_setValueScale(Cranked *cranked, SynthSignal signal, float scale) {
     signal->scale = scale;
 }
 
-void cranked::playdate_sound_signal_setValueOffset(Cranked *cranked, PDSynthSignal_32 *signal, float offset) {
+void cranked::playdate_sound_signal_setValueOffset(Cranked *cranked, SynthSignal signal, float offset) {
     signal->offset = framesFromSeconds(offset);
 }
 
-uint8_t *cranked::playdate_sound_getError(Cranked *cranked) {
-    return cranked->fromVirtualAddress<uint8_t>(cranked->audio.lastError);
+uint8 *cranked::playdate_sound_getError(Cranked *cranked) {
+    return cranked->fromVirtualAddress<uint8>(cranked->audio.lastError);
 }
 
-PDSynthLFO_32 *cranked::playdate_sound_lfo_newLFO(Cranked *cranked, int32_t type) {
+SynthLFO cranked::playdate_sound_lfo_newLFO(Cranked *cranked, int32 type) {
     return cranked->nativeEngine.createReferencedResource<PDSynthLFO_32>((LFOType)type);
 }
 
-void cranked::playdate_sound_lfo_freeLFO(Cranked *cranked, PDSynthLFO_32 *lfo) {
+void cranked::playdate_sound_lfo_freeLFO(Cranked *cranked, SynthLFO lfo) {
     lfo->dereference();
 }
 
-void cranked::playdate_sound_lfo_setType(Cranked *cranked, PDSynthLFO_32 *lfo, int32_t type) {
+void cranked::playdate_sound_lfo_setType(Cranked *cranked, SynthLFO lfo, int32 type) {
     lfo->type = (LFOType)type;
 }
 
-void cranked::playdate_sound_lfo_setRate(Cranked *cranked, PDSynthLFO_32 *lfo, float rate) {
+void cranked::playdate_sound_lfo_setRate(Cranked *cranked, SynthLFO lfo, float rate) {
     lfo->rate = rate;
 }
 
-void cranked::playdate_sound_lfo_setPhase(Cranked *cranked, PDSynthLFO_32 *lfo, float phase) {
+void cranked::playdate_sound_lfo_setPhase(Cranked *cranked, SynthLFO lfo, float phase) {
     lfo->phase = phase;
 }
 
-void cranked::playdate_sound_lfo_setCenter(Cranked *cranked, PDSynthLFO_32 *lfo, float center) {
+void cranked::playdate_sound_lfo_setCenter(Cranked *cranked, SynthLFO lfo, float center) {
     lfo->center = center;
 }
 
-void cranked::playdate_sound_lfo_setDepth(Cranked *cranked, PDSynthLFO_32 *lfo, float depth) {
+void cranked::playdate_sound_lfo_setDepth(Cranked *cranked, SynthLFO lfo, float depth) {
     lfo->depth = depth;
 }
 
-void cranked::playdate_sound_lfo_setArpeggiation(Cranked *cranked, PDSynthLFO_32 *lfo, int32_t nSteps, float *steps) {
+void cranked::playdate_sound_lfo_setArpeggiation(Cranked *cranked, SynthLFO lfo, int32 nSteps, float *steps) {
     lfo->type = LFOType::Arpeggiator;
     lfo->arpeggiationSteps.clear();
     for (int i = 0; i < nSteps; i++)
         lfo->arpeggiationSteps.push_back(steps[i]);
 }
 
-void cranked::playdate_sound_lfo_setFunction(Cranked *cranked, PDSynthLFO_32 *lfo, cref_t lfoFunc, void *userdata, int32_t interpolate) {
-    lfo->function = lfoFunc;
+void cranked::playdate_sound_lfo_setFunction(Cranked *cranked, SynthLFO lfo, cref_t lfoFunc, void *userdata, int32 interpolate) {
+    lfo->func = lfoFunc;
     lfo->functionUserdata = cranked->toVirtualAddress(userdata);
     lfo->functionInterpolate = interpolate;
     lfo->type = LFOType::Function;
 }
 
-void cranked::playdate_sound_lfo_setDelay(Cranked *cranked, PDSynthLFO_32 *lfo, float holdoff, float ramptime) {
+void cranked::playdate_sound_lfo_setDelay(Cranked *cranked, SynthLFO lfo, float holdoff, float ramptime) {
     lfo->holdOffSamples = framesFromSeconds(holdoff);
     lfo->rampTimeSamples = framesFromSeconds(ramptime);
 }
 
-void cranked::playdate_sound_lfo_setRetrigger(Cranked *cranked, PDSynthLFO_32 *lfo, int32_t flag) {
+void cranked::playdate_sound_lfo_setRetrigger(Cranked *cranked, SynthLFO lfo, int32 flag) {
     lfo->reTrigger = flag;
 }
 
-float cranked::playdate_sound_lfo_getValue(Cranked *cranked, PDSynthLFO_32 *lfo) {
+float cranked::playdate_sound_lfo_getValue(Cranked *cranked, SynthLFO lfo) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_lfo_setGlobal(Cranked *cranked, PDSynthLFO_32 *lfo, int32_t global) {
+void cranked::playdate_sound_lfo_setGlobal(Cranked *cranked, SynthLFO lfo, int32 global) {
     lfo->global = global;
 }
 
-void cranked::playdate_sound_lfo_setStartPhase(Cranked *cranked, PDSynthLFO_32 * lfo, float phase) {
+void cranked::playdate_sound_lfo_setStartPhase(Cranked *cranked, SynthLFO  lfo, float phase) {
     lfo->phase = phase;
 }
 
-PDSynthEnvelope_32 *cranked::playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release) {
+SynthEnvelope cranked::playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release) {
     return cranked->nativeEngine.createReferencedResource<PDSynthEnvelope_32>(attack, decay, sustain, release);
 }
 
-void cranked::playdate_sound_envelope_freeEnvelope(Cranked *cranked, PDSynthEnvelope_32 *env) {
+void cranked::playdate_sound_envelope_freeEnvelope(Cranked *cranked, SynthEnvelope env) {
     env->dereference();
 }
 
-void cranked::playdate_sound_envelope_setAttack(Cranked *cranked, PDSynthEnvelope_32 *env, float attack) {
+void cranked::playdate_sound_envelope_setAttack(Cranked *cranked, SynthEnvelope env, float attack) {
     env->attack = attack;
 }
 
-void cranked::playdate_sound_envelope_setDecay(Cranked *cranked, PDSynthEnvelope_32 *env, float decay) {
+void cranked::playdate_sound_envelope_setDecay(Cranked *cranked, SynthEnvelope env, float decay) {
     env->decay = decay;
 }
 
-void cranked::playdate_sound_envelope_setSustain(Cranked *cranked, PDSynthEnvelope_32 *env, float sustain) {
+void cranked::playdate_sound_envelope_setSustain(Cranked *cranked, SynthEnvelope env, float sustain) {
     env->sustain = sustain;
 }
 
-void cranked::playdate_sound_envelope_setRelease(Cranked *cranked, PDSynthEnvelope_32 *env, float release) {
+void cranked::playdate_sound_envelope_setRelease(Cranked *cranked, SynthEnvelope env, float release) {
     env->release = release;
 }
 
-void cranked::playdate_sound_envelope_setLegato(Cranked *cranked, PDSynthEnvelope_32 *env, int32_t flag) {
+void cranked::playdate_sound_envelope_setLegato(Cranked *cranked, SynthEnvelope env, int32 flag) {
     env->legato = flag;
 }
 
-void cranked::playdate_sound_envelope_setRetrigger(Cranked *cranked, PDSynthEnvelope_32 *env, int32_t flag) {
+void cranked::playdate_sound_envelope_setRetrigger(Cranked *cranked, SynthEnvelope env, int32 flag) {
     env->reTrigger = flag;
 }
 
-float cranked::playdate_sound_envelope_getValue(Cranked *cranked, PDSynthEnvelope_32 *env) {
+float cranked::playdate_sound_envelope_getValue(Cranked *cranked, SynthEnvelope env) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_envelope_setCurvature(Cranked *cranked, PDSynthEnvelope_32 *env, float amount) {
+void cranked::playdate_sound_envelope_setCurvature(Cranked *cranked, SynthEnvelope env, float amount) {
     env->curvature = amount;
 }
 
-void cranked::playdate_sound_envelope_setVelocitySensitivity(Cranked *cranked, PDSynthEnvelope_32 *env, float velsens) {
+void cranked::playdate_sound_envelope_setVelocitySensitivity(Cranked *cranked, SynthEnvelope env, float velsens) {
     env->velocitySensitivity = velsens;
 }
 
-void cranked::playdate_sound_envelope_setRateScaling(Cranked *cranked, PDSynthEnvelope_32 *env, float scaling, float start, float end) {
+void cranked::playdate_sound_envelope_setRateScaling(Cranked *cranked, SynthEnvelope env, float scaling, float start, float end) {
     env->rateScaling = scaling;
     env->rateStart = start;
     env->rateEnd = end;
 }
 
-PDSynth_32 *cranked::playdate_sound_synth_newSynth(Cranked *cranked) {
+Synth cranked::playdate_sound_synth_newSynth(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<PDSynth_32>();
 }
 
-void cranked::playdate_sound_synth_freeSynth(Cranked *cranked, PDSynth_32 *synth) {
+void cranked::playdate_sound_synth_freeSynth(Cranked *cranked, Synth synth) {
     synth->dereference();
 }
 
-void cranked::playdate_sound_synth_setWaveform(Cranked *cranked, PDSynth_32 *synth, int32_t wave) {
+void cranked::playdate_sound_synth_setWaveform(Cranked *cranked, Synth synth, int32 wave) {
     synth->waveform = (SoundWaveform)wave;
 }
 
-void cranked::playdate_sound_synth_setGenerator(Cranked *cranked, PDSynth_32 *synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void *userdata) {
+void cranked::playdate_sound_synth_setGenerator(Cranked *cranked, Synth synth, int32 stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void *userdata) {
     cranked::playdate_sound_synth_setGenerator_deprecated(cranked, synth, stereo, render, noteOn, release, setparam, dealloc, userdata);
     synth->generatorCopyUserdataFunc = copyUserdata;
 }
 
-PDSynth_32 * cranked::playdate_sound_synth_copy(Cranked *cranked, PDSynth_32 * synth) {
+Synth  cranked::playdate_sound_synth_copy(Cranked *cranked, Synth  synth) {
     return nullptr; // Todo
 }
 
-void cranked::playdate_sound_synth_setGenerator_deprecated(Cranked *cranked, PDSynth_32 *synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void *userdata) {
+void cranked::playdate_sound_synth_setGenerator_deprecated(Cranked *cranked, Synth synth, int32 stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void *userdata) {
     synth->generatorStereo = stereo;
     synth->generatorRenderFunc = render;
     synth->generatorNoteOnFunc = noteOn;
@@ -2140,740 +2212,744 @@ void cranked::playdate_sound_synth_setGenerator_deprecated(Cranked *cranked, PDS
     synth->generatorCopyUserdataFunc = 0;
 }
 
-void cranked::playdate_sound_synth_setSample(Cranked *cranked, PDSynth_32 *synth, AudioSample_32 *sample, uint32_t sustainStart, uint32_t sustainEnd) {
+void cranked::playdate_sound_synth_setSample(Cranked *cranked, Synth synth, AudioSample sample, uint32 sustainStart, uint32 sustainEnd) {
     synth->sample = sample;
     synth->sampleSustainStart = sustainStart;
     synth->sampleSustainEnd = sustainEnd;
 }
 
-void cranked::playdate_sound_synth_setAttackTime(Cranked *cranked, PDSynth_32 *synth, float attack) {
-    synth->envelope.attack = attack;
+void cranked::playdate_sound_synth_setAttackTime(Cranked *cranked, Synth synth, float attack) {
+    synth->envelope->attack = attack;
 }
 
-void cranked::playdate_sound_synth_setDecayTime(Cranked *cranked, PDSynth_32 *synth, float decay) {
-    synth->envelope.decay = decay;
+void cranked::playdate_sound_synth_setDecayTime(Cranked *cranked, Synth synth, float decay) {
+    synth->envelope->decay = decay;
 }
 
-void cranked::playdate_sound_synth_setSustainLevel(Cranked *cranked, PDSynth_32 *synth, float sustain) {
-    synth->envelope.sustain = sustain;
+void cranked::playdate_sound_synth_setSustainLevel(Cranked *cranked, Synth synth, float sustain) {
+    synth->envelope->sustain = sustain;
 }
 
-void cranked::playdate_sound_synth_setReleaseTime(Cranked *cranked, PDSynth_32 *synth, float release) {
-    synth->envelope.release = release;
+void cranked::playdate_sound_synth_setReleaseTime(Cranked *cranked, Synth synth, float release) {
+    synth->envelope->release = release;
 }
 
-void cranked::playdate_sound_synth_setTranspose(Cranked *cranked, PDSynth_32 *synth, float halfSteps) {
+void cranked::playdate_sound_synth_setTranspose(Cranked *cranked, Synth synth, float halfSteps) {
     synth->transposeHalfSteps = halfSteps;
 }
 
-void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, PDSynth_32 *synth, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, Synth synth, SynthSignalValue mod) {
     synth->frequencyModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_synth_getFrequencyModulator(Cranked *cranked, PDSynth_32 *synth) {
+SynthSignalValue cranked::playdate_sound_synth_getFrequencyModulator(Cranked *cranked, Synth synth) {
     return synth->frequencyModulator.get();
 }
 
-void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, PDSynth_32 *synth, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, Synth synth, SynthSignalValue mod) {
     synth->amplitudeModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_synth_getAmplitudeModulator(Cranked *cranked, PDSynth_32 *synth) {
+SynthSignalValue cranked::playdate_sound_synth_getAmplitudeModulator(Cranked *cranked, Synth synth) {
     return synth->amplitudeModulator.get();
 }
 
-int32_t cranked::playdate_sound_synth_getParameterCount(Cranked *cranked, PDSynth_32 *synth) {
+int32 cranked::playdate_sound_synth_getParameterCount(Cranked *cranked, Synth synth) {
     // Todo
     return 0;
 }
 
-int32_t cranked::playdate_sound_synth_setParameter(Cranked *cranked, PDSynth_32 *synth, int32_t parameter, float value) {
+int32 cranked::playdate_sound_synth_setParameter(Cranked *cranked, Synth synth, int32 parameter, float value) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, PDSynth_32 *synth, int32_t parameter, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, Synth synth, int32 parameter, SynthSignalValue mod) {
     synth->parameterModulators[parameter] = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_synth_getParameterModulator(Cranked *cranked, PDSynth_32 *synth, int32_t parameter) {
+SynthSignalValue cranked::playdate_sound_synth_getParameterModulator(Cranked *cranked, Synth synth, int32 parameter) {
     return synth->parameterModulators[parameter].get();
 }
 
-void cranked::playdate_sound_synth_playNote(Cranked *cranked, PDSynth_32 *synth, float freq, float vel, float len, uint32_t when) {
+void cranked::playdate_sound_synth_playNote(Cranked *cranked, Synth synth, float freq, float vel, float len, uint32 when) {
     // Todo
 }
 
-void cranked::playdate_sound_synth_playMIDINote(Cranked *cranked, PDSynth_32 *synth, float note, float vel, float len, uint32_t when) {
+void cranked::playdate_sound_synth_playMIDINote(Cranked *cranked, Synth synth, float note, float vel, float len, uint32 when) {
     // Todo
 }
 
-void cranked::playdate_sound_synth_noteOff(Cranked *cranked, PDSynth_32 *synth, uint32_t when) {
+void cranked::playdate_sound_synth_noteOff(Cranked *cranked, Synth synth, uint32 when) {
     // Todo
 }
 
-void cranked::playdate_sound_synth_stop(Cranked *cranked, PDSynth_32 *synth) {
+void cranked::playdate_sound_synth_stop(Cranked *cranked, Synth synth) {
     // Todo
 }
 
-void cranked::playdate_sound_synth_setVolume(Cranked *cranked, PDSynth_32 *synth, float left, float right) {
+void cranked::playdate_sound_synth_setVolume(Cranked *cranked, Synth synth, float left, float right) {
     synth->leftVolume = left;
     synth->rightVolume = right;
 }
 
-void cranked::playdate_sound_synth_getVolume(Cranked *cranked, PDSynth_32 *synth, float *left, float *right) {
+void cranked::playdate_sound_synth_getVolume(Cranked *cranked, Synth synth, float *left, float *right) {
     *left = synth->leftVolume;
     *right = synth->rightVolume;
 }
 
-int32_t cranked::playdate_sound_synth_isPlaying(Cranked *cranked, PDSynth_32 *synth) {
+int32 cranked::playdate_sound_synth_isPlaying(Cranked *cranked, Synth synth) {
     return synth->playing;
 }
 
-PDSynthEnvelope_32 *cranked::playdate_sound_synth_getEnvelope(Cranked *cranked, PDSynth_32 *synth) {
-    return &synth->envelope;
+SynthEnvelope cranked::playdate_sound_synth_getEnvelope(Cranked *cranked, Synth synth) {
+    return synth->envelope.get();
 }
 
-int32_t cranked::playdate_sound_synth_setWavetable(Cranked *cranked, PDSynth_32 * synth, AudioSample_32 * sample, int32_t log2size, int32_t columns, int32_t rows) {
+int32 cranked::playdate_sound_synth_setWavetable(Cranked *cranked, Synth  synth, AudioSample sample, int32 log2size, int32 columns, int32 rows) {
     return 0; // Todo
 }
 
-ControlSignal_32 *cranked::playdate_control_signal_newSignal(Cranked *cranked) {
+ControlSignal cranked::playdate_control_signal_newSignal(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<ControlSignal_32>();
 }
 
-void cranked::playdate_control_signal_freeSignal(Cranked *cranked, ControlSignal_32 *signal) {
+void cranked::playdate_control_signal_freeSignal(Cranked *cranked, ControlSignal signal) {
     signal->dereference();
 }
 
-void cranked::playdate_control_signal_clearEvents(Cranked *cranked, ControlSignal_32 *control) {
+void cranked::playdate_control_signal_clearEvents(Cranked *cranked, ControlSignal control) {
     control->events.clear();
 }
 
-void cranked::playdate_control_signal_addEvent(Cranked *cranked, ControlSignal_32 *control, int32_t step, float value, int32_t interpolate) {
-    control->events.insert(std::pair(step, ControlSignal_32::Event{value, (bool)interpolate}));
+void cranked::playdate_control_signal_addEvent(Cranked *cranked, ControlSignal control, int32 step, float value, int32 interpolate) {
+    control->events.insert(pair(step, ControlSignal_32::Event{value, (bool)interpolate}));
 }
 
-void cranked::playdate_control_signal_removeEvent(Cranked *cranked, ControlSignal_32 *control, int32_t step) {
+void cranked::playdate_control_signal_removeEvent(Cranked *cranked, ControlSignal control, int32 step) {
     control->events.erase(step);
 }
 
-int32_t cranked::playdate_control_signal_getMIDIControllerNumber(Cranked *cranked, ControlSignal_32 *control) {
+int32 cranked::playdate_control_signal_getMIDIControllerNumber(Cranked *cranked, ControlSignal control) {
     return control->controllerNumber;
 }
 
-PDSynthInstrument_32 *cranked::playdate_sound_instrument_newInstrument(Cranked *cranked) {
+SynthInstrument cranked::playdate_sound_instrument_newInstrument(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<PDSynthInstrument_32>();
 }
 
-void cranked::playdate_sound_instrument_freeInstrument(Cranked *cranked, PDSynthInstrument_32 *inst) {
+void cranked::playdate_sound_instrument_freeInstrument(Cranked *cranked, SynthInstrument inst) {
     inst->dereference();
 }
 
-int32_t cranked::playdate_sound_instrument_addVoice(Cranked *cranked, PDSynthInstrument_32 *inst, PDSynth_32 *synth, float rangeStart, float rangeEnd, float transpose) {
+int32 cranked::playdate_sound_instrument_addVoice(Cranked *cranked, SynthInstrument inst, Synth synth, float rangeStart, float rangeEnd, float transpose) {
     // Todo: Check if already in an instrument or channel
-    inst->voices.emplace_back(synth);
+    eraseByEquivalentKey(inst->voices, synth);
     synth->instrumentStartFrequency = rangeStart;
     synth->instrumentEndFrequency = rangeEnd;
     synth->instrumentTranspose = transpose;
     return true;
 }
 
-PDSynth_32 *cranked::playdate_sound_instrument_playNote(Cranked *cranked, PDSynthInstrument_32 *inst, float frequency, float vel, float len, uint32_t when) {
+Synth cranked::playdate_sound_instrument_playNote(Cranked *cranked, SynthInstrument inst, float frequency, float vel, float len, uint32 when) {
     // Todo
     return nullptr;
 }
 
-PDSynth_32 *cranked::playdate_sound_instrument_playMIDINote(Cranked *cranked, PDSynthInstrument_32 *inst, float note, float vel, float len, uint32_t when) {
+Synth cranked::playdate_sound_instrument_playMIDINote(Cranked *cranked, SynthInstrument inst, float note, float vel, float len, uint32 when) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_instrument_setPitchBend(Cranked *cranked, PDSynthInstrument_32 *inst, float bend) {
+void cranked::playdate_sound_instrument_setPitchBend(Cranked *cranked, SynthInstrument inst, float bend) {
     inst->pitchBend = bend;
 }
 
-void cranked::playdate_sound_instrument_setPitchBendRange(Cranked *cranked, PDSynthInstrument_32 *inst, float halfSteps) {
+void cranked::playdate_sound_instrument_setPitchBendRange(Cranked *cranked, SynthInstrument inst, float halfSteps) {
     inst->pitchBendRangeHalfSteps = halfSteps;
 }
 
-void cranked::playdate_sound_instrument_setTranspose(Cranked *cranked, PDSynthInstrument_32 *inst, float halfSteps) {
+void cranked::playdate_sound_instrument_setTranspose(Cranked *cranked, SynthInstrument inst, float halfSteps) {
     inst->transposeHalfSteps = halfSteps;
 }
 
-void cranked::playdate_sound_instrument_noteOff(Cranked *cranked, PDSynthInstrument_32 *inst, float note, uint32_t when) {
+void cranked::playdate_sound_instrument_noteOff(Cranked *cranked, SynthInstrument inst, float note, uint32 when) {
     // Todo
 }
 
-void cranked::playdate_sound_instrument_allNotesOff(Cranked *cranked, PDSynthInstrument_32 *inst, uint32_t when) {
+void cranked::playdate_sound_instrument_allNotesOff(Cranked *cranked, SynthInstrument inst, uint32 when) {
     // Todo
 }
 
-void cranked::playdate_sound_instrument_setVolume(Cranked *cranked, PDSynthInstrument_32 *inst, float left, float right) {
+void cranked::playdate_sound_instrument_setVolume(Cranked *cranked, SynthInstrument inst, float left, float right) {
     inst->leftVolume = left;
     inst->rightVolume = right;
 }
 
-void cranked::playdate_sound_instrument_getVolume(Cranked *cranked, PDSynthInstrument_32 *inst, float *left, float *right) {
+void cranked::playdate_sound_instrument_getVolume(Cranked *cranked, SynthInstrument inst, float *left, float *right) {
     *left = inst->leftVolume;
     *right = inst->rightVolume;
 }
 
-int32_t cranked::playdate_sound_instrument_activeVoiceCount(Cranked *cranked, PDSynthInstrument_32 *inst) {
+int32 cranked::playdate_sound_instrument_activeVoiceCount(Cranked *cranked, SynthInstrument inst) {
     // Todo
     return 0;
 }
 
-SequenceTrack_32 *cranked::playdate_sound_track_newTrack(Cranked *cranked) {
+SequenceTrack cranked::playdate_sound_track_newTrack(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<SequenceTrack_32>();
 }
 
-void cranked::playdate_sound_track_freeTrack(Cranked *cranked, SequenceTrack_32 *track) {
+void cranked::playdate_sound_track_freeTrack(Cranked *cranked, SequenceTrack track) {
     track->dereference();
 }
 
-void cranked::playdate_sound_track_setInstrument(Cranked *cranked, SequenceTrack_32 *track, PDSynthInstrument_32 *inst) {
+void cranked::playdate_sound_track_setInstrument(Cranked *cranked, SequenceTrack track, SynthInstrument inst) {
     track->instrument = inst;
 }
 
-PDSynthInstrument_32 *cranked::playdate_sound_track_getInstrument(Cranked *cranked, SequenceTrack_32 *track) {
+SynthInstrument cranked::playdate_sound_track_getInstrument(Cranked *cranked, SequenceTrack track) {
     return track->instrument.get();
 }
 
-void cranked::playdate_sound_track_addNoteEvent(Cranked *cranked, SequenceTrack_32 *track, uint32_t step, uint32_t len, float note, float velocity) {
+void cranked::playdate_sound_track_addNoteEvent(Cranked *cranked, SequenceTrack track, uint32 step, uint32 len, float note, float velocity) {
     // Todo
 }
 
-void cranked::playdate_sound_track_removeNoteEvent(Cranked *cranked, SequenceTrack_32 *track, uint32_t step, float note) {
+void cranked::playdate_sound_track_removeNoteEvent(Cranked *cranked, SequenceTrack track, uint32 step, float note) {
     // Todo
 }
 
-void cranked::playdate_sound_track_clearNotes(Cranked *cranked, SequenceTrack_32 *track) {
+void cranked::playdate_sound_track_clearNotes(Cranked *cranked, SequenceTrack track) {
     // Todo
 }
 
-int32_t cranked::playdate_sound_track_getControlSignalCount(Cranked *cranked, SequenceTrack_32 *track) {
+int32 cranked::playdate_sound_track_getControlSignalCount(Cranked *cranked, SequenceTrack track) {
     // Todo
     return 0;
 }
 
-ControlSignal_32 *cranked::playdate_sound_track_getControlSignal(Cranked *cranked, SequenceTrack_32 *track, int32_t idx) {
+ControlSignal cranked::playdate_sound_track_getControlSignal(Cranked *cranked, SequenceTrack track, int32 idx) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_track_clearControlEvents(Cranked *cranked, SequenceTrack_32 *track) {
+void cranked::playdate_sound_track_clearControlEvents(Cranked *cranked, SequenceTrack track) {
     // Todo
 }
 
-int32_t cranked::playdate_sound_track_getPolyphony(Cranked *cranked, SequenceTrack_32 *track) {
-    // Todo
-    return 0;
-}
-
-int32_t cranked::playdate_sound_track_activeVoiceCount(Cranked *cranked, SequenceTrack_32 *track) {
+int32 cranked::playdate_sound_track_getPolyphony(Cranked *cranked, SequenceTrack track) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_track_setMuted(Cranked *cranked, SequenceTrack_32 *track, int32_t mute) {
+int32 cranked::playdate_sound_track_activeVoiceCount(Cranked *cranked, SequenceTrack track) {
+    // Todo
+    return 0;
+}
+
+void cranked::playdate_sound_track_setMuted(Cranked *cranked, SequenceTrack track, int32 mute) {
     track->muted = mute;
 }
 
-uint32_t cranked::playdate_sound_track_getLength(Cranked *cranked, SequenceTrack_32 *track) {
+uint32 cranked::playdate_sound_track_getLength(Cranked *cranked, SequenceTrack track) {
     // Todo
     return 0;
 }
 
-int32_t cranked::playdate_sound_track_getIndexForStep(Cranked *cranked, SequenceTrack_32 *track, uint32_t step) {
+int32 cranked::playdate_sound_track_getIndexForStep(Cranked *cranked, SequenceTrack track, uint32 step) {
     // Todo
     return 0;
 }
 
-int32_t cranked::playdate_sound_track_getNoteAtIndex(Cranked *cranked, SequenceTrack_32 *track, int32_t index, uint32_t *outStep, uint32_t *outLen, float *outNote, float *outVelocity) {
+int32 cranked::playdate_sound_track_getNoteAtIndex(Cranked *cranked, SequenceTrack track, int32 index, uint32 *outStep, uint32 *outLen, float *outNote, float *outVelocity) {
     // Todo
     return 0;
 }
 
-ControlSignal_32 *cranked::playdate_sound_track_getSignalForController(Cranked *cranked, SequenceTrack_32 *track, int32_t controller, int32_t create) {
+ControlSignal cranked::playdate_sound_track_getSignalForController(Cranked *cranked, SequenceTrack track, int32 controller, int32 create) {
     // Todo
     return nullptr;
 }
 
-SoundSequence_32 *cranked::playdate_sound_sequence_newSequence(Cranked *cranked) {
+SoundSequence cranked::playdate_sound_sequence_newSequence(Cranked *cranked) {
     return cranked->audio.allocateReferencedSource<SoundSequence_32>();
 }
 
-void cranked::playdate_sound_sequence_freeSequence(Cranked *cranked, SoundSequence_32 *sequence) {
+void cranked::playdate_sound_sequence_freeSequence(Cranked *cranked, SoundSequence sequence) {
     sequence->dereference();
 }
-int32_t cranked::playdate_sound_sequence_loadMIDIFile(Cranked *cranked, SoundSequence_32 *seq, uint8_t *path) {
+int32 cranked::playdate_sound_sequence_loadMIDIFile(Cranked *cranked, SoundSequence seq, uint8 *path) {
     // Todo
     return 0;
 }
 
-uint32_t cranked::playdate_sound_sequence_getTime(Cranked *cranked, SoundSequence_32 *seq) {
+uint32 cranked::playdate_sound_sequence_getTime(Cranked *cranked, SoundSequence seq) {
     return seq->time;
 }
 
-void cranked::playdate_sound_sequence_setTime(Cranked *cranked, SoundSequence_32 *seq, uint32_t time) {
+void cranked::playdate_sound_sequence_setTime(Cranked *cranked, SoundSequence seq, uint32 time) {
     seq->time = (int)time;
 }
 
-void cranked::playdate_sound_sequence_setLoops(Cranked *cranked, SoundSequence_32 *seq, int32_t loopstart, int32_t loopend, int32_t loops) {
+void cranked::playdate_sound_sequence_setLoops(Cranked *cranked, SoundSequence seq, int32 loopstart, int32 loopend, int32 loops) {
     seq->currentLoop = 0;
     seq->loopStart = loopstart;
     seq->loopEnd = loopend;
     seq->loops = loops;
 }
 
-int32_t cranked::playdate_sound_sequence_getTempo(Cranked *cranked, SoundSequence_32 *seq) {
-    return (int32_t) seq->tempo; // Why still an integer? Breaking ABI change?
+float cranked::playdate_sound_sequence_getTempo(Cranked *cranked, SoundSequence seq) {
+    return seq->tempo;
 }
 
-void cranked::playdate_sound_sequence_setTempo(Cranked *cranked, SoundSequence_32 * seq, float stepsPerSecond) {
+int32 cranked::playdate_sound_sequence_getTempo_deprecated(Cranked *cranked, SoundSequence seq) {
+    return (int32) seq->tempo;
+}
+
+void cranked::playdate_sound_sequence_setTempo(Cranked *cranked, SoundSequence seq, float stepsPerSecond) {
     seq->tempo = stepsPerSecond;
 }
 
-void cranked::playdate_sound_sequence_setTempo_int(Cranked *cranked, SoundSequence_32 * seq, int32_t stepsPerSecond) {
+void cranked::playdate_sound_sequence_setTempo_int(Cranked *cranked, SoundSequence seq, int32 stepsPerSecond) {
     seq->tempo = (float)stepsPerSecond;
 }
 
-int32_t cranked::playdate_sound_sequence_getTrackCount(Cranked *cranked, SoundSequence_32 *seq) {
+int32 cranked::playdate_sound_sequence_getTrackCount(Cranked *cranked, SoundSequence seq) {
     // Todo
     return 0;
 }
 
-SequenceTrack_32 *cranked::playdate_sound_sequence_addTrack(Cranked *cranked, SoundSequence_32 *seq) {
+SequenceTrack cranked::playdate_sound_sequence_addTrack(Cranked *cranked, SoundSequence seq) {
     // Todo
     return nullptr;
 }
 
-SequenceTrack_32 *cranked::playdate_sound_sequence_getTrackAtIndex(Cranked *cranked, SoundSequence_32 *seq, uint32_t track) {
+SequenceTrack cranked::playdate_sound_sequence_getTrackAtIndex(Cranked *cranked, SoundSequence seq, uint32 track) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_sequence_setTrackAtIndex(Cranked *cranked, SoundSequence_32 *seq, SequenceTrack_32 *track, uint32_t idx) {
+void cranked::playdate_sound_sequence_setTrackAtIndex(Cranked *cranked, SoundSequence seq, SequenceTrack track, uint32 idx) {
     // Todo
 }
 
-void cranked::playdate_sound_sequence_allNotesOff(Cranked *cranked, SoundSequence_32 *seq) {
+void cranked::playdate_sound_sequence_allNotesOff(Cranked *cranked, SoundSequence seq) {
     // Todo
 }
 
-int32_t cranked::playdate_sound_sequence_isPlaying(Cranked *cranked, SoundSequence_32 *seq) {
+int32 cranked::playdate_sound_sequence_isPlaying(Cranked *cranked, SoundSequence seq) {
     return seq->playing;
 }
 
-uint32_t cranked::playdate_sound_sequence_getLength(Cranked *cranked, SoundSequence_32 *seq) {
+uint32 cranked::playdate_sound_sequence_getLength(Cranked *cranked, SoundSequence seq) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_sequence_play(Cranked *cranked, SoundSequence_32 *seq, cref_t finishCallback, void *userdata) {
+void cranked::playdate_sound_sequence_play(Cranked *cranked, SoundSequence seq, cref_t finishCallback, void *userdata) {
     // Todo
 }
 
-void cranked::playdate_sound_sequence_stop(Cranked *cranked, SoundSequence_32 *seq) {
+void cranked::playdate_sound_sequence_stop(Cranked *cranked, SoundSequence seq) {
     // Todo
 }
 
-int32_t cranked::playdate_sound_sequence_getCurrentStep(Cranked *cranked, SoundSequence_32 *seq, int32_t *timeOffset) {
+int32 cranked::playdate_sound_sequence_getCurrentStep(Cranked *cranked, SoundSequence seq, int32 *timeOffset) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_sequence_setCurrentStep(Cranked *cranked, SoundSequence_32 *seq, int32_t step, int32_t timeOffset, int32_t playNotes) {
+void cranked::playdate_sound_sequence_setCurrentStep(Cranked *cranked, SoundSequence seq, int32 step, int32 timeOffset, int32 playNotes) {
     // Todo
 }
 
-TwoPoleFilter_32 *cranked::playdate_sound_effect_twopolefilter_newFilter(Cranked *cranked) {
+TwoPoleFilter cranked::playdate_sound_effect_twopolefilter_newFilter(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<TwoPoleFilter_32>();
 }
 
-void cranked::playdate_sound_effect_twopolefilter_freeFilter(Cranked *cranked, TwoPoleFilter_32 *filter) {
+void cranked::playdate_sound_effect_twopolefilter_freeFilter(Cranked *cranked, TwoPoleFilter filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setType(Cranked *cranked, TwoPoleFilter_32 *filter, int32_t type) {
+void cranked::playdate_sound_effect_twopolefilter_setType(Cranked *cranked, TwoPoleFilter filter, int32 type) {
     filter->type = (TwoPoleFilterType) type;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setFrequency(Cranked *cranked, TwoPoleFilter_32 *filter, float frequency) {
+void cranked::playdate_sound_effect_twopolefilter_setFrequency(Cranked *cranked, TwoPoleFilter filter, float frequency) {
     filter->frequency = frequency;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked *cranked, TwoPoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signal) {
     filter->frequencyModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_twopolefilter_getFrequencyModulator(Cranked *cranked, TwoPoleFilter_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getFrequencyModulator(Cranked *cranked, TwoPoleFilter filter) {
     return filter->frequencyModulator.get();
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setGain(Cranked *cranked, TwoPoleFilter_32 *filter, float gain) {
+void cranked::playdate_sound_effect_twopolefilter_setGain(Cranked *cranked, TwoPoleFilter filter, float gain) {
     filter->gain = gain;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setResonance(Cranked *cranked, TwoPoleFilter_32 *filter, float resonance) {
+void cranked::playdate_sound_effect_twopolefilter_setResonance(Cranked *cranked, TwoPoleFilter filter, float resonance) {
     filter->resonance = resonance;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked *cranked, TwoPoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signal) {
     filter->resonanceModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_twopolefilter_getResonanceModulator(Cranked *cranked, TwoPoleFilter_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getResonanceModulator(Cranked *cranked, TwoPoleFilter filter) {
     return filter->resonanceModulator.get();
 }
 
-OnePoleFilter_32 *cranked::playdate_sound_effect_onepolefilter_newFilter(Cranked *cranked) {
+OnePoleFilter cranked::playdate_sound_effect_onepolefilter_newFilter(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<OnePoleFilter_32>();
 }
 
-void cranked::playdate_sound_effect_onepolefilter_freeFilter(Cranked *cranked, OnePoleFilter_32 *filter) {
+void cranked::playdate_sound_effect_onepolefilter_freeFilter(Cranked *cranked, OnePoleFilter filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_onepolefilter_setParameter(Cranked *cranked, OnePoleFilter_32 *filter, float parameter) {
+void cranked::playdate_sound_effect_onepolefilter_setParameter(Cranked *cranked, OnePoleFilter filter, float parameter) {
     filter->cutoffFrequency = parameter;
 }
 
-void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked *cranked, OnePoleFilter_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked *cranked, OnePoleFilter filter, SynthSignalValue signal) {
     filter->cutoffFrequencyModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_onepolefilter_getParameterModulator(Cranked *cranked, OnePoleFilter_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_onepolefilter_getParameterModulator(Cranked *cranked, OnePoleFilter filter) {
     return filter->cutoffFrequencyModulator.get();
 }
 
-BitCrusher_32 *cranked::playdate_sound_effect_bitcrusher_newBitCrusher(Cranked *cranked) {
+BitCrusher cranked::playdate_sound_effect_bitcrusher_newBitCrusher(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<BitCrusher_32>();
 }
 
-void cranked::playdate_sound_effect_bitcrusher_freeBitCrusher(Cranked *cranked, BitCrusher_32 *filter) {
+void cranked::playdate_sound_effect_bitcrusher_freeBitCrusher(Cranked *cranked, BitCrusher filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setAmount(Cranked *cranked, BitCrusher_32 *filter, float amount) {
+void cranked::playdate_sound_effect_bitcrusher_setAmount(Cranked *cranked, BitCrusher filter, float amount) {
     filter->amount = amount;
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *cranked, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signal) {
     filter->amountModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getAmountModulator(Cranked *cranked, BitCrusher_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getAmountModulator(Cranked *cranked, BitCrusher filter) {
     return filter->amountModulator.get();
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked, BitCrusher_32 *filter, float undersampling) {
+void cranked::playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked, BitCrusher filter, float undersampling) {
     filter->undersampling = undersampling;
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *cranked, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signal) {
     filter->undersamplingModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher filter) {
     return filter->undersamplingModulator.get();
 }
 
-RingModulator_32 *cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
+RingModulator cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<RingModulator_32>();
 }
 
-void cranked::playdate_sound_effect_ringmodulator_freeRingmod(Cranked *cranked, RingModulator_32 *filter) {
+void cranked::playdate_sound_effect_ringmodulator_freeRingmod(Cranked *cranked, RingModulator filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_ringmodulator_setFrequency(Cranked *cranked, RingModulator_32 *filter, float frequency) {
+void cranked::playdate_sound_effect_ringmodulator_setFrequency(Cranked *cranked, RingModulator filter, float frequency) {
     filter->frequency = frequency;
 }
 
-void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked *cranked, RingModulator_32 *filter, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked *cranked, RingModulator filter, SynthSignalValue signal) {
     filter->frequencyModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_ringmodulator_getFrequencyModulator(Cranked *cranked, RingModulator_32 *filter) {
+SynthSignalValue cranked::playdate_sound_effect_ringmodulator_getFrequencyModulator(Cranked *cranked, RingModulator filter) {
     return filter->frequencyModulator.get();
 }
 
-DelayLine_32 *cranked::playdate_sound_effect_delayline_newDelayLine(Cranked *cranked, int32_t length, int32_t stereo) {
+DelayLine cranked::playdate_sound_effect_delayline_newDelayLine(Cranked *cranked, int32 length, int32 stereo) {
     return cranked->nativeEngine.createReferencedResource<DelayLine_32>((int) length, (bool) stereo);
 }
 
-void cranked::playdate_sound_effect_delayline_freeDelayLine(Cranked *cranked, DelayLine_32 *filter) {
+void cranked::playdate_sound_effect_delayline_freeDelayLine(Cranked *cranked, DelayLine filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_delayline_setLength(Cranked *cranked, DelayLine_32 *d, int32_t frames) {
+void cranked::playdate_sound_effect_delayline_setLength(Cranked *cranked, DelayLine d, int32 frames) {
     d->data.clear();
     d->data.resize((d->stereo ? 2 : 1) * frames);
 }
 
-void cranked::playdate_sound_effect_delayline_setFeedback(Cranked *cranked, DelayLine_32 *d, float fb) {
+void cranked::playdate_sound_effect_delayline_setFeedback(Cranked *cranked, DelayLine d, float fb) {
     d->feedback = fb;
 }
 
-DelayLineTap_32 *cranked::playdate_sound_effect_delayline_addTap(Cranked *cranked, DelayLine_32 *d, int32_t delay) {
+DelayLineTap cranked::playdate_sound_effect_delayline_addTap(Cranked *cranked, DelayLine d, int32 delay) {
     return cranked->audio.allocateReferencedSource<DelayLineTap_32>(d, (int) delay);
 }
 
-void cranked::playdate_sound_effect_delayline_freeTap(Cranked *cranked, DelayLineTap_32 *tap) {
+void cranked::playdate_sound_effect_delayline_freeTap(Cranked *cranked, DelayLineTap tap) {
     tap->dereference();
 }
 
-void cranked::playdate_sound_effect_delayline_setTapDelay(Cranked *cranked, DelayLineTap_32 *t, int32_t frames) {
+void cranked::playdate_sound_effect_delayline_setTapDelay(Cranked *cranked, DelayLineTap t, int32 frames) {
     t->delayFrames = frames;
 }
 
-void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cranked, DelayLineTap_32 *t, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cranked, DelayLineTap t, SynthSignalValue mod) {
     t->delayModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_delayline_getTapDelayModulator(Cranked *cranked, DelayLineTap_32 *t) {
+SynthSignalValue cranked::playdate_sound_effect_delayline_getTapDelayModulator(Cranked *cranked, DelayLineTap t) {
     return t->delayModulator.get();
 }
 
-void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cranked, DelayLineTap_32 *t, int32_t flip) {
+void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cranked, DelayLineTap t, int32 flip) {
     t->channelsFlipped = flip;
 }
 
-Overdrive_32 *cranked::playdate_sound_effect_overdrive_newOverdrive(Cranked *cranked) {
+Overdrive cranked::playdate_sound_effect_overdrive_newOverdrive(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<Overdrive_32>();
 }
 
-void cranked::playdate_sound_effect_overdrive_freeOverdrive(Cranked *cranked, Overdrive_32 *filter) {
+void cranked::playdate_sound_effect_overdrive_freeOverdrive(Cranked *cranked, Overdrive filter) {
     filter->dereference();
 }
 
-void cranked::playdate_sound_effect_overdrive_setGain(Cranked *cranked, Overdrive_32 *o, float gain) {
+void cranked::playdate_sound_effect_overdrive_setGain(Cranked *cranked, Overdrive o, float gain) {
     o->gain = gain;
 }
 
-void cranked::playdate_sound_effect_overdrive_setLimit(Cranked *cranked, Overdrive_32 *o, float limit) {
+void cranked::playdate_sound_effect_overdrive_setLimit(Cranked *cranked, Overdrive o, float limit) {
     o->limit = limit;
 }
 
-void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked, Overdrive_32 *o, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked, Overdrive o, SynthSignalValue mod) {
     o->limitModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_overdrive_getLimitModulator(Cranked *cranked, Overdrive_32 *o) {
+SynthSignalValue cranked::playdate_sound_effect_overdrive_getLimitModulator(Cranked *cranked, Overdrive o) {
     return o->limitModulator.get();
 }
 
-void cranked::playdate_sound_effect_overdrive_setOffset(Cranked *cranked, Overdrive_32 *o, float offset) {
+void cranked::playdate_sound_effect_overdrive_setOffset(Cranked *cranked, Overdrive o, float offset) {
     o->offset = offset;
 }
 
-void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranked, Overdrive_32 *o, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranked, Overdrive o, SynthSignalValue mod) {
     o->offsetModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_overdrive_getOffsetModulator(Cranked *cranked, Overdrive_32 *o) {
+SynthSignalValue cranked::playdate_sound_effect_overdrive_getOffsetModulator(Cranked *cranked, Overdrive o) {
     return o->offsetModulator.get();
 }
 
-SoundEffect_32 *cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_t proc, void *userdata) {
+SoundEffect cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_t proc, void *userdata) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect_32 *effect) {
+void cranked::playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect effect) {
     effect->dereference();
 }
 
-void cranked::playdate_sound_effect_setMix(Cranked *cranked, SoundEffect_32 *effect, float level) {
+void cranked::playdate_sound_effect_setMix(Cranked *cranked, SoundEffect effect, float level) {
     effect->mixLevel = level;
 }
 
-void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffect_32 *effect, PDSynthSignalValue_32 *signal) {
+void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffect effect, SynthSignalValue signal) {
     effect->mixModulator = signal;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect_32 *effect) {
+SynthSignalValue cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect effect) {
     return effect->mixModulator.get();
 }
 
-void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect_32 *effect, void *userdata) {
+void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect effect, void *userdata) {
     effect->userdata = cranked->toVirtualAddress(userdata);
 }
 
-void *cranked::playdate_sound_effect_getUserdata(Cranked *cranked, SoundEffect_32 *effect) {
+void *cranked::playdate_sound_effect_getUserdata(Cranked *cranked, SoundEffect effect) {
     return cranked->fromVirtualAddress(effect->userdata);
 }
 
-SoundChannel_32 *cranked::playdate_sound_channel_newChannel(Cranked *cranked) {
+SoundChannel cranked::playdate_sound_channel_newChannel(Cranked *cranked) {
     return cranked->audio.allocateChannel();
 }
 
-void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel_32 *channel) {
+void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel channel) {
     channel->dereference();
 }
 
-int32_t cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel_32 *channel, SoundSource_32 *source) {
-    if (std::find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
+int32 cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel channel, SoundSource source) {
+    if (find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
         return false;
-    channel->sources.emplace_back(source);
+    channel->sources.emplace(source);
     return true;
 }
 
-int32_t cranked::playdate_sound_channel_removeSource(Cranked *cranked, SoundChannel_32 *channel, SoundSource_32 *source) {
-    return std::erase(channel->sources, source) > 0;
+int32 cranked::playdate_sound_channel_removeSource(Cranked *cranked, SoundChannel channel, SoundSource source) {
+    return eraseByEquivalentKey(channel->sources, source);
 }
 
-SoundSource_32 *cranked::playdate_sound_channel_addCallbackSource(Cranked *cranked, SoundChannel_32 *channel, cref_t callback, void *context, int32_t stereo) {
+SoundSource cranked::playdate_sound_channel_addCallbackSource(Cranked *cranked, SoundChannel channel, cref_t callback, void *context, int32 stereo) {
     // Todo
     return nullptr;
 }
 
-void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel_32 *channel, SoundEffect_32 *effect) {
-    channel->effects.emplace_back(effect);
+void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel channel, SoundEffect effect) {
+    channel->effects.emplace(effect);
 }
 
-void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel_32 *channel, SoundEffect_32 *effect) {
-    std::erase(channel->effects, effect);
+void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel channel, SoundEffect effect) {
+    eraseByEquivalentKey(channel->effects, effect);
 }
 
-void cranked::playdate_sound_channel_setVolume(Cranked *cranked, SoundChannel_32 *channel, float volume) {
+void cranked::playdate_sound_channel_setVolume(Cranked *cranked, SoundChannel channel, float volume) {
     channel->volume = volume;
 }
 
-float cranked::playdate_sound_channel_getVolume(Cranked *cranked, SoundChannel_32 *channel) {
+float cranked::playdate_sound_channel_getVolume(Cranked *cranked, SoundChannel channel) {
     return channel->volume;
 }
 
-void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundChannel_32 *channel, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue mod) {
     channel->volumeModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_channel_getVolumeModulator(Cranked *cranked, SoundChannel_32 *channel) {
+SynthSignalValue cranked::playdate_sound_channel_getVolumeModulator(Cranked *cranked, SoundChannel channel) {
     return channel->volumeModulator.get();
 }
 
-void cranked::playdate_sound_channel_setPan(Cranked *cranked, SoundChannel_32 *channel, float pan) {
+void cranked::playdate_sound_channel_setPan(Cranked *cranked, SoundChannel channel, float pan) {
     channel->pan = pan;
 }
 
-void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChannel_32 *channel, PDSynthSignalValue_32 *mod) {
+void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue mod) {
     channel->panModulator = mod;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel_32 *channel) {
+SynthSignalValue cranked::playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel channel) {
     return channel->panModulator.get();
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel_32 *channel) {
+SynthSignalValue cranked::playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel channel) {
     // Todo
     return nullptr;
 }
 
-PDSynthSignalValue_32 *cranked::playdate_sound_channel_getWetLevelSignal(Cranked *cranked, SoundChannel_32 *channel) {
+SynthSignalValue cranked::playdate_sound_channel_getWetLevelSignal(Cranked *cranked, SoundChannel channel) {
     // Todo
     return nullptr;
 }
 
-uint32_t cranked::playdate_sound_getCurrentTime(Cranked *cranked) {
+uint32 cranked::playdate_sound_getCurrentTime(Cranked *cranked) {
     return cranked->audio.sampleTime;
 }
 
-SoundSource_32 *cranked::playdate_sound_addSource(Cranked *cranked, cref_t callback, void *context, int32_t stereo) {
+SoundSource cranked::playdate_sound_addSource(Cranked *cranked, cref_t callback, void *context, int32 stereo) {
     // Todo
     return nullptr;
 }
 
-SoundChannel_32 *cranked::playdate_sound_getDefaultChannel(Cranked *cranked) {
+SoundChannel cranked::playdate_sound_getDefaultChannel(Cranked *cranked) {
     return cranked->audio.mainChannel.get();
 }
 
-int32_t cranked::playdate_sound_addChannel(Cranked *cranked, SoundChannel_32 *channel) {
+int32 cranked::playdate_sound_addChannel(Cranked *cranked, SoundChannel channel) {
     if (channel == cranked->audio.mainChannel)
         return false;
     auto &activeChannels = cranked->audio.activeChannels;
-    bool success = std::find(activeChannels.begin(), activeChannels.end(), channel) == activeChannels.end();
-    activeChannels.emplace_back(channel);
+    bool success = !activeChannels.contains(channel);
+    activeChannels.emplace(channel);
     return success;
 }
 
-int32_t cranked::playdate_sound_removeChannel(Cranked *cranked, SoundChannel_32 *channel) {
+int32 cranked::playdate_sound_removeChannel(Cranked *cranked, SoundChannel channel) {
     auto &activeChannels = cranked->audio.activeChannels;
-    bool success = std::find(activeChannels.begin(), activeChannels.end(), channel) != activeChannels.end();
-    activeChannels.erase(std::remove(activeChannels.begin(), activeChannels.end(), channel), activeChannels.end());
+    bool success = activeChannels.contains(channel);
+    eraseByEquivalentKey(activeChannels, channel);
     return success;
 }
 
-int32_t cranked::playdate_sound_setMicCallback(Cranked *cranked, cref_t callback, void *context, int32_t forceInternal) {
+int32 cranked::playdate_sound_setMicCallback(Cranked *cranked, cref_t callback, void *context, int32 forceInternal) {
     cranked->audio.micCallback = callback;
     cranked->audio.micCallbackUserdata = cranked->toVirtualAddress(context);
     cranked->audio.micCallbackSource = (MicSource)forceInternal;
     return (int)MicSource::Autodetect; // Todo
 }
 
-void cranked::playdate_sound_getHeadphoneState(Cranked *cranked, int32_t *headphone, int32_t *headsetmic, cref_t changeCallback) {
+void cranked::playdate_sound_getHeadphoneState(Cranked *cranked, int32 *headphone, int32 *headsetmic, cref_t changeCallback) {
     *headphone = cranked->audio.headphonesConnected;
     *headsetmic = cranked->audio.headsetMicConnected;
     cranked->audio.headsetStateCallback = changeCallback;
 }
 
-void cranked::playdate_sound_setOutputsActive(Cranked *cranked, int32_t headphone, int32_t speaker) {
+void cranked::playdate_sound_setOutputsActive(Cranked *cranked, int32 headphone, int32 speaker) {
     cranked->audio.headphoneOutputActive = headphone;
     cranked->audio.speakerOutputActive = speaker;
 }
 
-int32_t cranked::playdate_sound_removeSource(Cranked *cranked, SoundSource_32 *source) {
-    if (std::erase(cranked->audio.mainChannel->sources, source))
+int32 cranked::playdate_sound_removeSource(Cranked *cranked, SoundSource source) {
+    if (eraseByEquivalentKey(cranked->audio.mainChannel->sources, source))
         return true;
     for (auto &channel : cranked->audio.activeChannels)
-        if (std::erase(channel->sources, source))
+        if (eraseByEquivalentKey(channel->sources, source))
             return true;
     return false;
 }
 
-int32_t cranked::playdate_display_getWidth(Cranked *cranked) {
+int32 cranked::playdate_display_getWidth(Cranked *cranked) {
     return DISPLAY_WIDTH / cranked->graphics.displayScale;
 }
 
-int32_t cranked::playdate_display_getHeight(Cranked *cranked) {
+int32 cranked::playdate_display_getHeight(Cranked *cranked) {
     return DISPLAY_HEIGHT / cranked->graphics.displayScale;
 }
 
 void cranked::playdate_display_setRefreshRate(Cranked *cranked, float rate) {
-    cranked->graphics.framerate = std::max(1.0f, rate);
+    cranked->graphics.framerate = max(1.0f, rate);
 }
 
-void cranked::playdate_display_setInverted(Cranked *cranked, int32_t flag) {
+void cranked::playdate_display_setInverted(Cranked *cranked, int32 flag) {
     cranked->graphics.displayInverted = flag;
 }
 
-void cranked::playdate_display_setScale(Cranked *cranked, uint32_t s) {
+void cranked::playdate_display_setScale(Cranked *cranked, uint32 s) {
     if (s == 1 or s == 2 or s == 4 or s == 8)
-        cranked->graphics.displayScale = s;
+        cranked->graphics.displayScale = (int32)s;
     else
         cranked->graphics.displayScale = 1;
 }
 
-void cranked::playdate_display_setMosaic(Cranked *cranked, uint32_t x, uint32_t y) {
+void cranked::playdate_display_setMosaic(Cranked *cranked, uint32 x, uint32 y) {
     cranked->graphics.displayMosaic = {(int)x & 0x3, (int)y & 3};
 }
 
-void cranked::playdate_display_setFlipped(Cranked *cranked, int32_t x, int32_t y) {
+void cranked::playdate_display_setFlipped(Cranked *cranked, int32 x, int32 y) {
     cranked->graphics.displayFlippedX = x;
     cranked->graphics.displayFlippedY = y;
 }
 
-void cranked::playdate_display_setOffset(Cranked *cranked, int32_t x, int32_t y) {
+void cranked::playdate_display_setOffset(Cranked *cranked, int32 x, int32 y) {
     cranked->graphics.displayOffset = {x, y};
 }
 
-int32_t cranked::playdate_scoreboards_addScore(Cranked *cranked, uint8_t *boardId, uint32_t value, cref_t callback) {
+int32 cranked::playdate_scoreboards_addScore(Cranked *cranked, uint8 *boardId, uint32 value, cref_t callback) {
     // Todo
     return 0;
 }
 
-int32_t cranked::playdate_scoreboards_getPersonalBest(Cranked *cranked, uint8_t *boardId, cref_t callback) {
+int32 cranked::playdate_scoreboards_getPersonalBest(Cranked *cranked, uint8 *boardId, cref_t callback) {
     // Todo
     return 0;
 }
@@ -2882,7 +2958,7 @@ void cranked::playdate_scoreboards_freeScore(Cranked *cranked, PDScore_32 *score
     // Todo
 }
 
-int32_t cranked::playdate_scoreboards_getScoreboards(Cranked *cranked, cref_t callback) {
+int32 cranked::playdate_scoreboards_getScoreboards(Cranked *cranked, cref_t callback) {
     // Todo
     return 0;
 }
@@ -2891,7 +2967,7 @@ void cranked::playdate_scoreboards_freeBoardsList(Cranked *cranked, PDBoardsList
     // Todo
 }
 
-int32_t cranked::playdate_scoreboards_getScores(Cranked *cranked, uint8_t *boardId, cref_t callback) {
+int32 cranked::playdate_scoreboards_getScores(Cranked *cranked, uint8 *boardId, cref_t callback) {
     // Todo
     return 0;
 }
@@ -2899,3 +2975,5 @@ int32_t cranked::playdate_scoreboards_getScores(Cranked *cranked, uint8_t *board
 void cranked::playdate_scoreboards_freeScoresList(Cranked *cranked, PDScoresList_32 *scoresList) {
     // Todo
 }
+
+#pragma clang diagnostic pop

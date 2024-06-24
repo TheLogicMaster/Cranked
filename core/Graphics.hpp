@@ -1,15 +1,10 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "Constants.hpp"
 #include "Rom.hpp"
 #include "HeapAllocator.hpp"
 #include "NativeResource.hpp"
-
-#include <cmath>
-#include <unordered_map>
-#include <unordered_set>
-#include <optional>
+#include "Geometry.hpp"
 
 namespace cranked {
 
@@ -17,89 +12,9 @@ namespace cranked {
 
     class Cranked;
 
-    template<typename T>
-    struct Vector2 {
-        T x, y;
-
-        template<typename S>
-        [[nodiscard]] inline Vector2<S> as() const {
-            return Vector2<S>((S) x, (S) y);
-        }
-
-        inline Vector2 operator+(const Vector2 other) const {
-            return {x + other.x, y + other.y};
-        }
-
-        inline Vector2 operator-(const Vector2 other) const {
-            return {x - other.x, y - other.y};
-        }
-
-        inline Vector2 operator-() const {
-            return {-x, -y};
-        }
-    };
-
-    typedef Vector2<int32_t> IntVec2;
-    typedef Vector2<float> Vec2;
-
-    template<typename T>
-    struct Rectangle {
-        template<typename S>
-        [[nodiscard]] inline Rectangle<S> as() const {
-            return Rectangle<S>(pos.template as<S>(), size.template as<S>());
-        }
-
-        template<typename S>
-        [[nodiscard]] inline bool contains(Vector2<S> point) const {
-            return point.x >= pos.x and point.x < pos.x + size.x and point.y >= pos.y and point.y < pos.y + size.y;
-        }
-
-        template<typename S>
-        inline Rectangle operator+(const Vector2<S> offset) const {
-            return {pos.x + offset.x, pos.y + offset.y, size.x, size.y};
-        }
-
-        template<typename S>
-        inline Rectangle operator-(const Vector2<S> offset) const {
-            return {pos.x - offset.x, pos.y - offset.y, size.x, size.y};
-        }
-
-        template<typename S>
-        inline Rectangle intersection(const Rectangle<S> &other) {
-            Rectangle rect{};
-            if (other.pos.x < pos.x) {
-                rect.pos.x = other.pos.x;
-                rect.size.x = std::max(0.0f, std::min(other.size.x, size.x - (pos.x - other.pos.x)));
-            } else {
-                rect.pos.x = pos.x;
-                rect.size.x = std::max(0.0f, std::min(size.x, other.size.x - (other.pos.x - pos.x)));
-            }
-            if (other.pos.y < pos.y) {
-                rect.pos.y = other.pos.y;
-                rect.size.y = std::max(0.0f, std::min(other.size.y, size.y - (pos.y - other.pos.y)));
-            } else {
-                rect.pos.y = pos.y;
-                rect.size.y = std::max(0.0f, std::min(size.y, other.size.y - (other.pos.y - pos.y)));
-            }
-            return rect;
-        }
-
-        Vector2<T> pos;
-        Vector2<T> size;
-    };
-
-    typedef Rectangle<int32_t> IntRect;
-    typedef Rectangle<float> Rect;
-
-    struct Transform {
-        // Todo
-
-        float m11, m12, m21, m22, tx, ty;
-    };
-
     union LCDColor {
-        inline LCDColor(uint32_t value) : pattern(value) {} // NOLINT: Intentional implicit conversion
-        inline LCDColor(LCDSolidColor value) : color(value) {} // NOLINT: Intentional implicit conversion
+        inline LCDColor(uint32 value) : pattern(value) {} // NOLINT(*-explicit-constructor)
+        inline LCDColor(LCDSolidColor value) : color(value) {} // NOLINT(*-explicit-constructor)
 
         LCDSolidColor color;
         cref_t pattern;
@@ -147,8 +62,8 @@ namespace cranked {
         int width;
         int height;
         bool inverted{};
-        vheap_vector<uint8_t> data;
-        ResourcePtr<LCDBitmap_32> mask;
+        vheap_vector<uint8> data;
+        BitmapRef mask;
     };
 
     struct LCDSprite_32 : NativeResource {
@@ -158,33 +73,92 @@ namespace cranked {
         LCDSprite_32(LCDSprite_32 &&other) = delete;
         ~LCDSprite_32() override;
 
-        PDRect_32 bounds{};
-        ResourcePtr<LCDBitmap_32> image{};
-        float centerX{}, centerY{};
-        bool visible{};
-        bool updatesEnabled{};
+        Rect getWorldCollideRect() {
+            return { bounds.pos + collideRect.pos, collideRect.size };
+        }
+
+        void updateCollisionWorld();
+
+        void setCollisionsEnabled(bool enabled) {
+            collisionsEnabled = enabled;
+            updateCollisionWorld();
+        }
+
+        /// Sets the collision rect relative to top-left corner of bounds
+        void setCollisionRect(Rect rect) {
+            collideRect = rect;
+            updateCollisionWorld();
+        }
+
+        /// Sets the bounding rect in screen space (Before draw offset, and size is overridden if an image is present)
+        void setBounds(Rect rect) {
+            bounds = rect;
+            if (image) // Todo: Is this correct?
+                bounds.size = { (float)image->width, (float)image->height };
+            updateCollisionWorld();
+        }
+
+        /// Sets the position based on the specified center
+        void setPosition(Vec2 pos) {
+            bounds.pos = pos - getCenterOffset();
+            updateCollisionWorld();
+        }
+
+        /// Gets the position based on the specified center
+        [[nodiscard]] Vec2 getPosition() const {
+            return bounds.pos + getCenterOffset();
+        }
+
+        /// Sets the image and adjusts the bounds to maintain the same position
+        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip) {
+            // Todo: Figure out how this relates to stencil
+            if (!dontRedrawOnImageChange)
+                dirty = true;
+            if (bitmap and !bitmap->mask)
+                opaque = true;
+            image = bitmap;
+            flip = bitmapFlip;
+            Vec2 pos = getPosition();
+            if (bitmap)
+                bounds.size = { (float)bitmap->width, (float)bitmap->height };
+            setPosition(pos);
+        }
+
+        /// Returns the offset from the world space top-left corner that is considered the sprite's position
+        [[nodiscard]] Vec2 getCenterOffset() const {
+            return { center.x * bounds.size.x, center.y * bounds.size.y };
+        }
+
+        void draw();
+
+        void update();
+
+        Rect bounds{};
+        BitmapRef image{};
+        Vec2 center{ 0.5f, 0.5f };
+        bool visible = true;
+        bool updatesEnabled = true;
         bool dontRedrawOnImageChange{};
         bool ignoresDrawOffset{};
         bool opaque{};
-        bool collisionsEnabled{};
-        PDRect_32 collideRect{};
-        int16_t zIndex{};
-        Vec2 size{};
-        Vec2 pos{};
+        bool collisionsEnabled = true;
+        Rect collideRect{};
+        uint32 groupMask{}; // Todo: Only present on Lua side, just filters after Bump output? Or filter passed into bump calls?
+        int16 zIndex{};
         Rect scale{};
-        Rect clipRect{};
-        uint8_t tag{};
+        IntRect clipRect{};
+        uint8 tag{};
         LCDBitmapDrawMode drawMode{};
         LCDBitmapFlip flip{};
-        ResourcePtr<LCDBitmap_32> stencil{};
+        BitmapRef stencil{};
         bool stencilTiled{};
-        uint8_t stencilPattern[8]{};
+        uint8 stencilPattern[8]{};
         cref_t updateFunction{};
         cref_t drawFunction{};
         cref_t collideResponseFunction{};
         cref_t userdata{};
         bool dirty{};
-        std::vector<LCDRect_32> dirtyRects;
+        vector<LCDRect_32> dirtyRects;
     };
 
     struct LCDBitmapTable_32 : NativeResource {
@@ -197,20 +171,20 @@ namespace cranked {
         LCDBitmapTable_32 &operator=(const LCDBitmapTable_32 &other);
 
         int cellsPerRow{};
-        std::vector<ResourcePtr<LCDBitmap_32>> bitmaps;
+        vector<BitmapRef> bitmaps;
     };
 
     struct LCDFontGlyph_32 : NativeResource {
-        explicit LCDFontGlyph_32(LCDBitmap_32 *bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable);
+        explicit LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable);
 
         LCDFontGlyph_32(const LCDFontGlyph_32 &other) = delete;
         LCDFontGlyph_32(LCDFontGlyph_32 &&other) = delete;
         ~LCDFontGlyph_32() override = default;
 
         int advance;
-        std::map<int, int8_t> shortKerningTable;
-        std::map<int, int8_t> longKerningTable; // Page 0 entries
-        ResourcePtr<LCDBitmap_32> bitmap;
+        map<int, int8> shortKerningTable; // Page 0 entries
+        map<int, int8> longKerningTable;
+        BitmapRef bitmap;
     };
 
     struct LCDFontPage_32 : NativeResource {
@@ -220,7 +194,7 @@ namespace cranked {
         LCDFontPage_32(LCDFontPage_32 &&other) = delete;
         ~LCDFontPage_32() override = default;
 
-        std::unordered_map<int, ResourcePtr<LCDFontGlyph_32>> glyphs;
+        unordered_map<int, FontGlyphRef> glyphs;
     };
 
     struct LCDFont_32 : NativeResource {
@@ -233,11 +207,11 @@ namespace cranked {
         int tracking;
         int glyphWidth;
         int glyphHeight;
-        std::unordered_map<int, ResourcePtr<LCDFontPage_32>> pages;
+        unordered_map<int, FontPageRef> pages;
     };
 
     struct DisplayContext { // Todo: Lua native resources used here should be saved into a `set` table to prevent garbage collection until popped/reset
-        explicit DisplayContext(LCDBitmap_32 *bitmap) : bitmap(bitmap) {}
+        explicit DisplayContext(Bitmap bitmap) : bitmap(bitmap) {}
 
         DisplayContext(const DisplayContext &other) = default;
         DisplayContext(DisplayContext &&other) = delete;
@@ -250,7 +224,7 @@ namespace cranked {
             font.reset();
         }
 
-        ResourcePtr<LCDBitmap_32> bitmap;
+        BitmapRef bitmap;
         IntVec2 drawOffset{};
         IntRect clipRect{}; // In world-space (Offset by drawOffset)
         LCDSolidColor drawingColor{};
@@ -258,13 +232,13 @@ namespace cranked {
         int lineWidth = 1;
         LCDLineCapStyle lineEndCapStyle{};
         StrokeLocation strokeLocation{}; // Only used by drawRect
-        ResourcePtr<LCDBitmap_32> stencilImage{};
+        BitmapRef stencilImage{};
         bool stencilTiled{};
-        uint8_t stencilPattern[8]{}; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
+        uint8 stencilPattern[8]{}; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
         bool usingStencil{};
-        ResourcePtr<LCDBitmap_32> focusedImage; // Todo: Is this global or context specific?
+        BitmapRef focusedImage; // Todo: Is this global or context specific?
         LCDBitmapDrawMode bitmapDrawMode{};
-        ResourcePtr<LCDFont_32> font{};
+        FontRef font{};
         LCDPolygonFillRule polygonFillRule{};
         int textTracking{};
         int textLeading{};
@@ -286,12 +260,12 @@ namespace cranked {
             return displayContextStack.empty() ? frameBufferContext : displayContextStack.back();
         }
 
-        inline LCDBitmap_32 *getTargetBitmap() {
+        inline Bitmap getTargetBitmap() {
             auto &context = getCurrentDisplayContext();
             return (context.focusedImage ? context.focusedImage : context.bitmap).get();
         }
 
-        void pushContext(LCDBitmap_32 *target);
+        void pushContext(Bitmap target);
 
         void popContext();
 
@@ -315,59 +289,62 @@ namespace cranked {
 
         void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
 
-        void drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false,
-                        std::optional<IntRect> sourceRect = {});
+        void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
 
-        void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, LCDFont_32 *font = nullptr);
+        void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, Font font = nullptr);
 
         void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
 
-        void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle,
-                         LCDColor color, bool filled);
+        void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, LCDColor color, bool filled);
 
-        inline LCDSprite_32 *createSprite() {
+        void updateSprites();
+
+        void drawSprites();
+
+        inline Sprite createSprite() {
             return heap.construct<LCDSprite_32>(cranked);
         }
 
-        inline LCDBitmap_32 *createBitmap(int width, int height) {
+        inline Bitmap createBitmap(int width, int height) {
             return heap.construct<LCDBitmap_32>(cranked, width, height);
         }
 
-        inline LCDBitmapTable_32 *createBitmapTable(int count) {
+        inline BitmapTable createBitmapTable(int count) {
             return heap.construct<LCDBitmapTable_32>(cranked, count);
         }
 
-        LCDBitmapTable_32 *getBitmapTable(const std::string &path);
+        BitmapTable getBitmapTable(const string &path);
 
-        LCDBitmap_32 *getImage(const std::string &path);
+        Bitmap getImage(const string &path);
 
-        LCDBitmap_32 *getImage(const Rom::ImageCell &source);
+        Bitmap getImage(const Rom::ImageCell &source);
 
-        LCDFont_32 *getFont(const std::string &path);
+        Font getFont(const string &path);
 
-        LCDFont_32 *getFont(const Rom::Font &source);
+        Font getFont(const Rom::Font &source);
 
-        LCDFont_32 *getFont(const uint8_t *data, bool wide);
+        Font getFont(const uint8 *data, bool wide);
 
         Cranked &cranked;
         HeapAllocator &heap;
         Rom::Font systemFontSource;
-        ResourcePtr<LCDFont_32> systemFont;
-        uint32_t displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
+        FontRef systemFont;
+        uint32 displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
         bool displayBufferNativeEndian = false;
-        uint32_t displayBufferOnColor = 0xB0AEA7FF;
-        uint32_t displayBufferOffColor = 0x302E27FF;
-        ResourcePtr<LCDBitmap_32> frameBuffer, previousFrameBuffer;
-        DisplayContext frameBufferContext{frameBuffer.get()};
-        std::vector<DisplayContext> displayContextStack;
+        uint32 displayBufferOnColor = 0xB0AEA7FF;
+        uint32 displayBufferOffColor = 0x302E27FF;
+        BitmapRef frameBuffer, previousFrameBuffer;
+        DisplayContext frameBufferContext{ frameBuffer.get() };
+        vector<DisplayContext> displayContextStack;
         IntVec2 displayOffset{};
-        int32_t displayScale{};
+        int32 displayScale{};
         bool displayInverted{};
         bool displayFlippedX{}, displayFlippedY{};
         IntVec2 displayMosaic{};
         float framerate{};
         bool alwaysRedrawSprites{};
-        std::vector<ResourcePtr<LCDSprite_32>> spriteDrawList;
+        unordered_set<Sprite> allocatedSprites;
+        unordered_set<SpriteRef> spriteDrawList;
     };
 
 }

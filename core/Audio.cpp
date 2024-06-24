@@ -9,7 +9,7 @@ SoundSource_32::~SoundSource_32() {
     // Todo: Remove from channel
 }
 
-AudioSample_32::AudioSample_32(Cranked &cranked, int size) : NativeResource(cranked), data(vheap_vector<uint8_t>(size, cranked.heap.allocator<uint8_t>())) {}
+AudioSample_32::AudioSample_32(Cranked &cranked, int size) : NativeResource(cranked), data(vheap_vector<uint8>(size, cranked.heap.allocator<uint8>())) {}
 
 SoundEffect_32::SoundEffect_32(Cranked &cranked) : NativeResource(cranked) {}
 
@@ -62,7 +62,7 @@ PDSynthLFO_32::PDSynthLFO_32(Cranked &cranked, LFOType type) : PDSynthSignal_32(
 PDSynthEnvelope_32::PDSynthEnvelope_32(Cranked &cranked, float attack, float decay, float sustain, float release)
         : PDSynthSignal_32(cranked), attack(attack), decay(decay), sustain(sustain), release(release) {}
 
-PDSynth_32::PDSynth_32(Cranked &cranked) : SoundSource_32(cranked), envelope(cranked) {}
+PDSynth_32::PDSynth_32(Cranked &cranked) : SoundSource_32(cranked), envelope(cranked.heap.construct<PDSynthEnvelope_32>(cranked)) {}
 
 ControlSignal_32::ControlSignal_32(Cranked &cranked) : PDSynthSignal_32(cranked) {}
 
@@ -70,7 +70,7 @@ PDSynthInstrument_32::PDSynthInstrument_32(Cranked &cranked) : SoundSource_32(cr
 
 Audio::Audio(Cranked &cranked) : cranked(cranked), heap(cranked.heap) {}
 
-void Audio::sampleAudio(int16_t *samples, int len) {
+void Audio::sampleAudio(int16 *samples, int len) {
     // Todo
 }
 
@@ -78,7 +78,7 @@ void Audio::reset() {
     sampleTime = 0;
     lastError = 0;
     mainChannel.reset();
-    for (auto &active : activeChannels)
+    for (SoundChannelRef &active : vector(activeChannels.begin(), activeChannels.end()))
         active.reset();
     activeChannels.clear();
 }

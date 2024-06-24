@@ -10,7 +10,7 @@ Graphics::Graphics(Cranked &cranked)
 LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked) : NativeResource(cranked) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked), width(width), height(height), data(vheap_vector<uint8_t>(width * height, cranked.heap.allocator<uint8_t>())), mask(nullptr) {}
+        : NativeResource(cranked), width(width), height(height), data(vheap_vector<uint8>(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
         : NativeResource(other), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
@@ -25,7 +25,7 @@ LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     return *this;
 }
 
-LCDFontGlyph_32::LCDFontGlyph_32(LCDBitmap_32 *bitmap, int advance, const std::map<int, int8_t> &shortKerningTable, const std::map<int, int8_t> &longKerningTable)
+LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable)
         : NativeResource(bitmap->cranked), bitmap(bitmap), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable) {}
 
 LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked) {}
@@ -47,7 +47,7 @@ bool LCDBitmap_32::getBufferPixel(int x, int y) {
     if (x < 0 or x >= width or y < 0 or y >= height)
         return false;
     int offset = 7 - x % 8;
-    auto stride = (int) std::ceil((float) width / 8);
+    auto stride = (int) ceil((float) width / 8);
     return data[y * stride + x / 8] & (1 << offset);
 }
 
@@ -55,7 +55,7 @@ void LCDBitmap_32::setBufferPixel(int x, int y, bool color) {
     if (x < 0 or x >= width or y < 0 or y >= height)
         return;
     int offset = 7 - x % 8;
-    auto stride = (int) std::ceil((float) width / 8);
+    auto stride = (int) ceil((float) width / 8);
     auto &word = data[y * stride + x / 8];
     word &= ~(1 << offset);
     word |= color << offset;
@@ -69,8 +69,8 @@ void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
     if (color.pattern >= 4) {
         auto row = y % 8;
         auto column = x % 8;
-        auto word = cranked.virtualRead<uint8_t>(color.pattern + row);
-        auto maskWord = cranked.virtualRead<uint8_t>(color.pattern + row + 8);
+        auto word = cranked.virtualRead<uint8>(color.pattern + row);
+        auto maskWord = cranked.virtualRead<uint8>(color.pattern + row + 8);
         if (maskWord & (0x80 >> column))
             c = word & (0x80 >> column) ? LCDSolidColor::White : LCDSolidColor::Black;
         else
@@ -108,12 +108,12 @@ void LCDBitmap_32::drawLine(int x1, int y1, int x2, int y2, LCDColor color) {
     // Todo: Draws slightly differently from official implementation, steps differently
     bool vertical = abs(y2 - y1) > abs(x2 - x1);
     if (vertical) {
-        std::swap(x1, y1);
-        std::swap(x2, y2);
+        swap(x1, y1);
+        swap(x2, y2);
     }
     if (x1 > x2) {
-        std::swap(x1, x2);
-        std::swap(y1, y2);
+        swap(x1, x2);
+        swap(y1, y2);
     }
     int dx = x2 - x1;
     int dy = abs(y2 - y1);
@@ -149,14 +149,39 @@ void LCDBitmap_32::fillRect(int x, int y, int w, int h, LCDColor color) {
     }
 }
 
-LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {}
-
-LCDSprite_32::~LCDSprite_32() {
-    auto &drawList = cranked.graphics.spriteDrawList;
-    drawList.erase(std::remove(drawList.begin(), drawList.end(), this), drawList.end());
+LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {
+    cranked.graphics.allocatedSprites.emplace(this);
 }
 
-void Graphics::pushContext(LCDBitmap_32 *target) {
+LCDSprite_32::~LCDSprite_32() {
+    eraseByEquivalentKey(cranked.graphics.spriteDrawList, this);
+    cranked.graphics.allocatedSprites.erase(this);
+}
+
+void LCDSprite_32::updateCollisionWorld() {
+    cranked.bump.updateSprite(this);
+}
+
+void LCDSprite_32::draw() {
+    if (!visible)
+        return;
+    Vec2 drawPos = bounds.pos;// - Vec2{center.x * bounds.size.x, center.y * bounds.size.y};
+    if (image and clipRect) {
+        // Todo: Respect clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
+        cranked.graphics.drawBitmap(image.get(), (int)drawPos.x, (int)drawPos.y, flip, ignoresDrawOffset);
+    } else if (drawFunction)
+        cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::struct4f_t, ArgType::struct4f_t>
+                (drawFunction, this, fromRect(Rect{ drawPos, bounds.size }), PDRect_32{ 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT }); // Todo: Dirty rect
+}
+
+void LCDSprite_32::update() {
+    if (!updatesEnabled)
+        return;
+    if (updateFunction)
+        cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t>(updateFunction, this);
+}
+
+void Graphics::pushContext(Bitmap target) {
     displayContextStack.emplace_back(target ? target : frameBuffer.get());
 }
 
@@ -168,7 +193,7 @@ void Graphics::popContext() {
 
 void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
     auto &context = getCurrentDisplayContext();
-    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32_t>() + IntVec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
         return;
     context.bitmap->drawPixel(pos.x, pos.y, color);
@@ -176,7 +201,7 @@ void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
 
 LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
     auto &context = getCurrentDisplayContext();
-    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32_t>() + IntVec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     return context.bitmap->getPixel(pos.x, pos.y);
 }
 
@@ -222,7 +247,7 @@ void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
     drawLine(x2, y2, x3, y3, lineWidth, color);
 }
 
-void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, std::optional<IntRect> sourceRect) {
+void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, optional<IntRect> sourceRect) {
     auto &context = getCurrentDisplayContext();
     auto mode = context.bitmapDrawMode;
     bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
@@ -269,7 +294,7 @@ void Graphics::drawBitmap(LCDBitmap_32 *bitmap, int x, int y, LCDBitmapFlip flip
         }
 }
 
-void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, LCDFont_32 *font) {
+void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, Font font) {
     // Todo: Support encodings
     // Todo: Kerning
     const char *string = (const char *) text;
@@ -284,23 +309,23 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
             auto &glyph = *page->glyphs.at(character);
             drawBitmap(glyph.bitmap.get(), x, y, LCDBitmapFlip::Unflipped);
             x += glyph.advance + font->tracking;
-        } catch (std::out_of_range &ignored) {}
+        } catch (out_of_range &ignored) {} // Todo: Prevent exceptions?
     }
 }
 
 void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
     int a, b, y, last;
     if (y1 > y2) {
-        std::swap(y1, y2);
-        std::swap(x1, x2);
+        swap(y1, y2);
+        swap(x1, x2);
     }
     if (y2 > y3) {
-        std::swap(y2, y3);
-        std::swap(x2, x3);
+        swap(y2, y3);
+        swap(x2, x3);
     }
     if (y1 > y2) {
-        std::swap(y1, y2);
-        std::swap(x1, x2);
+        swap(y1, y2);
+        swap(x1, x2);
     }
     if (y1 == y3) {
         a = b = x1;
@@ -326,7 +351,7 @@ void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
         sa += dx12;
         sb += dx13;
         if (a > b)
-            std::swap(a, b);
+            swap(a, b);
         drawLine(a, y, b + 1, y, 1, color);
     }
     sa = dx23 * (y - y2);
@@ -337,7 +362,7 @@ void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
         sa += dx12;
         sb += dx13;
         if (a > b)
-            std::swap(a, b);
+            swap(a, b);
         drawLine(a, y, b + 1, y, 1, color);
     }
 }
@@ -429,7 +454,24 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
     }
 }
 
-LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
+void Graphics::updateSprites() {
+    // Todo: Supposed to be updated in sorted order?
+    for (auto &sprite : spriteDrawList) {
+        sprite->update();
+    }
+}
+
+void Graphics::drawSprites() {
+    auto &context = getCurrentDisplayContext();
+    context.bitmap->clear(context.backgroundColor);
+    // Todo: Dirty rect support
+    // Todo: Sort by Z then added order (Stable sort?)
+    for (auto &sprite : spriteDrawList) {
+        sprite->draw();
+    }
+}
+
+BitmapTable Graphics::getBitmapTable(const string &path) {
     auto bitmapTable = cranked.rom->getImageTable(path);
     auto table = heap.construct<LCDBitmapTable_32>(cranked, bitmapTable.cellsPerRow);
     table->bitmaps.reserve(bitmapTable.cells.size());
@@ -438,15 +480,15 @@ LCDBitmapTable_32 *Graphics::getBitmapTable(const std::string &path) {
     return table;
 }
 
-LCDBitmap_32 *Graphics::getImage(const std::string &path) {
+Bitmap Graphics::getImage(const string &path) {
     auto image = cranked.rom->getImage(path);
     return getImage(image.cell);
 }
 
-LCDBitmap_32 *Graphics::getImage(const Rom::ImageCell &source) {
+Bitmap Graphics::getImage(const Rom::ImageCell &source) {
     auto bitmap = heap.construct<LCDBitmap_32>(cranked, source.width, source.height);
-    auto stride = (int) std::ceil((float) source.width / 8);
-    auto readBitmapData = [&](const uint8_t *src, uint8_t *dest){
+    auto stride = (int) ceil((float) source.width / 8);
+    auto readBitmapData = [&](const uint8 *src, uint8 *dest){
         for (int i = 0; i < source.height; i++)
             for (int j = 0; j < source.width; j++)
                 if (src[i * source.width + j])
@@ -460,11 +502,11 @@ LCDBitmap_32 *Graphics::getImage(const Rom::ImageCell &source) {
     return bitmap;
 }
 
-LCDFont_32 *Graphics::getFont(const std::string &path) {
+Font Graphics::getFont(const string &path) {
     return getFont(cranked.rom->getFont(path));
 }
 
-LCDFont_32 *Graphics::getFont(const Rom::Font &source) {
+Font Graphics::getFont(const Rom::Font &source) {
     auto font = heap.construct<LCDFont_32>(cranked, source.tracking, source.glyphWidth, source.glyphHeight);
     for (auto &pageEntry : source.glyphs) {
         auto &page = font->pages[pageEntry.first] = heap.construct<LCDFontPage_32>(cranked);
@@ -476,8 +518,8 @@ LCDFont_32 *Graphics::getFont(const Rom::Font &source) {
     return font;
 }
 
-LCDFont_32 *Graphics::getFont(const uint8_t *data, bool wide) {
-    auto fontData = Rom::readFontData((uint8_t *) data, wide);
+Font Graphics::getFont(const uint8 *data, bool wide) {
+    auto fontData = Rom::readFontData((uint8 *) data, wide);
     auto font = getFont(fontData);
     return font;
 }
@@ -490,10 +532,6 @@ void Graphics::init() {
 }
 
 void Graphics::reset() {
-    for (auto &sprite : spriteDrawList)
-        sprite.reset();
-    spriteDrawList.clear();
-
     frameBuffer.reset();
     previousFrameBuffer.reset();
     systemFont.reset();
@@ -503,6 +541,12 @@ void Graphics::reset() {
     displayContextStack.clear();
 
     frameBufferContext.reset();
+
+    for (SpriteRef &sprite : vector(spriteDrawList.begin(), spriteDrawList.end()))
+        sprite.reset();
+    spriteDrawList.clear();
+
+    allocatedSprites.clear();
 
     memset(displayBufferRGBA, 0, sizeof(displayBufferRGBA));
     displayOffset = {};
@@ -536,7 +580,7 @@ void Graphics::flushDisplayBuffer() {
             if (displayBufferNativeEndian)
                 displayBufferRGBA[i][j] = color;
             else
-                writeUint32BE((uint8_t *) &displayBufferRGBA[i][j], color);
+                writeUint32BE((uint8 *) &displayBufferRGBA[i][j], color);
         }
     }
 

@@ -1,5 +1,20 @@
 #pragma once
 
+#include "Constants.hpp"
+#include "ffi.h"
+#include "nlohmann/json.hpp"
+#include "boost/asio.hpp"
+#include "dynarmic/interface/A32/a32.h"
+#include "dynarmic/interface/A32/config.h"
+#include "unicorn/unicorn.h"
+#include "capstone/platform.h"
+#include "capstone/capstone.h"
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
+#include "libzippp.h"
+#include "zlib.h"
+
 #include <vector>
 #include <memory>
 #include <filesystem>
@@ -8,13 +23,67 @@
 #include <bit>
 #include <chrono>
 #include <functional>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <format>
+#include <limits>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
+#include <map>
+#include <cmath>
+#include <cctype>
+#include <concepts>
+#include <optional>
+#include <regex>
+#include <cstddef>
+#include <iomanip>
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <thread>
+#include <utility>
+#include <variant>
 
 namespace cranked {
 
     class Cranked;
+
+    using std::stoi, std::stol, std::from_chars, std::to_string, std::isalpha, std::popcount;
+    using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round;
+    using std::string, std::basic_string, std::string_view;
+    using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue;
+    using std::function, std::invoke;
+    using std::exception, std::runtime_error, std::range_error, std::out_of_range, std::logic_error;
+    using std::strong_ordering, std::errc;
+    using std::optional, std::tuple, std::make_tuple, std::tie, std::ignore, std::pair, std::make_pair;
+    using std::variant, std::get, std::get_if, std::holds_alternative;
+    using std::false_type, std::tuple_element_t, std::is_same_v, std::is_pointer_v, std::is_class_v, std::remove_pointer_t, std::is_enum_v, std::is_void_v;
+    using std::hash, std::equal_to, std::less;
+    using std::char_traits, std::numeric_limits;
+    using std::size_t, std::time_t;
+    using std::derived_from, std::integral, std::floating_point, std::is_standard_layout_v, std::is_trivial_v;
+    using std::ostringstream, std::istringstream, std::ifstream, std::getline, std::ios;
+    using std::free, std::bad_alloc, std::aligned_alloc, std::addressof;
+    using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap;
+    using std::unique_ptr, std::shared_ptr, std::make_shared, std::make_unique;
+    using std::format, std::vformat, std::make_format_args;
+    using std::regex, std::regex_match, std::match_results, std::cmatch;
+
+    namespace filesystem = std::filesystem;
+    namespace chrono = std::chrono;
+    namespace this_thread = std::this_thread;
+
+    typedef int64_t int64;
+    typedef uint64_t uint64;
+    typedef int32_t int32;
+    typedef uint32_t uint32;
+    typedef int16_t int16;
+    typedef uint16_t uint16;
+    typedef int8_t int8;
+    typedef uint8_t uint8;
 
     enum class LogLevel {
         Verbose,
@@ -23,21 +92,21 @@ namespace cranked {
         Error
     };
 
-    typedef std::function<void(Cranked &cranked, LogLevel level, const char *format, va_list args)> LoggingCallback;
-    typedef std::function<void(Cranked &cranked)> InternalUpdateCallback;
+    typedef function<void(Cranked &cranked, LogLevel level, const char *fmt, va_list args)> LoggingCallback;
+    typedef function<void(Cranked &cranked)> InternalUpdateCallback;
 
-    class CrankedError : public std::runtime_error {
+    class CrankedError : public runtime_error {
     public:
-        explicit CrankedError(const char *message) : std::runtime_error(message) {}
+        explicit CrankedError(const char *message) : runtime_error(message) {}
 
-        explicit CrankedError(const std::string &message) : std::runtime_error(message) {}
+        explicit CrankedError(const string &message) : runtime_error(message) {}
 
         template<class... Args>
-        explicit CrankedError(std::string_view fmt, Args&&... args) : CrankedError(std::vformat(fmt, std::make_format_args(args...))) {}
+        explicit CrankedError(string_view fmt, Args&&... args) : CrankedError(vformat(fmt, make_format_args(args...))) {}
 
         CrankedError(const CrankedError &other) = default;
 
-        CrankedError(CrankedError &&other) noexcept : std::runtime_error(std::move(other)) {}
+        CrankedError(CrankedError &&other) noexcept : runtime_error(std::move(other)) {}
     };
 
     struct Config {
@@ -47,25 +116,25 @@ namespace cranked {
         int debugPort;
     };
 
-    inline std::vector<std::string> splitString(std::string string, const std::string &delimiter) {
-        std::vector<std::string> split;
+    inline vector<string> splitString(string str, const string &delimiter) {
+        vector<string> split;
         size_t pos;
-        while ((pos = string.find(delimiter)) != std::string::npos) {
-            split.push_back(string.substr(0, pos));
-            string.erase(0, pos + delimiter.length());
+        while ((pos = str.find(delimiter)) != string::npos) {
+            split.push_back(str.substr(0, pos));
+            str.erase(0, pos + delimiter.length());
         }
-        split.push_back(string);
+        split.push_back(str);
         return split;
     }
 
-    inline std::vector<std::string> splitString(std::string string, char delimiter) {
-        std::vector<std::string> split;
+    inline vector<string> splitString(string str, char delimiter) {
+        vector<string> split;
         size_t pos;
-        while ((pos = string.find(delimiter)) != std::string::npos) {
-            split.push_back(string.substr(0, pos));
-            string.erase(0, pos + 1);
+        while ((pos = str.find(delimiter)) != string::npos) {
+            split.push_back(str.substr(0, pos));
+            str.erase(0, pos + 1);
         }
-        split.push_back(string);
+        split.push_back(str);
         return split;
     }
 
@@ -73,17 +142,17 @@ namespace cranked {
     public:
         Version() : version(0) {}
 
-        explicit Version(const std::string &string) : version(parseVersion(string)) {}
+        explicit Version(const string &str) : version(parseVersion(str)) {}
 
         explicit Version(int version) : version(version) {}
 
-        static int parseVersion(const std::string &string) {
-            auto split = splitString(string, '.');
+        static int parseVersion(const string &str) {
+            auto split = splitString(str, '.');
             if (split.size() != 3) throw CrankedError("Invalid version string");
-            return std::stoi(split[0]) * 10000 + std::stoi(split[1]) * 100 + std::stoi(split[2]);
+            return stoi(split[0]) * 10000 + stoi(split[1]) * 100 + stoi(split[2]);
         }
 
-        std::strong_ordering operator<=>(Version rhs) const {
+        strong_ordering operator<=>(Version rhs) const {
             return version <=> rhs.version;
         }
 
@@ -107,8 +176,8 @@ namespace cranked {
             return version > 0;
         }
 
-        [[nodiscard]] std::string toString() const {
-            return std::format("{}.{}.{}", getMajor(), getMinor(), getPatch());
+        [[nodiscard]] string toString() const {
+            return format("{}.{}.{}", getMajor(), getMinor(), getPatch());
         }
 
     private:
@@ -118,12 +187,11 @@ namespace cranked {
     inline static Version VERSION_2_4_1{"2.4.1"};
 
     template<typename TP>
-    inline std::time_t to_time_t(TP tp) {
-        using namespace std::chrono;
+    inline time_t to_time_t(TP tp) {
 #if __ANDROID__
-        return system_clock::to_time_t(time_point_cast<system_clock::duration>(tp - TP::clock::now() + system_clock::now()));
+        return chrono::system_clock::to_time_t(chrono::time_point_cast<chrono::system_clock::duration>(tp - TP::clock::now() + chrono::system_clock::now()));
 #else
-        return system_clock::to_time_t(clock_cast<system_clock>(tp));
+        return chrono::system_clock::to_time_t(chrono::clock_cast<chrono::system_clock>(tp));
 #endif
     }
 
@@ -131,54 +199,53 @@ namespace cranked {
     inline T2 bit_cast(T1 t1) {
 #if __ANDROID__
         static_assert(sizeof(T1) == sizeof(T2), "Types must match sizes");
-        static_assert(std::is_standard_layout_v<T1> && std::is_trivial_v<T1>, "Requires POD input");
-        static_assert(std::is_standard_layout_v<T2> && std::is_trivial_v<T2>, "Requires POD output");
-
+        static_assert(is_standard_layout_v<T1> and is_trivial_v<T1>, "Requires POD input");
+        static_assert(is_standard_layout_v<T2> and is_trivial_v<T2>, "Requires POD output");
         T2 t2;
-        memcpy( std::addressof(t2), std::addressof(t1), sizeof(T1) );
+        memcpy(addressof(t2), addressof(t1), sizeof(T1));
         return t2;
 #else
         return std::bit_cast<T2>(t1);
 #endif
     }
 
-    std::vector<uint8_t> decompressData(const uint8_t *data, size_t length, size_t expectedSize);
+    vector<uint8> decompressData(const uint8 *data, size_t length, size_t expectedSize);
 
-    inline std::vector<uint8_t> readFileData(const std::string &path) {
-        std::vector<uint8_t> data;
-        if (!std::filesystem::is_regular_file(path))
+    inline vector<uint8> readFileData(const string &path) {
+        vector<uint8> data;
+        if (!filesystem::is_regular_file(path))
             throw CrankedError("No such file: {}", path);
-        std::ifstream input(path, std::ios::binary | std::ios::ate);
+        ifstream input(path, ios::binary | ios::ate);
         auto size = input.tellg();
         if (size <= 0)
             throw CrankedError("Failed to read file: {}", path);
-        input.seekg(0, std::ios::beg);
+        input.seekg(0, ios::beg);
         data.resize(size);
         input.read((char *) data.data(), size);
         return data;
     }
 
-    inline uint32_t readUint32LE(const uint8_t *data) {
-        auto ptr = (uint8_t *) data;
+    inline uint32 readUint32LE(const uint8 *data) {
+        auto ptr = (uint8 *) data;
         return ptr[0] | ptr[1] << 8 | ptr[2] << 16 | ptr[3] << 24;
     }
 
-    inline void writeUint32LE(uint8_t *data, uint32_t value) {
+    inline void writeUint32LE(uint8 *data, uint32 value) {
         for (int i = 0; i < 4; i++) {
             data[i] = value & 0xFF;
             value >>= 8;
         }
     }
 
-    inline void writeUint32BE(uint8_t *data, uint32_t value) {
+    inline void writeUint32BE(uint8 *data, uint32 value) {
         for (int i = 0; i < 4; i++) {
             data[3 - i] = value & 0xFF;
             value >>= 8;
         }
     }
 
-    inline uint16_t readUint16LE(const uint8_t *data) {
-        auto ptr = (uint8_t *) data;
+    inline uint16 readUint16LE(const uint8 *data) {
+        auto ptr = (uint8 *) data;
         return ptr[0] | ptr[1] << 8;
     }
 
@@ -192,38 +259,57 @@ namespace cranked {
     }
 
     template<typename T>
-    inline std::string formatHex(T value) {
-        std::ostringstream stream;
+    inline string formatHex(T value) {
+        ostringstream stream;
         stream << std::hex << value;
         return stream.str();
     }
 
     template<typename T>
-    static std::string formatHexStringLE(T t) {
-        std::ostringstream stream;
+    static string formatHexStringLE(T t) {
+        ostringstream stream;
         stream << std::hex;
         for (int i = 0; i < (int)sizeof(T); i++)
-            stream << std::format("{:02x}", (t >> 8 * i) & 0xFF);
+            stream << format("{:02x}", (t >> 8 * i) & 0xFF);
         return stream.str();
     }
 
     template<typename T>
-    static T decodeHexStringLE(std::string_view string) {
+    static T decodeHexStringLE(string_view string) {
         if (string.size() / 2 != sizeof(T))
             throw CrankedError("Invalid hex string for type");
         T t{};
-        uint8_t byte{};
+        uint8 byte{};
         for (int i = 0; i < (int)sizeof(T); i++) {
-            auto result = std::from_chars(string.begin() + i * 2, string.begin() + i * 2 + 2, byte, 16);
-            if (result.ec != std::errc{})
+            auto result = from_chars(string.begin() + i * 2, string.begin() + i * 2 + 2, byte, 16);
+            if (result.ec != errc{})
                 throw CrankedError("Invalid hex byte");
             t |= byte << i * 8;
         }
         return t;
     }
 
+    template<typename S, typename T>
+    constexpr inline T nearestValue(T a, T b, S test) {
+        T val = T(test);
+        return abs(a - val) < abs(b - val) ? a : b;
+    }
+
+    template<typename T, typename V>
+    inline bool eraseByEquivalentKey(unordered_set<T> &set, const V &value) {
+        auto found = set.find(value);
+        if (found != set.end()) {
+            set.erase(found);
+            return true;
+        }
+        return false;
+    }
+
+    template <typename T>
+    concept numeric_type = integral<T> or floating_point<T>;
+
     template<typename S>
-    struct dependent_false : std::false_type {};
+    struct dependent_false : false_type {};
 
     template<typename F>
     struct FunctionTypeHelper;
@@ -232,10 +318,10 @@ namespace cranked {
     struct FunctionTypeHelper<R(*)(Args...)> {
         using Pointer = R(*)(Args...);
         using RetType = R;
-        using ArgTypes = std::tuple<Args...>;
-        static constexpr std::size_t ArgCount = sizeof...(Args);
-        template<std::size_t N>
-        using NthArg = std::tuple_element_t<N, ArgTypes>;
+        using ArgTypes = tuple<Args...>;
+        static constexpr size_t ArgCount = sizeof...(Args);
+        template<size_t N>
+        using NthArg = tuple_element_t<N, ArgTypes>;
     };
 
 }

@@ -1,21 +1,16 @@
 #include "Rom.hpp"
-#include "Utils.hpp"
 #include "Cranked.hpp"
-
-#include <fstream>
-#include <cstring>
-#include <filesystem>
 
 using namespace cranked;
 
-Rom::Rom(const std::string &path, Cranked *cranked) : cranked(cranked), path(path) {
-    if (!std::filesystem::is_directory(path)) {
-        zip = std::make_unique<libzippp::ZipArchive>(path);
+Rom::Rom(const string &path, Cranked *cranked) : cranked(cranked), path(path) {
+    if (!filesystem::is_directory(path)) {
+        zip = make_unique<libzippp::ZipArchive>(path);
         zip->open(libzippp::ZipArchive::ReadOnly);
     }
     try {
         loadManifest();
-    } catch (std::exception &ignored) {}
+    } catch (exception &ignored) {}
     sdkVersion = getPdxVersion();
     if (!sdkVersion.isValid())
         logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
@@ -28,11 +23,11 @@ Rom::~Rom() {
 
 void Rom::loadManifest() {
     auto data = readRomFile("pdxinfo");
-    std::istringstream input((const char *) data.data());
-    std::string line;
-    while (std::getline(input, line)) {
+    istringstream input((const char *) data.data());
+    string line;
+    while (getline(input, line)) {
         auto index = line.find('=');
-        if (index == std::string::npos)
+        if (index == string::npos)
             continue;
         manifest[line.substr(0, index)] = line.substr(index + 1);
     }
@@ -45,10 +40,10 @@ void Rom::load() {
     if (zip)
         zip->open();
 
-    std::vector<uint8_t> pdzData;
+    vector<uint8> pdzData;
     try {
         pdzData = readRomFile("main.pdz");  // Todo: Don't use exceptions if not needed here
-    } catch (std::exception &ignored) {}
+    } catch (exception &ignored) {}
     if (!pdzData.empty())
         pdzFiles = loadPDZ(pdzData);
 
@@ -58,32 +53,32 @@ void Rom::load() {
             break;
         }
 
-    std::vector<uint8_t> pdexData;
+    vector<uint8> pdexData;
     try {
         pdexData = readRomFile("pdex.bin");
-    } catch (std::exception &ignored) {}
+    } catch (exception &ignored) {}
     if (!pdexData.empty()) {
         // Format is 16 byte magic, 16 byte MD5, decompressed size, Code and data size, relative address of shim function, relocation count
         // Last N 4-byte ints of compressed data are relocation offsets
         const int HEADER_SIZE = 0x30; // Magic + 16 byte MD5 + 4 32-bit integers
         if (strcmp((char *) pdexData.data(), PDX_MAGIC) != 0)
             throw CrankedError("Invalid PDX magic");
-        auto decompressedSize = *(uint32_t *) &pdexData[0x20];
-        combinedProgramSize = *(uint32_t *) &pdexData[0x24];
-        auto shimOffset = *(uint32_t *) &pdexData[0x28];
-        auto relocationCount = *(uint32_t *) &pdexData[0x2C];
+        auto decompressedSize = *(uint32 *) &pdexData[0x20];
+        combinedProgramSize = *(uint32 *) &pdexData[0x24];
+        auto shimOffset = *(uint32 *) &pdexData[0x28];
+        auto relocationCount = *(uint32 *) &pdexData[0x2C];
 
         // Todo: Detect uncompressed binary gracefully (Test with older version of SDK)
         try {
             binary = decompressData(pdexData.data() + HEADER_SIZE, pdexData.size() - HEADER_SIZE, decompressedSize);
-        } catch (std::exception &ex) {
+        } catch (exception &ex) {
             binary = pdexData;
         }
 
         // Relocations
         for (int i = 0; i < relocationCount; i++) {
-            auto offset = *(uint32_t *) (binary.data() + binary.size() - 4 * (i + 1));
-            *(uint32_t *) &binary[offset] += CODE_ADDRESS;
+            auto offset = *(uint32 *) (binary.data() + binary.size() - 4 * (i + 1));
+            *(uint32 *) &binary[offset] += CODE_ADDRESS;
         }
         binary.resize(binary.size() - 4 * relocationCount);
         binarySize = binary.size();
@@ -94,7 +89,7 @@ void Rom::load() {
     if (zip) {
         for (auto &entry : zip->getEntries()) { // Preload zip entry data, to avoid having to abstract into common file-type API
             if (!entry.isFile()) continue;
-            std::vector<uint8_t> data(entry.getSize());
+            vector<uint8> data(entry.getSize());
             auto zipData = entry.readAsBinary();
             memcpy(data.data(), zipData, data.size());
             delete[] (char *) zipData;
@@ -102,27 +97,27 @@ void Rom::load() {
                     .name = entry.getName(),
                     .type = getFileType(data.data()),
                     .isDir = entry.isDirectory(),
-                    .size = (uint32_t) entry.getSize(),
+                    .size = (uint32) entry.getSize(),
                     .extra = 0,
                     .data = data,
                     .modTime = entry.getDate(),
             });
         }
     } else {
-        for (auto &entry : std::filesystem::recursive_directory_iterator(path)) {
+        for (auto &entry : filesystem::recursive_directory_iterator(path)) {
             auto type = FileType::UNKNOWN;
             if (!entry.is_directory())
                 try {
-                    std::ifstream input(path / entry.path(), std::ios::binary);
+                    ifstream input(path / entry.path(), ios::binary);
                     char buffer[13]{}; // Null terminator is not strictly needed, but doesn't hurt
                     input.read(buffer, 12);
-                    type = getFileType((uint8_t *) buffer);
-                } catch (std::exception &ignored) {}
+                    type = getFileType((uint8 *) buffer);
+                } catch (exception &ignored) {}
             outerFiles.emplace_back(File{
                     .name = entry.path().lexically_relative(path),
                     .type = type,
                     .isDir = entry.is_directory(),
-                    .size = entry.is_directory() ? 0 : (uint32_t) entry.file_size(),
+                    .size = entry.is_directory() ? 0 : (uint32) entry.file_size(),
                     .extra = 0,
                     .data = {},
                     .modTime = to_time_t(entry.last_write_time()),
@@ -142,12 +137,12 @@ void Rom::unload() {
     loaded = false;
 }
 
-std::vector<uint8_t> Rom::readRomFile(const std::string &name, const std::string &extension) {
+vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
     auto filepath = !extension.empty() and not name.ends_with(extension) ? name + extension : name;
     for (auto &file : pdzFiles)
         if (file.name == name)
             return file.data;
-    std::vector<uint8_t> data;
+    vector<uint8> data;
     if (zip) {
         auto entry = zip->getEntry(filepath);
         if (entry.isNull())
@@ -157,12 +152,12 @@ std::vector<uint8_t> Rom::readRomFile(const std::string &name, const std::string
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(std::filesystem::path(path) / filepath);
+        data = readFileData(filesystem::path(path) / filepath);
     return data;
 }
 
-Rom::File *Rom::findRomFile(const std::string &name) {
-    auto normalize = [](const std::filesystem::path &p){ // Very basic normalization, should help a bit
+Rom::File *Rom::findRomFile(const string &name) {
+    auto normalize = [](const filesystem::path &p){ // Very basic normalization, should help a bit
         return p.lexically_normal();
     };
     for (auto &file : pdzFiles) // Todo: Should PDZ contents be included?
@@ -174,11 +169,11 @@ Rom::File *Rom::findRomFile(const std::string &name) {
     return nullptr;
 }
 
-std::vector<std::string> Rom::listRomFiles(std::string base, bool recursive) {
-    std::vector<std::string> files;
+vector<string> Rom::listRomFiles(string base, bool recursive) {
+    vector<string> files;
     if (base == "/" or base == ".") // Todo: Normalize paths better with fs::lexically_normal
         base = "";
-    std::vector<std::string> collectedDirs;
+    vector<string> collectedDirs;
     for (auto &file : outerFiles) {
         if (!file.name.starts_with(base))
             continue;
@@ -198,8 +193,8 @@ std::vector<std::string> Rom::listRomFiles(std::string base, bool recursive) {
     return files;
 }
 
-std::vector<Rom::File> Rom::loadPDZ(const std::vector<uint8_t> &data) {
-    std::vector<File> files;
+vector<Rom::File> Rom::loadPDZ(const vector<uint8> &data) {
+    vector<File> files;
     if (data.size() <= strlen(PDZ_MAGIC) or strcmp(PDZ_MAGIC, (char *) data.data()) != 0)
         throw CrankedError("Invalid PDZ magic");
     auto flags = readUint32LE(&data[12]);
@@ -214,17 +209,17 @@ std::vector<Rom::File> Rom::loadPDZ(const std::vector<uint8_t> &data) {
         auto entryLength = (entryHeader >> 8) & 0xFFFFFF;
         bool isCompressed = entryFlags & 0x80;
         auto fileType = entryFlags & 0xF;
-        auto fileName = std::string((const char *) data.data() + index);
+        auto fileName = string((const char *) data.data() + index);
         index += (int) fileName.length() + 1;
         index = (index + 0x3) & ~0x3; // Align to 4 bytes
-        uint32_t extra = 0;
+        uint32 extra = 0;
         if (FileType(fileType) == FileType::PDA) {
             extra = readUint32LE(&data[index]);
             index += 4;
             entryLength -= 4;
         }
 
-        std::vector<uint8_t> fileContents;
+        vector<uint8> fileContents;
         if (isCompressed) {
             auto fileSize = readUint32LE(&data[index]);
             fileContents = decompressData(data.data() + index + 4, entryLength - 4, fileSize);
@@ -235,20 +230,20 @@ std::vector<Rom::File> Rom::loadPDZ(const std::vector<uint8_t> &data) {
             index += entryLength;
         }
 
-        files.emplace_back(File{fileName, FileType(fileType), false, (uint32_t) fileContents.size(), extra, fileContents});
+        files.emplace_back(File{fileName, FileType(fileType), false, (uint32) fileContents.size(), extra, fileContents});
     }
 
     return files;
 }
 
-Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
+Rom::Font Rom::readFont(const uint8 *data, size_t dataSize) {
     if (strcmp(FONT_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad font magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
     bool wide = flags & 0x00000001; // Contains characters above U+1FFFF // Todo: Is this needed?
-    const uint8_t *fontData;
-    std::vector<uint8_t> decompressedData;
+    const uint8 *fontData;
+    vector<uint8> decompressedData;
     if (compressed) {
         auto size = readUint32LE(&data[0x10]);
 //        auto maxGlyphWidth = (int) readUint32LE(&data[0x14]); // Not needed
@@ -262,18 +257,18 @@ Rom::Font Rom::readFont(const uint8_t *data, size_t dataSize) {
     return readFontData(fontData, wide);
 }
 
-Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
+Rom::Font Rom::readFontData(const uint8 *data, bool wide) {
     // Read page list header
     Font font{};
     font.glyphWidth = data[0];
     font.glyphHeight = data[1];
     font.tracking = readUint16LE(data + 2);
-    std::vector<uint8_t> pageUsageFlags(64);
+    vector<uint8> pageUsageFlags(64);
     memcpy(pageUsageFlags.data(), data + 4, 64);
     int pageCount = 0;
     for (int i = 0; i < 64; i++)
-        pageCount += std::popcount(pageUsageFlags[i]);
-    std::vector<int> pageIndices(pageCount);
+        pageCount += popcount(pageUsageFlags[i]);
+    vector<int> pageIndices(pageCount);
     int pageIndex = 0;
     for (int i = 0; i < 64; i++)
         for (int j = 0; j < 8; j++) {
@@ -281,22 +276,22 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
             if (hasPage)
                 pageIndices[pageIndex++] = i * 64 + j;
         }
-    std::vector<uint32_t> pageOffsets(pageCount + 1); // First offset is zero, ignore last offset which points to end
+    vector<uint32> pageOffsets(pageCount + 1); // First offset is zero, ignore last offset which points to end
     for (int i = 0; i < pageCount; i++)
         pageOffsets[i + 1] = readUint32LE(data + 68 + i * 4);
     auto pageListHeaderEnd = data + 68 + pageCount * 4;
 
     // Read pages
     for (int page = 0; page < pageCount; page++) {
-        const uint8_t *pageData = pageListHeaderEnd + pageOffsets[page];
+        const uint8 *pageData = pageListHeaderEnd + pageOffsets[page];
 
         // Read page header
         pageData += 3; // First 3 bytes are padding
         int glyphCount = *(pageData++);
-        std::vector<uint8_t> glyphUsageFlags(32);
+        vector<uint8> glyphUsageFlags(32);
         memcpy(glyphUsageFlags.data(), pageData, 32);
         pageData += 32;
-        std::vector<uint16_t> glyphOffsets(glyphCount + 1); // First offset is zero, ignore last offset which points to end
+        vector<uint16> glyphOffsets(glyphCount + 1); // First offset is zero, ignore last offset which points to end
         for (int i = 0; i < glyphCount; i++) {
             glyphOffsets[i + 1] = readUint16LE(pageData);
             pageData += 2;
@@ -327,7 +322,7 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
 
             // Read short kerning table
             for (int j = 0; j < shortKerningEntries; j++) {
-                glyph.shortKerningTable[glyphData[0]] = *(int8_t *) &glyphData[1];
+                glyph.shortKerningTable[glyphData[0]] = *(int8 *) &glyphData[1];
                 glyphData += 2;
             }
 
@@ -338,7 +333,7 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
             // Read long kerning table
             for (int j = 0; j < longKerningEntries; j++) {
                 auto entry = readUint32LE(glyphData);
-                glyph.longKerningTable[int(entry >> 8)] = *(int8_t *) &entry;
+                glyph.longKerningTable[int(entry >> 8)] = *(int8 *) &entry;
                 glyphData += 4;
             }
 
@@ -350,13 +345,13 @@ Rom::Font Rom::readFontData(const uint8_t *data, bool wide) {
 }
 
 
-Rom::StringTable Rom::readStringTable(const uint8_t *data, size_t dataSize) {
+Rom::StringTable Rom::readStringTable(const uint8 *data, size_t dataSize) {
     if (strcmp(STRING_TABLE_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad string table magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
-    const uint8_t *stringData;
-    std::vector<uint8_t> decompressedData;
+    const uint8 *stringData;
+    vector<uint8> decompressedData;
     if (compressed) {
         auto size = readUint32LE(&data[0x10]);
         // Next 12 bytes are unused
@@ -366,7 +361,7 @@ Rom::StringTable Rom::readStringTable(const uint8_t *data, size_t dataSize) {
         stringData = data + 0x10;
     auto stringCount = readUint32LE(stringData);
     stringData += 4;
-    std::vector<uint32_t> offsets(stringCount);
+    vector<uint32> offsets(stringCount);
     for (int i = 0; i < stringCount - 1; i++) {
         offsets[i + 1] = readUint32LE(stringData);
         stringData += 4;
@@ -380,27 +375,27 @@ Rom::StringTable Rom::readStringTable(const uint8_t *data, size_t dataSize) {
     return table;
 }
 
-Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
+Rom::Audio Rom::readAudio(const uint8 *data, size_t dataSize) {
     if (strcmp(AUDIO_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad audio magic");
     auto headerWord = readUint32LE(data + 12);
     auto sampleRate = headerWord >> 8;
-    auto format = SoundFormat(headerWord & 0xFF);
-    bool stereo = format == SoundFormat::Stereo8bit or format == SoundFormat::Stereo16bit or format == SoundFormat::StereoADPCM;
+    auto soundFormat = SoundFormat(headerWord & 0xFF);
+    bool stereo = soundFormat == SoundFormat::Stereo8bit or soundFormat == SoundFormat::Stereo16bit or soundFormat == SoundFormat::StereoADPCM;
     auto audioDataSize = dataSize - 16;
-    Audio audio {.format = format, .stereo = stereo, .sampleRate = sampleRate};
+    Audio audio {.soundFormat = soundFormat, .stereo = stereo, .sampleRate = sampleRate};
     audio.data.resize(audioDataSize);
     memcpy(audio.data.data(), data + 16, audioDataSize);
-    if (format == SoundFormat::Mono8bit or format == SoundFormat::Stereo8bit) {
+    if (soundFormat == SoundFormat::Mono8bit or soundFormat == SoundFormat::Stereo8bit) {
         auto samples = audioDataSize;
         audio.samples.resize(samples);
         for (int i = 0; i < samples; i++)
-            audio.samples[i] = (int16_t) (((int) bit_cast<int8_t>(data[16 + i]) - 0x80) << 8); // Todo: Verify conversion
-    } else if (format == SoundFormat::Mono16bit or format == SoundFormat::Stereo16bit) {
+            audio.samples[i] = (int16) (((int) bit_cast<int8>(data[16 + i]) - 0x80) << 8); // Todo: Verify conversion
+    } else if (soundFormat == SoundFormat::Mono16bit or soundFormat == SoundFormat::Stereo16bit) {
         auto samples = audioDataSize / 2;
         audio.samples.resize(samples);
         for (int i = 0; i < samples; i++)
-            audio.samples[i] = bit_cast<int16_t>(readUint16LE(data + 16 + i * 2));
+            audio.samples[i] = bit_cast<int16>(readUint16LE(data + 16 + i * 2));
     } else { // 4-bit IMA ADPCM
         static constexpr int IMA_INDEX_TABLE[]{
                 -1, -1, -1, -1, 2, 4, 6, 8,
@@ -441,7 +436,7 @@ Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
                 blockData += 2;
             }
             for (int j = 0; j < samplesPerBlock / 2; j++) {
-                auto decodeSample = [](uint8_t sample, int &predictor, int &stepIndex, int &step){
+                auto decodeSample = [](uint8 sample, int &predictor, int &stepIndex, int &step){
                     int difference = 0;
                     if (sample & 0x4)
                         difference += step;
@@ -453,11 +448,11 @@ Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
                     if (sample & 0x8)
                         difference = -difference;
                     predictor += difference;
-                    predictor = std::max(std::min(predictor, 32767), -32767);
+                    predictor = max(min(predictor, 32767), -32767);
                     stepIndex += IMA_INDEX_TABLE[sample];
-                    stepIndex = std::max(std::min(stepIndex, 88), 0);
+                    stepIndex = max(min(stepIndex, 88), 0);
                     step = IMA_STEP_TABLE[stepIndex];
-                    return (int16_t) predictor;
+                    return (int16) predictor;
                 };
                 auto sample = *(blockData++);
                 auto first = sample >> 4;
@@ -470,13 +465,13 @@ Rom::Audio Rom::readAudio(const uint8_t *data, size_t dataSize) {
     return audio;
 }
 
-Rom::Image Rom::readImage(const uint8_t *data, size_t dataSize) {
+Rom::Image Rom::readImage(const uint8 *data, size_t dataSize) {
     if (strcmp(IMAGE_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad image magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
-    const uint8_t *imageData;
-    std::vector<uint8_t> decompressedData;
+    const uint8 *imageData;
+    vector<uint8> decompressedData;
     Image image{};
     if (compressed) {
         auto size = readUint32LE(&data[0x10]);
@@ -493,13 +488,13 @@ Rom::Image Rom::readImage(const uint8_t *data, size_t dataSize) {
     return image;
 }
 
-Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
+Rom::ImageTable Rom::readImageTable(const uint8 *data, size_t dataSize) {
     if (strcmp(IMAGE_TABLE_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad image table magic");
     auto flags = readUint32LE(&data[12]);
     bool compressed = flags & 0x80000000;
-    const uint8_t *tableData;
-    std::vector<uint8_t> decompressedData;
+    const uint8 *tableData;
+    vector<uint8> decompressedData;
     if (compressed) {
         auto size = readUint32LE(&data[0x10]);
 //        auto firstImageWidth = (int) readUint32LE(&data[0x14]); // Redundant
@@ -512,7 +507,7 @@ Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
     auto cellCount = readUint16LE(tableData);
     auto cellsPerRow = readUint16LE(tableData + 2);
     tableData += 4;
-    std::vector<uint32_t> offsets(cellCount);
+    vector<uint32> offsets(cellCount);
     for (int i = 0; i < cellCount - 1; i++) {
         offsets[i + 1] = readUint32LE(tableData);
         tableData += 4;
@@ -524,7 +519,7 @@ Rom::ImageTable Rom::readImageTable(const uint8_t *data, size_t dataSize) {
     return table;
 }
 
-Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
+Rom::Video Rom::readVideo(const uint8 *data, size_t dataSize) {
     if (strcmp(VIDEO_MAGIC, (char *) data) != 0)
         throw CrankedError("Bad video magic");
     data += 16; // Previous 32-bit word is reserved
@@ -536,10 +531,10 @@ Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     data += 8;
     enum class FrameType { Empty, I, P, Combined };
     struct FrameHeader {
-        uint32_t offset;
+        uint32 offset;
         FrameType type;
     };
-    std::vector<FrameHeader> headers(frameCount);
+    vector<FrameHeader> headers(frameCount);
     for (int i = 0; i < frameCount; i++) {
         auto value = readUint32LE(data);
         headers[i].offset = value >> 2;
@@ -550,12 +545,12 @@ Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     for (int i = 0; i < frameCount; i++) {
         auto frameData = data + headers[i].offset;
         auto type = headers[i].type;
-        auto readFrame = [&](const uint8_t *data){
-            std::vector<uint8_t> frame(width * height);
-            auto stride = (int) std::ceil(width / 8.0);
+        auto readFrame = [&](const uint8 *data){
+            vector<uint8> frame(width * height);
+            auto stride = (int) ceil(width / 8.0);
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
-                    frame[y * width + x] = (uint8_t) (bool) (data[y * stride + x / 8] & (1 << (7 - x % 8)));
+                    frame[y * width + x] = (uint8) (bool) (data[y * stride + x / 8] & (1 << (7 - x % 8)));
             return frame;
         };
         if (type == FrameType::I) {
@@ -578,7 +573,7 @@ Rom::Video Rom::readVideo(const uint8_t *data, size_t dataSize) {
     return video;
 }
 
-Rom::ImageCell Rom::readImageCell(const uint8_t *data) {
+Rom::ImageCell Rom::readImageCell(const uint8 *data) {
     int clipWidth = readUint16LE(data + 0);
     int clipHeight = readUint16LE(data + 2);
     int srcStride = readUint16LE(data + 4);
@@ -593,7 +588,7 @@ Rom::ImageCell Rom::readImageCell(const uint8_t *data) {
     cell.height = clipTop + clipHeight + clipBottom;
     cell.data.resize(cell.width * cell.height);
     cell.mask.resize(cell.data.size());
-    auto read = [&](int start, uint8_t *out){
+    auto read = [&](int start, uint8 *out){
         for (int y = 0; y < clipHeight; y++)
             for (int x = 0; x < clipWidth; x++)
                 out[(clipTop + y) * cell.width + clipLeft + x] = (bool) (data[start + y * srcStride + x / 8] & (1 << (7 - x % 8)));
@@ -609,10 +604,10 @@ Rom::ImageCell Rom::readImageCell(const uint8_t *data) {
     return cell;
 }
 
-Rom::FileType Rom::getFileType(const uint8_t *header) {
+Rom::FileType Rom::getFileType(const uint8 *header) {
     if (!strcmp((const char *) header, LUA_MAGIC))
         return FileType::LUAC;
-    std::string magic(header, header + 12);
+    string magic(header, header + 12);
     if (magic == IMAGE_MAGIC)
         return FileType::PDI;
     else if (magic == IMAGE_TABLE_MAGIC)
@@ -629,11 +624,11 @@ Rom::FileType Rom::getFileType(const uint8_t *header) {
         return FileType::UNKNOWN;
 }
 
-void Rom::logMessage(LogLevel level, const char *format, ...) const {
+void Rom::logMessage(LogLevel level, const char *fmt, ...) const {
     if (!cranked)
         return;
     va_list args;
-    va_start(args, format);
-    cranked->logMessageVA(level, format, args);
+    va_start(args, fmt);
+    cranked->logMessageVA(level, fmt, args);
     va_end(args);
 }

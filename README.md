@@ -9,12 +9,12 @@ the groundwork is laid and Lua or native programs can be run. See `Runtime.cpp` 
 and todo items. Expect many crashes.
 
 ## Screenshots
-### From C
-![From C](media/Screenshot_1.png)
-### From Lua
-![From Lua](media/Screenshot_2.png)
+### Basic Graphics
+![Basic Graphics](media/Shapes.png)
+### Sprite Collisions
+![Sprite Collisions](media/Sprite_Collisions.png)
 ### Native Debugging
-![Native Debugging](media/Screenshot_3.png)
+![Native Debugging](media/Debugging.png)
 
 ## Building
 Libraries are all embedded as submodules except for SDL2, which is required for building desktop targets.
@@ -34,7 +34,7 @@ executable with the ROM path as the only command-line argument or load the Libre
 likely crash at the moment and there is little in the way of useful debug output, so debugging from an IDE is best for now.
 
 ## Todo
-- Sprites
+- Finish Sprites (Collision occasionally phases a sprite off-screen in Sprite Collision example)
 - Graphical effects
 - Pattern/stencil drawing
 - Polygon, rounded rect drawing
@@ -50,7 +50,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - Finish C JSON decoding
 - Finish C Lua API
 - Test building on Windows/Mac
-- Create a testing framework to compare console output to the official simulator
+- Create a testing framework to compare console output to the official simulator (Graphics, Collisions)
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
 - Java library with native libs for Android app consumption
 - Ensuring that all resource reference counting is done correctly
@@ -65,6 +65,8 @@ likely crash at the moment and there is little in the way of useful debug output
 - GitHub Actions release builds
 - USB serial functionality (As controller, dump saves, backup games?)
 - Better execution model (The current approach works, but has limitations, coroutines might be elegant, avoiding recursive Lua invocation would be good)
+- C++ std::function callbacks may help to support both Lua and C++ with the same interface (With Lua/Native resource references, as well)
+- Fix git submodules to not get in detached head state
 
 ## Internals
 - Unicorn to provide Arm CPU emulation

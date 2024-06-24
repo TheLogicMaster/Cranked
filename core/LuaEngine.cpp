@@ -11,7 +11,7 @@ LuaEngine::~LuaEngine() {
 }
 
 void LuaEngine::init() {
-    if (!cranked.rom->hasLua || (cranked.nativeEngine.isLoaded() && cranked.nativeEngine.hasUpdateCallback()))
+    if (!cranked.rom->hasLua or (cranked.nativeEngine.isLoaded() and cranked.nativeEngine.hasUpdateCallback()))
         return; // Don't load Lua chunks in native-only mode
 
     luaInterpreter = lua_newstate(luaAllocator, this);
@@ -73,7 +73,7 @@ void LuaEngine::runUpdateLoop() {
     if (result == LUA_OK)
         lua_resetthread(luaUpdateThread);
     else if (result != LUA_YIELD) {
-        std::string error(getLuaError(result));
+        string error(getLuaError(result));
         inLuaUpdate = false;
         lua_resetthread(luaUpdateThread);
         throw CrankedError("Failed to run Lua update loop: {}", error);
@@ -89,7 +89,7 @@ void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t ns
     }
     try {
         return cranked->heap.reallocate(ptr, (int) nsize);
-    } catch (std::exception &ex) {
+    } catch (exception &ex) {
         return nullptr;
     }
 }

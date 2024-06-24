@@ -34,7 +34,7 @@ namespace magic_enum {
 
 using namespace cranked;
 
-typedef std::variant<std::string, int, float, bool> setting_type;
+typedef variant<string, int, float, bool> setting_type;
 
 enum class Windows {
     Debug, Registers, HeapMemory, CodeMemory, Disassembly
@@ -43,13 +43,13 @@ enum class Windows {
 struct Userdata {
     Cranked &cranked;
     SDL_Window* window{};
-    std::map<std::string, setting_type> settings; // Only updated while saving/loading
+    map<string, setting_type> settings; // Only updated while saving/loading
     float scale = 1;
     magic_enum::containers::array<Windows, bool> windowStates{};
 
     template<typename T>
-    bool tryGetSetting(const std::string &name, T &out) {
-        if (T *value = std::get_if<T>(&settings[name])) {
+    bool tryGetSetting(const string &name, T &out) {
+        if (T *value = get_if<T>(&settings[name])) {
             out = *value;
             return true;
         }
@@ -61,12 +61,14 @@ int main(int argc, const char *args[]) {
     cxxopts::Options commandArgOptions("Cranked", "A Playdate console emulator");
     commandArgOptions.add_options()
         ("d,debug", "GDB enable/port", cxxopts::value<int>())
-        ("program", "The program to run", cxxopts::value<std::string>());
+        ("p,pause", "Start paused", cxxopts::value<bool>())
+        ("program", "The program to run", cxxopts::value<string>());
     commandArgOptions.parse_positional({"program"});
 
     auto result = commandArgOptions.parse(argc, args);
-    std::string programPath = result["program"].as<std::string>();
+    string programPath = result["program"].as<string>();
     int debugPort = result["debug"].as_optional<int>().value_or(0);
+    bool startPaused = result["pause"].as_optional<bool>().value_or(false);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
         throw CrankedError("Failed to init SDL: {}", SDL_GetError());
@@ -86,7 +88,8 @@ int main(int argc, const char *args[]) {
         printf("Failed to initialize audio: %s\n", SDL_GetError());
 
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 440, 480, windowFlags);
+    // Todo: If window starts small, it squishes saved window positions
+    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1000, 1000, windowFlags);
     if (!window)
         throw CrankedError("Failed to create SDL window: {}", SDL_GetError());
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -137,10 +140,10 @@ int main(int argc, const char *args[]) {
         };
         settingsHandler.ReadLineFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, void *entry, const char *line) {
             auto userdata = (Userdata *)handler->UserData;
-            std::string lineStr(line);
+            string lineStr(line);
             size_t typeSeparatorIndex = lineStr.find('@');
             size_t valueSeparatorIndex = lineStr.find('=');
-            if (typeSeparatorIndex == std::string::npos or valueSeparatorIndex == std::string::npos)
+            if (typeSeparatorIndex == string::npos or valueSeparatorIndex == string::npos)
                 throw CrankedError("Bad settings item in line: `{}`", line);
             auto type = lineStr.substr(0, typeSeparatorIndex);
             auto name = lineStr.substr(typeSeparatorIndex + 1, valueSeparatorIndex - typeSeparatorIndex - 1);
@@ -149,14 +152,14 @@ int main(int argc, const char *args[]) {
                 if (type == "String")
                     userdata->settings[name] = value;
                 else if (type == "Int")
-                    userdata->settings[name] = std::stoi(value);
+                    userdata->settings[name] = stoi(value);
                 else if (type == "Float")
-                    userdata->settings[name] = std::stof(value);
+                    userdata->settings[name] = stof(value);
                 else if (type == "Bool")
-                    userdata->settings[name] = (bool) std::stoi(value);
+                    userdata->settings[name] = (bool) stoi(value);
                 else
                     throw CrankedError("Bad settings item type in line: `{}`", line);
-            } catch (std::logic_error &ex) {
+            } catch (logic_error &ex) {
                 throw CrankedError("Bad settings item value in line: `{}` ({})", line, ex.what());
             }
         };
@@ -172,7 +175,7 @@ int main(int argc, const char *args[]) {
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
                 bool shown{};
-                userdata->tryGetSetting("ShowWindow" + std::string(magic_enum::enum_name(value)), shown);
+                userdata->tryGetSetting("ShowWindow" + string(magic_enum::enum_name(value)), shown);
                 userdata->windowStates[value] = shown;
             }
         };
@@ -188,19 +191,19 @@ int main(int argc, const char *args[]) {
 
             for (size_t i = 0; i < userdata->windowStates.size(); i++) {
                 auto value = magic_enum::enum_value<Windows>(i);
-                userdata->settings["ShowWindow" + std::string(magic_enum::enum_name(value))] = userdata->windowStates[value];
+                userdata->settings["ShowWindow" + string(magic_enum::enum_name(value))] = userdata->windowStates[value];
             }
 
             buf->append("[Cranked][Settings]\n");
             for (const auto &entry : userdata->settings) {
-                if (std::holds_alternative<std::string>(entry.second))
-                    buf->appendf("String@%s=%s\n", entry.first.c_str(), std::get<std::string>(entry.second).c_str());
-                else if (std::holds_alternative<int>(entry.second))
-                    buf->appendf("Int@%s=%d\n", entry.first.c_str(), std::get<int>(entry.second));
-                else if (std::holds_alternative<float>(entry.second))
-                    buf->appendf("Float@%s=%f\n", entry.first.c_str(), std::get<float>(entry.second));
-                else if (std::holds_alternative<bool>(entry.second))
-                    buf->appendf("Bool@%s=%d\n", entry.first.c_str(), std::get<bool>(entry.second));
+                if (holds_alternative<string>(entry.second))
+                    buf->appendf("String@%s=%s\n", entry.first.c_str(), get<string>(entry.second).c_str());
+                else if (holds_alternative<int>(entry.second))
+                    buf->appendf("Int@%s=%d\n", entry.first.c_str(), get<int>(entry.second));
+                else if (holds_alternative<float>(entry.second))
+                    buf->appendf("Float@%s=%f\n", entry.first.c_str(), get<float>(entry.second));
+                else if (holds_alternative<bool>(entry.second))
+                    buf->appendf("Bool@%s=%d\n", entry.first.c_str(), get<bool>(entry.second));
                 else
                     throw CrankedError("Unexpected settings type variant");
             }
@@ -217,7 +220,7 @@ int main(int argc, const char *args[]) {
     MemoryEditor codeMemoryEditor;
     MemoryEditor heapMemoryEditor;
 
-    std::string newBreakpointText;
+    string newBreakpointText;
     bool disassemblyFollowPc = true;
 
     auto keyboardState = SDL_GetKeyboardState(nullptr);
@@ -225,12 +228,13 @@ int main(int argc, const char *args[]) {
     bool wasScaling = false;
     int newScale = 1;
     bool firstFrame = true;
+    bool requestedStart = false;
 
     // Todo: Extract the following disaster to separate functions
     auto callback = [&](Cranked &cranked){
         if (audioDevice) {
             int toQueue = 1024 - (int) SDL_GetQueuedAudioSize(audioDevice) / 4;
-            int16_t buffer[1024 * 2];
+            int16 buffer[1024 * 2];
             cranked.audio.sampleAudio(buffer, toQueue);
             SDL_QueueAudio(audioDevice, buffer, toQueue * 4);
         }
@@ -263,6 +267,22 @@ int main(int argc, const char *args[]) {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
+                // Todo: Clean this up (Different menu? Termination should not be necessary)
+                if (ImGui::MenuItem(cranked.state == Cranked::State::Stopped ? "Start" : cranked.state == Cranked::State::Stopping ? "Terminate" : "Stop")) {
+                    switch (cranked.state) {
+                        case cranked::Cranked::State::Stopped:
+                            requestedStart = true;
+                            break;
+                        case cranked::Cranked::State::Stopping:
+                            cranked.terminate();
+                            break;
+                        case cranked::Cranked::State::Running:
+                            cranked.stop();
+                            break;
+                    }
+                }
+                if (ImGui::MenuItem("Reset"))
+                    cranked.reset(); // Todo: This is not safe at present
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("View")) {
@@ -336,9 +356,9 @@ int main(int argc, const char *args[]) {
             ImGui::SameLine();
             if (ImGui::Button("Add") && !newBreakpointText.empty()) {
                 try {
-                    cranked.debugger.addBreakpoint((cref_t)std::stol(newBreakpointText, nullptr, 16));
+                    cranked.debugger.addBreakpoint((cref_t)stol(newBreakpointText, nullptr, 16));
                     newBreakpointText.clear();
-                } catch (std::exception &ex) {}
+                } catch (exception &ex) {}
             }
 
             ImGui::SameLine();
@@ -473,10 +493,15 @@ int main(int argc, const char *args[]) {
     cranked.config.updateCallback = callback;
     cranked.config.debugPort = debugPort;
     cranked.load(programPath);
-    cranked.start();
+    if (!startPaused)
+        cranked.start();
 
     while (!exited) {
         try {
+            if (requestedStart) {
+                cranked.start();
+                requestedStart = false;
+            }
             cranked.update();
             // Todo: Sleep for the rest of the frame
         } catch (NativeEngine::NativeExecutionError &ex) {
