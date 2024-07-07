@@ -1,16 +1,27 @@
 #include "Rom.hpp"
 #include "Cranked.hpp"
+#include "gen/AshevilleSans14Light.hpp"
+#include "gen/AshevilleSans14Bold.hpp"
+#include "gen/AshevilleSans14LightOblique.hpp"
+#include "gen/AshevilleSans24Light.hpp"
 
 using namespace cranked;
 
+unordered_map<string, Rom::File> Rom::systemFiles {
+    makeSystemFilePair("Fonts/Asheville-Sans-14-Light.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT, ASHEVILLE_SANS_14_LIGHT_SIZE),
+    makeSystemFilePair("Fonts/Asheville-Sans-14-Bold.pft", FileType::PFT, ASHEVILLE_SANS_14_BOLD, ASHEVILLE_SANS_14_BOLD_SIZE),
+    makeSystemFilePair("Fonts/Asheville-Sans-14-Light-Oblique.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT_OBLIQUE, ASHEVILLE_SANS_14_LIGHT_OBLIQUE_SIZE),
+    makeSystemFilePair("Fonts/Asheville-Sans-24-Light.pft", FileType::PFT, ASHEVILLE_SANS_24_LIGHT, ASHEVILLE_SANS_24_LIGHT_SIZE),
+};
+
 Rom::Rom(const string &path, Cranked *cranked) : cranked(cranked), path(path) {
-    if (!filesystem::is_directory(path)) {
+    if (!fs::is_directory(path)) {
         zip = make_unique<libzippp::ZipArchive>(path);
         zip->open(libzippp::ZipArchive::ReadOnly);
     }
     try {
         loadManifest();
-    } catch (exception &ignored) {}
+    } catch (exception &) {}
     sdkVersion = getPdxVersion();
     if (!sdkVersion.isValid())
         logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
@@ -43,7 +54,7 @@ void Rom::load() {
     vector<uint8> pdzData;
     try {
         pdzData = readRomFile("main.pdz");  // Todo: Don't use exceptions if not needed here
-    } catch (exception &ignored) {}
+    } catch (exception &) {}
     if (!pdzData.empty())
         pdzFiles = loadPDZ(pdzData);
 
@@ -56,7 +67,7 @@ void Rom::load() {
     vector<uint8> pdexData;
     try {
         pdexData = readRomFile("pdex.bin");
-    } catch (exception &ignored) {}
+    } catch (exception &) {}
     if (!pdexData.empty()) {
         // Format is 16 byte magic, 16 byte MD5, decompressed size, Code and data size, relative address of shim function, relocation count
         // Last N 4-byte ints of compressed data are relocation offsets
@@ -104,7 +115,7 @@ void Rom::load() {
             });
         }
     } else {
-        for (auto &entry : filesystem::recursive_directory_iterator(path)) {
+        for (auto &entry : fs::recursive_directory_iterator(path)) {
             auto type = FileType::UNKNOWN;
             if (!entry.is_directory())
                 try {
@@ -112,7 +123,7 @@ void Rom::load() {
                     char buffer[13]{}; // Null terminator is not strictly needed, but doesn't hurt
                     input.read(buffer, 12);
                     type = getFileType((uint8 *) buffer);
-                } catch (exception &ignored) {}
+                } catch (exception &) {}
             outerFiles.emplace_back(File{
                     .name = entry.path().lexically_relative(path),
                     .type = type,
@@ -139,6 +150,12 @@ void Rom::unload() {
 
 vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
     auto filepath = !extension.empty() and not name.ends_with(extension) ? name + extension : name;
+    if (filepath.starts_with("/System/")) {
+        auto file = findSystemFile(name.substr(8));
+        if (!file)
+            throw CrankedError("No such file: " + filepath);
+        return file->data;
+    }
     for (auto &file : pdzFiles)
         if (file.name == name)
             return file.data;
@@ -152,13 +169,15 @@ vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(filesystem::path(path) / filepath);
+        data = readFileData(fs::path(path) / filepath);
     return data;
 }
 
 Rom::File *Rom::findRomFile(const string &name) {
-    auto normalize = [](const filesystem::path &p){ // Very basic normalization, should help a bit
-        return p.lexically_normal();
+    if (name.starts_with("/System/"))
+        return findSystemFile(name.substr(8));
+    auto normalize = [](const fs::path &p){
+        return p; // p.lexically_normal(); // Todo: This surely doesn't work on Windows
     };
     for (auto &file : pdzFiles) // Todo: Should PDZ contents be included?
         if (normalize(file.name) == normalize(name))
@@ -610,18 +629,24 @@ Rom::FileType Rom::getFileType(const uint8 *header) {
     string magic(header, header + 12);
     if (magic == IMAGE_MAGIC)
         return FileType::PDI;
-    else if (magic == IMAGE_TABLE_MAGIC)
+    if (magic == IMAGE_TABLE_MAGIC)
         return FileType::PDT;
-    else if (magic == VIDEO_MAGIC)
+    if (magic == VIDEO_MAGIC)
         return FileType::PDV;
-    else if (magic == AUDIO_MAGIC)
+    if (magic == AUDIO_MAGIC)
         return FileType::PDA;
-    else if (magic == STRING_TABLE_MAGIC)
+    if (magic == STRING_TABLE_MAGIC)
         return FileType::PDS;
-    else if (magic == FONT_MAGIC)
+    if (magic == FONT_MAGIC)
         return FileType::PFT;
-    else
-        return FileType::UNKNOWN;
+    return FileType::UNKNOWN;
+}
+
+Rom::File *Rom::findSystemFile(const string &path) {
+    // Todo: Path should be normalized a bit
+    if (auto it = systemFiles.find(path); it != systemFiles.end())
+        return &it->second;
+    throw CrankedError("No such system file: " + path);
 }
 
 void Rom::logMessage(LogLevel level, const char *fmt, ...) const {

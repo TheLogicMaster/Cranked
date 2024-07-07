@@ -108,27 +108,27 @@ namespace cranked {
 
         vector<string> listRomFiles(string base, bool recursive); // Doesn't include PDZ contents
 
-        inline string getName() {
+        string getName() {
             return manifest["name"];
         }
 
-        inline string getAuthor() {
+        string getAuthor() {
             return manifest["author"];
         }
 
-        inline string getDescription() {
+        string getDescription() {
             return manifest["description"];
         }
 
-        inline string getBundleID() {
+        string getBundleID() {
             return manifest["bundleID"];
         }
 
-        inline string getVersion() {
+        string getVersion() {
             return manifest["version"];
         }
 
-        inline int getBuildNumber() {
+        int getBuildNumber() {
             try {
                 return stoi(manifest["buildNumber"]);
             } catch (exception &ex) {
@@ -136,23 +136,23 @@ namespace cranked {
             }
         }
 
-        inline string getImagePath() {
+        string getImagePath() {
             return manifest["imagePath"];
         }
 
-        inline string getLaunchSoundPath() {
+        string getLaunchSoundPath() {
             return manifest["launchSoundPath"];
         }
 
-        inline string getContentWarning() {
+        string getContentWarning() {
             return manifest["contentWarning"];
         }
 
-        inline string getContentWarning2() {
+        string getContentWarning2() {
             return manifest["contentWarning2"];
         }
 
-        inline Version getPdxVersion() {
+        Version getPdxVersion() {
             try {
                 return Version(stoi(manifest["pdxversion"]));
             } catch (exception &ex) {
@@ -160,7 +160,7 @@ namespace cranked {
             }
         }
 
-        inline int getBuildTime() {
+        int getBuildTime() {
             try {
                 return stoi(manifest["buildtime"]);
             } catch (exception &ex) {
@@ -168,32 +168,32 @@ namespace cranked {
             }
         }
 
-        inline Image getImage(const string &name) {
+        Image getImage(const string &name) {
             auto data = readRomFile(name, ".pdi");
             return readImage(data.data(), data.size());
         }
 
-        inline ImageTable getImageTable(const string &name) {
+        ImageTable getImageTable(const string &name) {
             auto data = readRomFile(name, ".pdt");
             return readImageTable(data.data(), data.size());
         }
 
-        inline StringTable getStringTable(const string &name) {
+        StringTable getStringTable(const string &name) {
             auto data = readRomFile(name, ".pds");
             return readStringTable(data.data(), data.size());
         }
 
-        inline Font getFont(const string &name) {
+        Font getFont(const string &name) {
             auto data = readRomFile(name, ".pft");
             return readFont(data.data(), data.size());
         }
 
-        inline Audio getAudio(const string &name) {
+        Audio getAudio(const string &name) {
             auto data = readRomFile(name, ".pda");
             return readAudio(data.data(), data.size());
         }
 
-        inline Video getVideo(const string &name) {
+        Video getVideo(const string &name) {
             auto data = readRomFile(name, ".pdv");
             return readVideo(data.data(), data.size());
         }
@@ -218,10 +218,19 @@ namespace cranked {
 
         static FileType getFileType(const uint8 *header);
 
+        static File *findSystemFile(const string &path);
+
+        static Font readSystemFont(const string &path) {
+            auto file = findSystemFile(fs::path("Fonts") / path);
+            if (!file)
+                throw CrankedError("No such system file: " + path);
+            return readFont(file->data.data(), file->data.size());
+        }
+
         Cranked *cranked; // Only present for logging, so optional
         bool loaded{};
         unique_ptr<libzippp::ZipArchive> zip;
-        filesystem::path path;
+        fs::path path;
         map<string, string> manifest{};
         vector<File> outerFiles;
         vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?
@@ -246,6 +255,12 @@ namespace cranked {
         void loadManifest();
 
         static ImageCell readImageCell(const uint8 *start);
+
+        static pair<string, File> makeSystemFilePair(const string &path, FileType type, const uint8 *data, size_t size) {
+            return pair{ path, File{ path, type, false, (uint32)size, 0, vector(data, data + size), 0 } };
+        }
+
+        static unordered_map<string, File> systemFiles;
     };
 
 }

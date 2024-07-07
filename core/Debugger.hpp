@@ -43,9 +43,11 @@ namespace cranked {
             return breakpoints;
         }
 
+#if USE_CAPSTONE
         const cs_insn *getDisassembly() {
             return disassembly;
         }
+#endif
 
         int getDisassemblySize() const {
             return disassemblySize;
@@ -143,8 +145,10 @@ namespace cranked {
 
         Cranked &cranked;
         NativeEngine &nativeEngine;
+#if USE_CAPSTONE
         csh capstoneHandle{};
         cs_insn *disassembly{};
+#endif
         int disassemblySize{};
         asio::io_context ioContext;
         asio::ip::tcp::acceptor tcpAcceptor {ioContext};

@@ -2,11 +2,371 @@
 
 #include "gen/PlaydateAPI.hpp"
 #include "Rom.hpp"
-#include "HeapAllocator.hpp"
+#include "Geometry.hpp"
 
 namespace cranked {
 
     class Cranked;
+
+    // Todo: Ensure all table accesses are raw to avoid meta-method calls (getfield, setfield, geti, seti, getp, setp, gettable, settable)
+
+    // Todo: Disassembler
+
+    class LuaValGuard;
+
+    /**
+     * Represents a value on the Lua stack
+     * `index` should be positive to use non-relative indices that don't change as values are pushed onto the stack
+     */
+    struct LuaVal {
+        lua_State *context;
+        int index;
+
+        LuaVal(lua_State *context, int index) : context(context), index(index) {}
+
+        explicit LuaVal(lua_State *context) : context(context), index(lua_gettop(context)) {}
+
+        operator int() const { // NOLINT(*-explicit-constructor)
+            return index;
+        }
+
+        LuaVal operator+(int offset) const {
+            return {context, index + offset};
+        }
+
+        [[nodiscard]] bool isTable() const {
+            return lua_istable(context, index);
+        }
+
+        [[nodiscard]] bool isNil() const {
+            return lua_isnil(context, index);
+        }
+
+        [[nodiscard]] bool isString() const {
+            return lua_isstring(context, index);
+        }
+
+        [[nodiscard]] bool isInt() const {
+            return lua_isinteger(context, index);
+        }
+
+        [[nodiscard]] bool isFloat() const {
+            return lua_isnumber(context, index);
+        }
+
+        [[nodiscard]] bool isBool() const {
+            return lua_isboolean(context, index);
+        }
+
+        [[nodiscard]] bool isLightUserdata() const {
+            return lua_islightuserdata(context, index);
+        }
+
+        [[nodiscard]] bool isUserdataObject() const {
+            if (!lua_istable(context, index))
+                return false;
+            lua_getfield(context, index, "userdata");
+            bool isUserdata = lua_isuserdata(context, -1);
+            lua_pop(context, 1);
+            return isUserdata;
+        }
+
+        [[nodiscard]] bool hasName(const string &name) const {
+            lua_getfield(context, index, "__name");
+            bool match = !lua_isnil(context, -1) and name == lua_tostring(context, -1);
+            lua_pop(context, 1);
+            return match;
+        }
+
+        [[nodiscard]] const char *asString() const {
+            return lua_tostring(context, index);
+        }
+
+        [[nodiscard]] int asInt() const {
+            return lua_tointeger(context, index);
+        }
+
+        [[nodiscard]] float asFloat() const {
+            return lua_tonumber(context, index);
+        }
+
+        [[nodiscard]] bool asBool() const {
+            return lua_toboolean(context, index);
+        }
+
+        [[nodiscard]] void *asLightUserdata() const {
+            return lua_touserdata(context, index);
+        }
+
+        template<typename T>
+        [[nodiscard]] T *asUserdataObject() const {
+            if (!lua_istable(context, index))
+                return nullptr;
+            lua_getfield(context, index, "userdata");
+            auto value = (T *) lua_touserdata(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] Rect asRect() const {
+            return {getFloatField("x"), getFloatField("y"), getFloatField("width"), getFloatField("height")};
+        }
+
+        [[nodiscard]] IntRect asIntRect() const {
+            return {getIntField("x"), getIntField("y"), getIntField("width"), getIntField("height")};
+        }
+
+        [[nodiscard]] chrono::system_clock::time_point asTime() const {
+            chrono::system_clock::time_point time{};
+            time += chrono::years(getIntField("year"));
+            time += chrono::months(getIntField("month"));
+            time += chrono::days(getIntField("day"));
+            time += chrono::hours(getIntField("hour"));
+            time += chrono::minutes(getIntField("minute"));
+            time += chrono::seconds(getIntField("second"));
+            time += chrono::milliseconds(getIntField("millisecond"));
+            return time;
+        }
+
+        [[nodiscard]] GraphicsFlip asFlip() const {
+            if (isInt())
+                return (GraphicsFlip)asInt();
+            if (isString()) {
+                auto str = string(asString());
+                if (str == "flipX")
+                    return GraphicsFlip::FlippedX;
+                if (str == "flipY")
+                    return GraphicsFlip::FlippedY;
+                if (str == "flipXY")
+                    return GraphicsFlip::FlippedXY;
+            }
+            return GraphicsFlip::Unflipped;
+        }
+
+        [[nodiscard]] PDFontVariant asFontVariant() const {
+            if (isInt())
+                return (PDFontVariant)asInt();
+            if (isString()) {
+                auto str = string(asString());
+                if (str == "normal")
+                    return PDFontVariant::Normal;
+                if (str == "bold")
+                    return PDFontVariant::Bold;
+                if (str == "italic")
+                    return PDFontVariant::Italic;
+            }
+            return PDFontVariant::Normal;
+        }
+
+        [[nodiscard]] PDLanguage asLanguage() const {
+            if (isInt())
+                return (PDLanguage)asInt();
+            if (isString()) {
+                auto str = string(asString());
+                if (str == "en")
+                    return PDLanguage::English;
+                if (str == "jp")
+                    return PDLanguage::Japanese;
+            }
+            return PDLanguage::English;
+        }
+
+        void setStringElement(int n, const char *value) const {
+            lua_pushstring(context, value);
+            lua_seti(context, index, n);
+        }
+
+        void setIntElement(int n, int value) const {
+            lua_pushinteger(context, value);
+            lua_seti(context, index, n);
+        }
+
+        void setFloatElement(int n, float value) const {
+            lua_pushnumber(context, value);
+            lua_seti(context, index, n);
+        }
+
+        void setBoolElement(int n, bool value) const {
+            lua_pushboolean(context, value);
+            lua_seti(context, index, n);
+        }
+
+        void setLightUserdataElement(int n, void *value) const {
+            lua_pushlightuserdata(context, value);
+            lua_seti(context, index, n);
+        }
+
+        [[nodiscard]] const char *getStringElement(int n) const {
+            lua_geti(context, index, n);
+            auto value = lua_tostring(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] int getIntElement(int n) const {
+            lua_geti(context, index, n);
+            auto value = lua_tointeger(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] float getFloatElement(int n) const {
+            lua_geti(context, index, n);
+            auto value = lua_tonumber(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] bool getBoolElement(int n) const {
+            lua_geti(context, index, n);
+            auto value = lua_toboolean(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] void *getLightUserdataElement(int n) const {
+            lua_geti(context, index, n);
+            auto value = lua_touserdata(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        template<typename T>
+        T *getUserdataObjectElement(int n) {
+            lua_geti(context, index, n);
+            auto value = LuaVal(context, -1).asUserdataObject<T>();
+            lua_pop(context, 1);
+            return value;
+        }
+
+        void setStringField(const char *name, const char *value) const {
+            lua_pushstring(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        void setIntField(const char *name, int value) const {
+            lua_pushinteger(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        void setFloatField(const char *name, float value) const {
+            lua_pushnumber(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        void setBoolField(const char *name, bool value) const {
+            lua_pushboolean(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        void setLightUserdataField(const char *name, void *value) const {
+            lua_pushlightuserdata(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        [[nodiscard]] const char *getStringField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = lua_tostring(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] int getIntField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = lua_tointeger(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] float getFloatField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = lua_tonumber(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] bool getBoolField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = lua_toboolean(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        [[nodiscard]] void *getLightUserdataField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = lua_touserdata(context, -1);
+            lua_pop(context, 1);
+            return value;
+        }
+
+        template<typename T>
+        [[nodiscard]] T *getUserdataObjectField(const char *name) const {
+            lua_getfield(context, index, name);
+            auto value = LuaVal(context, -1).asUserdataObject<T>();
+            lua_pop(context, 1);
+            return value;
+        }
+
+        /**
+         * This pushes a value onto the stack, so it must be popped in reverse order with respect to other retrieved fields
+         */
+        [[nodiscard]] LuaValGuard getField(const char *name) const;
+
+        [[nodiscard]] LuaVal getFieldRaw(const char *name) const {
+            lua_getfield(context, index, name);
+            return {context, lua_gettop(context)};
+        }
+
+        /**
+         * This pushes a value onto the stack, so it must be popped in reverse order with respect to other retrieved fields
+         */
+        [[nodiscard]] LuaValGuard getElement(int n) const;
+
+        [[nodiscard]] LuaVal getElementRaw(int n) const {
+            lua_geti(context, index, n);
+            return {context, lua_gettop(context)};
+        }
+    };
+
+    /**
+     * Manages a LuaVal lifecycle. Usually manually popping isn't needed, since `LuaValGuard` destructors should be called in reverse construction order
+     */
+    class LuaValGuard {
+    public:
+        explicit LuaValGuard(LuaVal val) : val(val), popped(false) {}
+
+        LuaValGuard() = delete;
+
+        LuaValGuard(const LuaValGuard &other) = delete;
+
+        LuaValGuard(LuaValGuard &&other) noexcept: val(other.val), popped(other.popped) {
+            other.popped = true;
+        }
+
+        ~LuaValGuard() noexcept(false) {
+            if (!popped)
+                pop();
+        }
+
+        void pop() const {
+            if (popped)
+                throw CrankedError("Double LuaVal pop");
+            if (lua_gettop(val.context) != val.index)
+                throw CrankedError("Unbalanced LuaVal pop");
+            lua_pop(val.context, 1);
+        }
+
+        LuaVal val;
+        bool popped;
+    };
+
+    inline LuaValGuard LuaVal::getField(const char *name) const {
+        return LuaValGuard(getFieldRaw(name));
+    }
+
+    inline LuaValGuard LuaVal::getElement(int n) const {
+        return LuaValGuard(getElementRaw(n));
+    }
 
     class LuaEngine {
     public:
@@ -18,7 +378,7 @@ namespace cranked {
 
         void runUpdateLoop();
 
-        lua_State *getContext() {
+        lua_State *getContext() const {
             return inLuaUpdate ? luaUpdateThread : luaInterpreter;
         }
 
@@ -26,7 +386,7 @@ namespace cranked {
             return luaInterpreter != nullptr;
         }
 
-        inline string getLuaError(int result = LUA_ERRRUN) {
+        [[nodiscard]] string getLuaError(int result = LUA_ERRRUN) const {
             switch (result) {
                 case -1:
                     return "Native exception";
@@ -51,7 +411,81 @@ namespace cranked {
             }
         }
 
-        inline void setQualifiedLuaGlobal(const char *name) {
+        LuaVal pushTable() const {
+            lua_newtable(getContext());
+            return LuaVal{getContext()};
+        }
+
+        LuaVal pushUserdataObject(void *value, const char *metatable) const {
+            auto object = pushTable();
+            object.setLightUserdataField("userdata", value);
+            if (!getQualifiedLuaGlobal(metatable))
+                throw CrankedError("Missing metatable for: " + string(metatable));
+            lua_setmetatable(getContext(), -2);
+            return object;
+        }
+
+        LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) const {
+            auto object = pushUserdataObject(resource, metatable);
+            resource->reference();
+            return object;
+        }
+
+        LuaVal pushImage(Bitmap image) const;
+
+        LuaVal pushSprite(Sprite sprite) const;
+
+        LuaVal pushFont(Font font) const;
+
+        LuaVal pushFile(File file) const;
+
+        LuaVal pushMenuItem(MenuItem item) const;
+
+        LuaVal pushNil() const {
+            lua_pushnil(getContext());
+            return LuaVal{getContext()};
+        }
+
+        LuaVal pushInt(int value) const {
+            lua_pushinteger(getContext(), value);
+            return LuaVal{getContext()};
+        }
+
+        LuaVal pushFloat(float value) const {
+            lua_pushnumber(getContext(), value);
+            return LuaVal{getContext()};
+        }
+
+        template<typename T>
+        LuaVal pushRect(const Rectangle<T> &rect) {
+            LuaVal val = pushTable();
+            if (!getQualifiedLuaGlobal("playdate.geometry.rect"))
+                throw CrankedError("Rect table missing");
+            lua_setmetatable(getContext(), -2);
+            auto floatRect = rect.template as<float>();
+            val.setFloatField("x", floatRect.pos.x);
+            val.setFloatField("y", floatRect.pos.y);
+            val.setFloatField("width", floatRect.size.x);
+            val.setFloatField("height", floatRect.size.y);
+            return val;
+        }
+
+        LuaVal pushTime(const chrono::system_clock::time_point &time) const {
+            LuaVal table = pushTable();
+            auto ymd = chrono::year_month_day{chrono::floor<chrono::days>(time)};
+            auto timeOffset = time - chrono::floor<chrono::days>(time);
+            chrono::hh_mm_ss hms{timeOffset};
+            table.setIntField("year", (int) ymd.year());
+            table.setIntField("month", (int) (uint) ymd.month());
+            table.setIntField("day", (int) (uint) ymd.day());
+            table.setIntField("hour", (int) hms.hours().count());
+            table.setIntField("minute", (int) hms.minutes().count());
+            table.setIntField("second", (int) hms.seconds().count());
+            table.setIntField("millisecond", (int) duration_cast<chrono::milliseconds>(timeOffset).count());
+            return table;
+        }
+
+        void setQualifiedLuaGlobal(const char *name) const {
             auto nameStr = string(name);
             size_t pos;
             auto luaContext = getContext();
@@ -74,7 +508,7 @@ namespace cranked {
             lua_pop(luaContext, 2);
         }
 
-        inline void getQualifiedLuaGlobal(const char *name, bool createMissing = false) {
+        bool getQualifiedLuaGlobal(const char *name, bool createMissing = false) const {
             auto nameStr = string(name);
             size_t pos;
             auto luaContext = getContext();
@@ -91,20 +525,20 @@ namespace cranked {
                 }
                 lua_copy(luaContext, -1, -2);
                 lua_pop(luaContext, 1);
-                return missing and not createMissing;
+                return !missing or createMissing;
             };
             while ((pos = nameStr.find('.')) != string::npos) {
                 currentName = nameStr.substr(0, pos);
-                if (getField(false))
-                    return;
+                if (!getField(false))
+                    return false;
                 nameStr.erase(0, pos + 1);
             }
             currentName = nameStr;
-            getField(true);
+            return getField(true);
         }
 
-        inline void invokeLuaCallback(const string &name) {
-            if (!luaInterpreter)
+        void invokeLuaCallback(const string &name) const {
+            if (!getContext())
                 return;
             auto start = lua_gettop(getContext());
             lua_getglobal(getContext(), "playdate");
@@ -114,8 +548,8 @@ namespace cranked {
             lua_settop(getContext(), start);
         }
 
-        inline bool invokeLuaInputCallback(const string &name, const vector<float> &args = {}) {
-            if (!luaInterpreter)
+        bool invokeLuaInputCallback(const string &name, const vector<float> &args = {}) {
+            if (!getContext())
                 return false;
             auto start = lua_gettop(getContext());
             lua_getglobal(getContext(), "cranked");
@@ -130,34 +564,39 @@ namespace cranked {
         }
 
         /**
-         * Preserves a given Lua value associated with a native resource using a reference counter
+         * Preserves a given Lua value in a reference counted global table
          */
-        template<typename T>
-        inline void preserveLuaReference(T *address, int index) {
-            if (!luaInterpreter)
+        void preserveLuaValue(int index) const {
+            if (!getContext())
                 return;
-            if (luaReferences[address]++ == 0) {
-                getQualifiedLuaGlobal("cranked.references");
-                lua_pushvalue(getContext(), index);
-                lua_rawsetp(getContext(), -2, address);
-                lua_pop(getContext(), 1);
-            }
+            if (!getQualifiedLuaGlobal("cranked.preserved"))
+                throw CrankedError("Preserved table missing");
+            lua_pushvalue(getContext(), index);
+            lua_rawget(getContext(), -2);
+            int count = lua_tointeger(getContext(), -1);
+            lua_pop(getContext(), 1);
+            lua_pushvalue(getContext(), index);
+            lua_pushinteger(getContext(), count + 1);
+            lua_rawset(getContext(), -3);
+            lua_pop(getContext(), 1);
         }
 
-        template<typename T>
-        inline bool releaseLuaReference(T *address) {
-            // Up to 3 map accesses isn't the most efficient, but shouldn't be too often
-            if (!luaInterpreter or !address or !luaReferences.contains(address))
-                return false;
-            if (--luaReferences[address] == 0) {
-                getQualifiedLuaGlobal("cranked.references");
+        void releaseLuaValue(int index) const {
+            if (!getContext())
+                return;
+            if (!getQualifiedLuaGlobal("cranked.preserved"))
+                throw CrankedError("Preserved table missing");
+            lua_pushvalue(getContext(), index);
+            lua_rawget(getContext(), -2);
+            int count = lua_tointeger(getContext(), -1);
+            lua_pop(getContext(), 1);
+            lua_pushvalue(getContext(), index);
+            if (count <= 1)
                 lua_pushnil(getContext());
-                lua_rawsetp(getContext(), -2, address);
-                lua_pop(getContext(), 1);
-                luaReferences.erase(address);
-                return true;
-            }
-            return false;
+            else
+                lua_pushinteger(getContext(), count - 1);
+            lua_rawset(getContext(), -3);
+            lua_pop(getContext(), 1);
         }
 
         unordered_set<string> loadedLuaFiles; // Todo: Should be made private
@@ -173,6 +612,5 @@ namespace cranked {
         lua_State *luaInterpreter{};
         lua_State *luaUpdateThread{};
         bool inLuaUpdate{};
-        map<void *, int> luaReferences; // Internal preserved Lua resources with reference count
     };
 }

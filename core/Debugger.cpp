@@ -4,14 +4,18 @@
 using namespace cranked;
 
 Debugger::Debugger(Cranked &cranked) : cranked(cranked), nativeEngine(cranked.nativeEngine) {
+#if USE_CAPSTONE
     if (auto result = cs_open(CS_ARCH_ARM, CS_MODE_THUMB, &capstoneHandle); result != CS_ERR_OK)
         throw CrankedError("Failed to open capstone: {}", cs_strerror(result));
+#endif
 }
 
 Debugger::~Debugger() {
+#if USE_CAPSTONE
     if (disassembly)
         cs_free(disassembly, disassemblySize);
     cs_close(&capstoneHandle);
+#endif
 }
 
 void Debugger::init() {
@@ -24,8 +28,10 @@ void Debugger::init() {
         startTcpAccept();
     }
 
+#if USE_CAPSTONE
     if (disassemblySize = (int)cs_disasm(capstoneHandle, nativeEngine.getCodeMemory().data() + CODE_OFFSET, nativeEngine.getCodeMemory().size() - CODE_OFFSET, CODE_ADDRESS, 0, &disassembly); disassemblySize == 0)
         throw CrankedError("Failed to disassemble program: {}", cs_strerror(cs_errno(capstoneHandle)));
+#endif
 }
 
 void Debugger::reset() {
@@ -38,9 +44,11 @@ void Debugger::reset() {
     packetDecodeBuffer.clear();
     breakpoints.clear();
 
+#if USE_CAPSTONE
     if (disassembly)
         cs_free(disassembly, disassemblySize);
     disassembly = nullptr;
+#endif
 
     enabled = false;
     halted = false;

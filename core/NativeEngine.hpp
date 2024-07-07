@@ -267,7 +267,11 @@ namespace cranked {
                             writeRegister(UC_ARM_REG_R0 + currentReg++, *(uint32 *) &param);
                     }
                     i++;
-                }(), ...);
+                }()
+#ifndef __CLION_IDE__ // Todo: Remove yet another CLion workaround when it is fixed
+                , ...
+#endif
+                );
 
                 // Todo: PC could point to previous native stack PC to help with debugging
                 // Todo: Unicorn randomly segfaults when stopping execution, using zero for return address may help?

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "HeapAllocator.hpp"
 #include "NativeResource.hpp"
 
 namespace cranked {
@@ -14,63 +13,63 @@ namespace cranked {
         }
 
         template<numeric_type S>
-        auto operator+(const Vector2<S> other) const {
+        [[nodiscard]] auto operator+(const Vector2<S> other) const {
             return Vector2{ x + other.x, y + other.y };
         }
 
         template<numeric_type S>
-        auto operator-(const Vector2<S> other) const {
+        [[nodiscard]] auto operator-(const Vector2<S> other) const {
             return Vector2{ x - other.x, y - other.y };
         }
 
         template<numeric_type S>
-        auto operator*(S scale) const {
+        [[nodiscard]] auto operator*(S scale) const {
             return Vector2{ x * scale, y * scale };
         }
 
         template<numeric_type S>
-        auto operator/(S scale) const {
+        [[nodiscard]] auto operator/(S scale) const {
             return Vector2{ x / scale, y / scale };
         }
 
         template<numeric_type S>
-        Vector2<T> &operator-=(const Vector2<S> other) {
+        Vector2 &operator-=(const Vector2<S> other) {
             return *this = *this - other;
         }
 
         template<numeric_type S>
-        Vector2<T> &operator+=(const Vector2<S> other) {
+        Vector2 &operator+=(const Vector2<S> other) {
             return *this = *this + other;
         }
 
         template<numeric_type S>
-        Vector2<T> &operator*=(S scale) {
+        Vector2 &operator*=(S scale) {
             return *this = *this * scale;
         }
 
         template<numeric_type S>
-        Vector2<T> &operator/=(S scale) {
+        Vector2 &operator/=(S scale) {
             return *this = *this / scale;
         }
 
-        Vector2 operator-() const {
+        [[nodiscard]] Vector2 operator-() const {
             return { -x, -y };
         }
 
         template<numeric_type S>
-        bool operator==(const Vector2<S> other) const {
+        [[nodiscard]] bool operator==(const Vector2<S> other) const {
             return x == other.x and y == other.y;
         }
 
-        operator bool() { // NOLINT(*-explicit-constructor)
+        [[nodiscard]] operator bool() const { // NOLINT(*-explicit-constructor)
             return x != T(0) or y != T(0);
         }
 
-        CollisionPoint_32 asCollisionPoint() {
+        [[nodiscard]] CollisionPoint_32 asCollisionPoint() const {
             return { (float)x, (float)y };
         }
 
-        CollisionVector_32 asCollisionVector() {
+        [[nodiscard]] CollisionVector_32 asCollisionVector() const {
             return { (int32)x, (int32)y };
         }
 
@@ -101,62 +100,66 @@ namespace cranked {
         }
 
         template<numeric_type S>
-        auto operator+(const Vector2<S> offset) const {
+        [[nodiscard]] auto operator+(const Vector2<S> offset) const {
             return Rectangle{ pos.x + offset.x, pos.y + offset.y, size.x, size.y };
         }
 
         template<numeric_type S>
-        auto operator-(const Vector2<S> offset) const {
+        [[nodiscard]] auto operator-(const Vector2<S> offset) const {
             return Rectangle{ pos.x - offset.x, pos.y - offset.y, size.x, size.y };
         }
 
         template<numeric_type S>
-        Rectangle<T> &operator+=(const Vector2<S> offset) {
+        Rectangle &operator+=(const Vector2<S> offset) {
             return *this = *this + offset;
         }
 
         template<numeric_type S>
-        Rectangle<T> &operator-=(const Vector2<S> offset) {
+        Rectangle &operator-=(const Vector2<S> offset) {
             return *this = *this - offset;
         }
 
         template<numeric_type S>
-        bool operator==(const Rectangle<S> other) const {
+        [[nodiscard]] bool operator==(const Rectangle<S> other) const {
             return pos == other.pos and size == other.size;
         }
 
         template<numeric_type S>
-        Rectangle intersection(const Rectangle<S> &other) {
-            Rectangle rect{};
+        [[nodiscard]] Rectangle intersection(const Rectangle<S> &other) const {
+            using A = decltype(T() + S());
+            Rectangle<A> rect{};
             if (other.pos.x < pos.x) {
-                rect.pos.x = other.pos.x;
-                rect.size.x = max(0.0f, min(other.size.x, size.x - (pos.x - other.pos.x)));
+                rect.pos.x = (A)other.pos.x;
+                rect.size.x = max((A)0.0f, min((A)other.size.x, (A)size.x - ((A)pos.x - (A)other.pos.x)));
             } else {
-                rect.pos.x = pos.x;
-                rect.size.x = max(0.0f, min(size.x, other.size.x - (other.pos.x - pos.x)));
+                rect.pos.x = (A)pos.x;
+                rect.size.x = max((A)0.0f, min((A)size.x, (A)other.size.x - ((A)other.pos.x - (A)pos.x)));
             }
             if (other.pos.y < pos.y) {
-                rect.pos.y = other.pos.y;
-                rect.size.y = max(0.0f, min(other.size.y, size.y - (pos.y - other.pos.y)));
+                rect.pos.y = (A)other.pos.y;
+                rect.size.y = max((A)0.0f, min((A)other.size.y, (A)size.y - ((A)pos.y - (A)other.pos.y)));
             } else {
-                rect.pos.y = pos.y;
-                rect.size.y = max(0.0f, min(size.y, other.size.y - (other.pos.y - pos.y)));
+                rect.pos.y = (A)pos.y;
+                rect.size.y = max((A)0.0f, min((A)size.y, (A)other.size.y - ((A)other.pos.y - (A)pos.y)));
             }
             return rect;
         }
 
-        operator bool() { // NOLINT(*-explicit-constructor)
+        [[nodiscard]] operator bool() const { // NOLINT(*-explicit-constructor)
             return size;
         }
 
         template<numeric_type S>
-        Vector2<T> nearestCorner(Vector2<S> point) {
+        [[nodiscard]] Vector2<T> nearestCorner(Vector2<S> point) const {
             return { nearestValue(pos.x, pos.x + size.x, point.x), nearestValue(pos.y, pos.y + size.y, point.y) };
         }
 
         template<numeric_type S>
-        bool contains(Vector2<S> point) {
-            return point.x >= pos.x and point.y >= pos.y and point.x <= pos.x + size.x and point.y <= pos.y + size.y;
+        [[nodiscard]] Vector2<T> rotateAbout(float angle, Vector2<S> pivot) const {
+            auto p = *this - pivot;
+            float c = cosf(angle), s = sinf(angle);
+            p = { p.x * c - p.y * s, p.x * s + p.y * c };
+            return p + pivot;
         }
 
         Vector2<T> pos;

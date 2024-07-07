@@ -407,8 +407,8 @@ static LuaRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width, in
     return 1;
 }
 
-static void playdate_graphics_image_gc_lua(Cranked *cranked, LuaVal image) {
-    releaseUserdataResource(image);
+static void playdate_graphics_image_gc_lua(Cranked *cranked, Bitmap image) {
+    image->dereference();
 }
 
 static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, Bitmap image, const char *path) {
@@ -594,8 +594,6 @@ static LuaRet playdate_graphics_image_vcrPauseFilterImage_lua(Cranked *cranked, 
 
 static void playdate_graphics_pushContext_lua(Cranked *cranked, LuaVal imageVal) {
     auto image = imageVal.isUserdataObject() ? imageVal.asUserdataObject<LCDBitmap_32>() : nullptr;
-    if (image)
-        cranked->luaEngine.preserveLuaReference(image, imageVal);
     cranked->graphics.pushContext(image);
 }
 
@@ -702,12 +700,35 @@ static void playdate_graphics_fillEllipseInRect_lua(Cranked *cranked, LuaVal arg
     drawEllipse(cranked, arg1, true);
 }
 
+static vector<int32> getPolygonPoints(Cranked *cranked, LuaVal arg) {
+    auto context = cranked->getLuaContext();
+    if (!context)
+        return {};
+    vector<int32> points;
+    if (arg.isTable()) {
+        int count = arg.getIntField("numberOfVertices");
+        for (int i = 0; i < count; i++) {
+            auto point = arg.getElement(i + 1);
+            points.emplace_back(point.val.getIntField("x"));
+            points.emplace_back(point.val.getIntField("y"));
+        }
+    } else {
+        int top = lua_gettop(context);
+        for (int i = arg.index; i <= top; i++)
+            points.emplace_back(lua_tointeger(context, i));
+    }
+    return points;
+}
+
 static void playdate_graphics_drawPolygon_lua(Cranked *cranked, LuaVal arg1) {
-    // Todo
+    auto points = getPolygonPoints(cranked, arg1);
+    cranked->graphics.drawPolygon(points.data(), (int)points.size(), cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
 static void playdate_graphics_fillPolygon_lua(Cranked *cranked, LuaVal arg1) {
-    // Todo
+    auto points = getPolygonPoints(cranked, arg1);
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    cranked->graphics.fillPolygon(points.data(), (int)points.size(), ctx.drawingColor, ctx.polygonFillRule);
 }
 
 static void playdate_graphics_setPolygonFillRule_lua(Cranked *cranked, LCDPolygonFillRule rule) {
@@ -867,8 +888,7 @@ static LuaRet playdate_GMTTimeFromEpoch_lua(Cranked *cranked, int seconds, int m
 }
 
 static int playdate_getFPS_lua(Cranked *cranked) {
-    auto delta = duration_cast<chrono::milliseconds>((chrono::system_clock::now() - cranked->lastFrameTime)).count();
-    return int((float) delta / 1000);
+    return (int)round(1000.0f / cranked->getFrameDelta());
 }
 
 static LuaRet playdate_getStats_lua(Cranked *cranked) {
@@ -894,14 +914,14 @@ static LuaRet playdate_getPowerStatus_lua(Cranked *cranked) {
 
 static LuaRet playdate_getSystemMenu_lua(Cranked *cranked) {
     pushTable(cranked); // Just use an empty table
-    cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu");
+    if (cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu"))
+        throw CrankedError("Playdate menu table missing");
     lua_setmetatable(cranked->getLuaContext(), -2);
     return 1;
 }
 
 static void playdate_setMenuImage_lua(Cranked *cranked, LuaVal image, int xOffset) {
     auto bitmap = image.asUserdataObject<LCDBitmap_32>();
-    cranked->luaEngine.preserveLuaReference(bitmap, image);
     cranked->menu.setImage(bitmap, xOffset);
 }
 
@@ -966,7 +986,7 @@ static LuaRet playdate_menu_addOptionsMenuItem_lua(Cranked *cranked, LuaVal menu
 }
 
 static LuaRet playdate_menu_getMenuItems_lua(Cranked *cranked, LuaVal menu) {
-    auto items = pushTable(cranked);
+    pushTable(cranked);
     int i = 1;
     for (auto &item : cranked->menu.items) {
         if (!item)
@@ -988,7 +1008,8 @@ static void playdate_menu_removeAllMenuItems_lua(Cranked *cranked, LuaVal menu) 
 
 static void playdate_menu_item_setCallback_lua(Cranked *cranked, MenuItem item, LuaVal callback) {
     // Todo: This needs to call a function on the item instead
-    cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks");
+    if (!cranked->luaEngine.getQualifiedLuaGlobal("cranked.menuCallbacks"))
+        throw CrankedError("Menu callbacks table missing");
     lua_pushvalue(cranked->getLuaContext(), callback);
     lua_seti(cranked->getLuaContext(), -2, cranked->menu.findItem(item) + 1);
     lua_pop(cranked->getLuaContext(), 1);
@@ -1225,13 +1246,12 @@ static LuaRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranked, 
     return 0;
 }
 
-static void playdate_graphics_setFont_lua(Cranked *cranked, LuaVal font, LuaVal variant) {
-    // Todo
+static void playdate_graphics_setFont_lua(Cranked *cranked, Font font, PDFontVariant variant) {
+    cranked->graphics.getCurrentDisplayContext().getFont(variant) = font;
 }
 
-static LuaRet playdate_graphics_getFont_lua(Cranked *cranked, LuaVal variant) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_getFont_lua(Cranked *cranked, PDFontVariant variant) {
+    return pushFont(cranked->graphics.getCurrentDisplayContext().getFont(variant).get());
 }
 
 static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFamily) {
@@ -1239,15 +1259,14 @@ static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFam
 }
 
 static void playdate_graphics_setFontTracking_lua(Cranked *cranked, int pixels) {
-    // Todo
+    cranked->graphics.getCurrentDisplayContext().textTracking = pixels;
 }
 
 static int playdate_graphics_getFontTracking_lua(Cranked *cranked) {
-    // Todo
-    return 0;
+    return cranked->graphics.getCurrentDisplayContext().textTracking;
 }
 
-static LuaRet playdate_graphics_getSystemFont_lua(Cranked *cranked, LuaVal variant) {
+static LuaRet playdate_graphics_getSystemFont_lua(Cranked *cranked, PDFontVariant variant) {
     // Todo
     return 0;
 }
@@ -1257,11 +1276,11 @@ static void playdate_graphics_drawText_lua(Cranked *cranked, const char *text, i
     cranked->graphics.drawText(text, (int) strlen(text), PDStringEncoding::ASCII, x, y);
 }
 
-static void playdate_graphics_drawLocalizedText_lua(Cranked *cranked, const char *key, int x, int y, LuaVal language, int leadingAdjustment) {
+static void playdate_graphics_drawLocalizedText_lua(Cranked *cranked, const char *key, int x, int y, PDLanguage language, int leadingAdjustment) {
     // Todo
 }
 
-static LuaRet playdate_graphics_getLocalizedText_lua(Cranked *cranked, const char *key, LuaVal language) {
+static LuaRet playdate_graphics_getLocalizedText_lua(Cranked *cranked, const char *key, PDLanguage language) {
     // Todo
     return 0;
 }
@@ -1271,9 +1290,12 @@ static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *st
     return 0;
 }
 
-static LuaRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
+    try {
+        return pushFont(cranked->graphics.getFont(path));
+    } catch (exception &) {
+        return pushNil(cranked);
+    }
 }
 
 static LuaRet playdate_graphics_font_newFamily_lua(Cranked *cranked, LuaVal fontPaths) {
@@ -1281,27 +1303,28 @@ static LuaRet playdate_graphics_font_newFamily_lua(Cranked *cranked, LuaVal font
     return 0;
 }
 
-static void playdate_graphics_font_drawText_lua(Cranked *cranked, Font font, int x, int y, int loadingAdjustment) {
-    // Todo
+static LuaRet playdate_graphics_font_drawText_lua(Cranked *cranked, Font font, const char *text, int x, int y, int loadingAdjustment) {
+    // Todo: Support leading, encodings, return size
+    cranked->graphics.drawText(text, (int)strlen(text), PDStringEncoding::ASCII, x, y);
+    pushInt(cranked, 0);
+    pushInt(cranked, 0);
+    return 2;
 }
 
 static int playdate_graphics_font_getHeight_lua(Cranked *cranked, Font font) {
-    // Todo
-    return 0;
+    return font->glyphHeight;
 }
 
 static int playdate_graphics_font_getTextWidth_lua(Cranked *cranked, Font font, const char *text) {
-    // Todo
-    return 0;
+    return font->glyphWidth;
 }
 
 static void playdate_graphics_font_setTracking_lua(Cranked *cranked, Font font, int pixels) {
-    // Todo
+    font->tracking = pixels;
 }
 
 static int playdate_graphics_font_getTracking_lua(Cranked *cranked, Font font) {
-    // Todo
-    return 0;
+    return font->tracking;
 }
 
 static void playdate_graphics_font_setLeading_lua(Cranked *cranked, Font font, int pixels) {
@@ -1313,35 +1336,41 @@ static int playdate_graphics_font_getLeading_lua(Cranked *cranked, Font font) {
     return 0;
 }
 
-static LuaRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, Font font, LuaVal character) {
+static LuaValRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, Font font, LuaVal character) {
+    // Todo: Support encodings
+    int c = character.isInt() ? character.asInt() : character.asString()[0];
+    try {
+        auto &page = font->pages.at(0);
+        auto &glyph = *page->glyphs.at(c);
+        return pushImage(glyph.bitmap.get());
+    } catch (out_of_range &ignored) { // Todo: Prevent exceptions?
+        return pushNil(cranked);
+    }
+}
+
+static LuaValRet playdate_graphics_sprite_new_lua(Cranked *context) {
+    return pushSprite(context->graphics.createSprite());
+}
+
+static void playdate_graphics_sprite_gc_lua(Cranked *cranked, Sprite sprite) {
+    sprite->dereference();
+}
+
+static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, Sprite sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_new_lua(Cranked *context) {
-    pushSprite(context->graphics.createSprite());
-    return 1;
-}
-
-static void playdate_graphics_sprite_gc_lua(Cranked *cranked, LuaVal sprite) {
-    releaseUserdataResource(sprite);
-}
-
-static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, LuaVal sprite) {
+static LuaRet playdate_graphics_sprite_update_lua(Cranked *cranked, Sprite sprite) {
     // Todo
     return 0;
 }
 
-static LuaRet playdate_graphics_sprite_update_lua(Cranked *cranked, LuaVal sprite) {
-    // Todo
-    return 0;
-}
-
-static void playdate_graphics_sprite_setImage_lua(Cranked *cranked, Sprite sprite, LuaVal image, LuaVal flip, float scale, LuaVal yScale) {
+static void playdate_graphics_sprite_setImage_lua(Cranked *cranked, Sprite sprite, Bitmap image, GraphicsFlip flip, float scale, LuaVal yScale) {
     // Todo
 }
 
-static LuaRet playdate_graphics_sprite_getImage_lua(Cranked *cranked, LuaVal sprite) {
+static LuaRet playdate_graphics_sprite_getImage_lua(Cranked *cranked, Sprite sprite) {
     // Todo
     return 0;
 }
@@ -2333,12 +2362,12 @@ void LuaEngine::registerLuaGlobals() {
 
     {
         auto playdate = LuaApiHelper(getContext(), "playdate", true);
-        playdate.setInteger("kButtonLeft", 1 << 0);
-        playdate.setInteger("kButtonRight", 1 << 1);
-        playdate.setInteger("kButtonUp", 1 << 2);
-        playdate.setInteger("kButtonDown", 1 << 3);
-        playdate.setInteger("kButtonB", 1 << 4);
-        playdate.setInteger("kButtonA", 1 << 5);
+        playdate.setInteger("kButtonLeft", (int)PDButtons::Left);
+        playdate.setInteger("kButtonRight", (int)PDButtons::Right);
+        playdate.setInteger("kButtonUp", (int)PDButtons::Up);
+        playdate.setInteger("kButtonDown", (int)PDButtons::Down);
+        playdate.setInteger("kButtonB", (int)PDButtons::B);
+        playdate.setInteger("kButtonA", (int)PDButtons::A);
         playdate.setInteger("isSimulator", 0); // Totally legit hardware
         playdate.setWrappedFunction<playdate_apiVersion_lua>("apiVersion");
         playdate.setWrappedFunction<playdate_wait_lua>("wait");
@@ -2487,10 +2516,10 @@ void LuaEngine::registerLuaGlobals() {
         { // Primarily implemented in Lua as tables (Official implementation is presumably done in C for performance, using all userdata)
             auto geometry = LuaApiHelper(getContext(), "geometry");
             geometry.setSelfIndex();
-            geometry.setInteger("kUnflipped", 0);
-            geometry.setInteger("kFlippedX", 1);
-            geometry.setInteger("kFlippedY", 2);
-            geometry.setInteger("kFlippedXY", 3);
+            geometry.setInteger("kUnflipped", (int)GraphicsFlip::Unflipped);
+            geometry.setInteger("kFlippedX", (int)GraphicsFlip::FlippedX);
+            geometry.setInteger("kFlippedY", (int)GraphicsFlip::FlippedY);
+            geometry.setInteger("kFlippedXY", (int)GraphicsFlip::FlippedXY);
 
             {
                 auto rect = LuaApiHelper(getContext(), "rect");
@@ -2542,30 +2571,30 @@ void LuaEngine::registerLuaGlobals() {
         {
             auto gfx = LuaApiHelper(getContext(), "graphics");
             gfx.setSelfIndex();
-            gfx.setInteger("kColorBlack", 0);
-            gfx.setInteger("kColorWhite", 1);
-            gfx.setInteger("kColorClear", 2);
-            gfx.setInteger("kColorXOR", 3);
-            gfx.setInteger("kDrawModeCopy", 0);
-            gfx.setInteger("kDrawModeWhiteTransparent", 1);
-            gfx.setInteger("kDrawModeBlackTransparent", 2);
-            gfx.setInteger("kDrawModeFillWhite", 3);
-            gfx.setInteger("kDrawModeFillBlack", 4);
-            gfx.setInteger("kDrawModeXOR", 5);
-            gfx.setInteger("kDrawModeNXOR", 6);
-            gfx.setInteger("kDrawModeInverted", 7);
-            gfx.setInteger("kImageUnflipped", 0);
-            gfx.setInteger("kImageFlippedX", 1);
-            gfx.setInteger("kImageFlippedY", 2);
-            gfx.setInteger("kImageFlippedXY", 3);
-            gfx.setInteger("kLineCapStyleButt", 0);
-            gfx.setInteger("kLineCapStyleSquare", 1);
-            gfx.setInteger("kLineCapStyleRound", 2);
-            gfx.setInteger("kPolygonFillNonZero", 0);
-            gfx.setInteger("kPolygonFillEvenOdd", 1);
-            gfx.setInteger("kStrokeCentered", 0);
-            gfx.setInteger("kStrokeInside", 1);
-            gfx.setInteger("kStrokeOutside", 2);
+            gfx.setInteger("kColorBlack", (int)LCDSolidColor::Black);
+            gfx.setInteger("kColorWhite", (int)LCDSolidColor::White);
+            gfx.setInteger("kColorClear", (int)LCDSolidColor::Clear);
+            gfx.setInteger("kColorXOR", (int)LCDSolidColor::XOR);
+            gfx.setInteger("kDrawModeCopy", (int)LCDBitmapDrawMode::Copy);
+            gfx.setInteger("kDrawModeWhiteTransparent", (int)LCDBitmapDrawMode::WhiteTransparent);
+            gfx.setInteger("kDrawModeBlackTransparent", (int)LCDBitmapDrawMode::BlackTransparent);
+            gfx.setInteger("kDrawModeFillWhite", (int)LCDBitmapDrawMode::FillWhite);
+            gfx.setInteger("kDrawModeFillBlack", (int)LCDBitmapDrawMode::FillBlack);
+            gfx.setInteger("kDrawModeXOR", (int)LCDBitmapDrawMode::XOR);
+            gfx.setInteger("kDrawModeNXOR", (int)LCDBitmapDrawMode::NXOR);
+            gfx.setInteger("kDrawModeInverted", (int)LCDBitmapDrawMode::Inverted);
+            gfx.setInteger("kImageUnflipped", (int)LCDBitmapFlip::Unflipped);
+            gfx.setInteger("kImageFlippedX", (int)LCDBitmapFlip::FlippedX);
+            gfx.setInteger("kImageFlippedY", (int)LCDBitmapFlip::FlippedY);
+            gfx.setInteger("kImageFlippedXY", (int)LCDBitmapFlip::FlippedXY);
+            gfx.setInteger("kLineCapStyleButt", (int)LCDLineCapStyle::Butt);
+            gfx.setInteger("kLineCapStyleSquare", (int)LCDLineCapStyle::Square);
+            gfx.setInteger("kLineCapStyleRound", (int)LCDLineCapStyle::Round);
+            gfx.setInteger("kPolygonFillNonZero", (int)LCDPolygonFillRule::NonZero);
+            gfx.setInteger("kPolygonFillEvenOdd", (int)LCDPolygonFillRule::EvenOdd);
+            gfx.setInteger("kStrokeCentered", (int)StrokeLocation::Centered);
+            gfx.setInteger("kStrokeInside", (int)StrokeLocation::Inside);
+            gfx.setInteger("kStrokeOutside", (int)StrokeLocation::Outside);
             gfx.setWrappedFunction<playdate_graphics_pushContext_lua>("pushContext");
             gfx.setWrappedFunction<playdate_graphics_popContext>("popContext");
             gfx.setWrappedFunction<playdate_graphics_clear_lua>("clear");
@@ -2629,17 +2658,17 @@ void LuaEngine::registerLuaGlobals() {
                 auto image = LuaApiHelper(getContext(), "image");
                 image.setSelfIndex();
                 image.setString("__name", "playdate.graphics.image");
-                image.setInteger("kDitherTypeNone", 0);
-                image.setInteger("kDitherTypeDiagonalLine", 1);
-                image.setInteger("kDitherTypeVerticalLine", 2);
-                image.setInteger("kDitherTypeHorizontalLine", 3);
-                image.setInteger("kDitherTypeScreen", 4);
-                image.setInteger("kDitherTypeBayer2x2", 5);
-                image.setInteger("kDitherTypeBayer4x4", 6);
-                image.setInteger("kDitherTypeBayer8x8", 7);
-                image.setInteger("kDitherTypeFloydSteinberg", 8);
-                image.setInteger("kDitherTypeBurkes", 9);
-                image.setInteger("kDitherTypeAtkinson", 10);
+                image.setInteger("kDitherTypeNone", (int)DitherType::None);
+                image.setInteger("kDitherTypeDiagonalLine", (int)DitherType::DiagonalLine);
+                image.setInteger("kDitherTypeVerticalLine", (int)DitherType::VerticalLine);
+                image.setInteger("kDitherTypeHorizontalLine", (int)DitherType::HorizontalLine);
+                image.setInteger("kDitherTypeScreen", (int)DitherType::Screen);
+                image.setInteger("kDitherTypeBayer2x2", (int)DitherType::Bayer2x2);
+                image.setInteger("kDitherTypeBayer4x4", (int)DitherType::Bayer4x4);
+                image.setInteger("kDitherTypeBayer8x8", (int)DitherType::Bayer8x8);
+                image.setInteger("kDitherTypeFloydSteinberg", (int)DitherType::FloydSteinberg);
+                image.setInteger("kDitherTypeBurkes", (int)DitherType::Burkes);
+                image.setInteger("kDitherTypeAtkinson", (int)DitherType::Atkinson);
                 image.setWrappedFunction<playdate_graphics_image_gc_lua>("__gc");
                 image.setWrappedFunction<playdate_graphics_image_new_lua>("new");
                 image.setWrappedFunction<playdate_graphics_image_load_lua>("load");
@@ -2713,8 +2742,11 @@ void LuaEngine::registerLuaGlobals() {
                 auto font = LuaApiHelper(getContext(), "font");
                 font.setSelfIndex();
                 font.setString("__name", "playdate.graphics.font");
-                font.setInteger("kLanguageEnglish", 0);
-                font.setInteger("kLanguageJapanese", 1);
+                font.setInteger("kLanguageEnglish", (int)PDLanguage::English);
+                font.setInteger("kLanguageJapanese", (int)PDLanguage::Japanese);
+                font.setInteger("kVariantNormal", (int)PDFontVariant::Normal);
+                font.setInteger("kVariantBold", (int)PDFontVariant::Bold);
+                font.setInteger("kVariantItalic", (int)PDFontVariant::Italic);
                 font.setWrappedFunction<playdate_graphics_font_new_lua>("new");
                 font.setWrappedFunction<playdate_graphics_font_newFamily_lua>("newFamily");
                 font.setWrappedFunction<playdate_graphics_font_drawText_lua>("drawText");
@@ -2730,10 +2762,10 @@ void LuaEngine::registerLuaGlobals() {
             { // Official implementation uses a table with a `_spriteud` userdata field, but using a plain userdata type in `userdata` should work fine
                 auto sprite = LuaApiHelper(getContext(), "sprite");
                 sprite.setString("__name", "playdate.graphics.sprite");
-                sprite.setInteger("kCollisionTypeSlide", 0);
-                sprite.setInteger("kCollisionTypeFreeze", 1);
-                sprite.setInteger("kCollisionTypeOverlap", 2);
-                sprite.setInteger("kCollisionTypeBounce", 3);
+                sprite.setInteger("kCollisionTypeSlide", (int)Bump::ResponseType::Slide);
+                sprite.setInteger("kCollisionTypeFreeze", (int)Bump::ResponseType::Freeze);
+                sprite.setInteger("kCollisionTypeOverlap", (int)Bump::ResponseType::Overlap);
+                sprite.setInteger("kCollisionTypeBounce", (int)Bump::ResponseType::Bounce);
                 sprite.setWrappedFunction<playdate_graphics_sprite_index_lua>("__index");
                 sprite.setWrappedFunction<playdate_graphics_sprite_gc_lua>("__gc");
                 sprite.setWrappedFunction<playdate_graphics_sprite_new_lua>("new");
@@ -2881,31 +2913,31 @@ void LuaEngine::registerLuaGlobals() {
         {
             auto sound = LuaApiHelper(getContext(), "sound");
             sound.setSelfIndex();
-            sound.setInteger("kFilterLowPass", 0);
-            sound.setInteger("kFilterHighPass", 1);
-            sound.setInteger("kFilterBandPass", 2);
-            sound.setInteger("kFilterNotch", 3);
-            sound.setInteger("kFilterPEQ", 4);
-            sound.setInteger("kFilterLowShelf", 5);
-            sound.setInteger("kFilterHighShelf", 6);
-            sound.setInteger("kFormat8bitMono", 0);
-            sound.setInteger("kFormat8bitStereo", 1);
-            sound.setInteger("kFormat16bitMono", 2);
-            sound.setInteger("kFormat16bitStereo", 3);
-            sound.setInteger("kLFOSquare", 0);
-            sound.setInteger("kLFOTriangle", 1);
-            sound.setInteger("kLFOSine", 2);
-            sound.setInteger("kLFOSampleAndHold", 3);
-            sound.setInteger("kLFOSawtoothDown", 5);
-            sound.setInteger("kLFOSawtoothUp", 4);
-            sound.setInteger("kWaveSquare", 0);
-            sound.setInteger("kWaveTriangle", 1);
-            sound.setInteger("kWaveSine", 2);
-            sound.setInteger("kWaveNoise", 3);
-            sound.setInteger("kWaveSawtooth", 4);
-            sound.setInteger("kWavePOPhase", 5);
-            sound.setInteger("kWavePODigital", 6);
-            sound.setInteger("kWavePOVosim", 7);
+            sound.setInteger("kFilterLowPass", (int)TwoPoleFilterType::LowPass);
+            sound.setInteger("kFilterHighPass", (int)TwoPoleFilterType::HighPass);
+            sound.setInteger("kFilterBandPass", (int)TwoPoleFilterType::BandPass);
+            sound.setInteger("kFilterNotch", (int)TwoPoleFilterType::Notch);
+            sound.setInteger("kFilterPEQ", (int)TwoPoleFilterType::PEQ);
+            sound.setInteger("kFilterLowShelf", (int)TwoPoleFilterType::LowShelf);
+            sound.setInteger("kFilterHighShelf", (int)TwoPoleFilterType::HighShelf);
+            sound.setInteger("kFormat8bitMono", (int)SoundFormat::Mono8bit);
+            sound.setInteger("kFormat8bitStereo", (int)SoundFormat::Stereo8bit);
+            sound.setInteger("kFormat16bitMono", (int)SoundFormat::Mono16bit);
+            sound.setInteger("kFormat16bitStereo", (int)SoundFormat::Stereo16bit);
+            sound.setInteger("kLFOSquare", (int)LFOType::Square);
+            sound.setInteger("kLFOTriangle", (int)LFOType::Triangle);
+            sound.setInteger("kLFOSine", (int)LFOType::Sine);
+            sound.setInteger("kLFOSampleAndHold", (int)LFOType::SampleAndHold);
+            sound.setInteger("kLFOSawtoothUp", (int)LFOType::SawtoothUp);
+            sound.setInteger("kLFOSawtoothDown", (int)LFOType::SawtoothDown);
+            sound.setInteger("kWaveSquare", (int)SoundWaveform::Square);
+            sound.setInteger("kWaveTriangle", (int)SoundWaveform::Triangle);
+            sound.setInteger("kWaveSine", (int)SoundWaveform::Sine);
+            sound.setInteger("kWaveNoise", (int)SoundWaveform::Noise);
+            sound.setInteger("kWaveSawtooth", (int)SoundWaveform::Sawtooth);
+            sound.setInteger("kWavePOPhase", (int)SoundWaveform::POPhase);
+            sound.setInteger("kWavePODigital", (int)SoundWaveform::PODigital);
+            sound.setInteger("kWavePOVosim", (int)SoundWaveform::POVosim);
             sound.setWrappedFunction<playdate_sound_getSampleRate_lua>("getSampleRate");
             sound.setWrappedFunction<playdate_sound_playingSources_lua>("playingSources");
             sound.setWrappedFunction<playdate_sound_addEffect_lua>("addEffect");

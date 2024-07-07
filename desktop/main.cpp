@@ -11,22 +11,7 @@
 
 #include <SDL.h>
 
-// Todo: Remove once CLion works with MagicEnum
-#ifndef __CLION_IDE__
 #include "magic_enum_all.hpp"
-#else
-namespace magic_enum {
-    namespace containers {
-        template<typename E, typename V>
-        struct array {
-            int size() { return {}; }
-            V& operator[](E value) { return *(V *)&value; }
-        };
-    }
-    template<typename E> E enum_value(size_t) { return {}; }
-    template<typename E> std::string enum_name(E) { return {}; }
-}
-#endif
 
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -267,7 +252,7 @@ int main(int argc, const char *args[]) {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
-                // Todo: Clean this up (Different menu? Termination should not be necessary)
+                // Todo: Clean this up (Different menu? Termination should not be necessary) (Also just doesn't work correctly at preset)
                 if (ImGui::MenuItem(cranked.state == Cranked::State::Stopped ? "Start" : cranked.state == Cranked::State::Stopping ? "Terminate" : "Stop")) {
                     switch (cranked.state) {
                         case cranked::Cranked::State::Stopped:
@@ -358,7 +343,7 @@ int main(int argc, const char *args[]) {
                 try {
                     cranked.debugger.addBreakpoint((cref_t)stol(newBreakpointText, nullptr, 16));
                     newBreakpointText.clear();
-                } catch (exception &ex) {}
+                } catch (exception &) {}
             }
 
             ImGui::SameLine();
@@ -463,6 +448,7 @@ int main(int argc, const char *args[]) {
             ImGui::Begin("Disassembly", &getWindowOpen(Windows::Disassembly), ImGuiWindowFlags_NoScrollbar);
             ImGui::Checkbox("Follow PC", &disassemblyFollowPc);
             ImGui::BeginChild("DisassemblyView", ImVec2(ImGui::GetWindowWidth() - 10 * scale, ImGui::GetWindowHeight() - 55 * scale));
+#if USE_CAPSTONE
             auto disassembly = cranked.debugger.getDisassembly();
             int size = cranked.debugger.getDisassemblySize();
             cref_t pc = cranked.nativeEngine.readRegister(UC_ARM_REG_PC) & ~0x1;
@@ -479,6 +465,7 @@ int main(int argc, const char *args[]) {
                         cranked.debugger.addBreakpoint(address);
                 }
             }
+#endif
             ImGui::EndChild();
             ImGui::End();
         }

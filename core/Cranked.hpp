@@ -49,36 +49,36 @@ namespace cranked {
 
         // Todo: Remove these temporary forwarding functions
         template<typename T = void>
-        inline T *fromVirtualAddress(cref_t address, bool throws = true) {
+        T *fromVirtualAddress(cref_t address, bool throws = true) {
             return nativeEngine.fromVirtualAddress<T>(address, throws);
         }
 
         template<typename T>
-        inline cref_t toVirtualAddress(T *ptr, bool throws = true) {
+        cref_t toVirtualAddress(T *ptr, bool throws = true) {
             return nativeEngine.toVirtualAddress(ptr, throws);
         }
 
         template<typename T>
-        inline void virtualWrite(uint32 address, T value) {
+        void virtualWrite(uint32 address, T value) {
             return nativeEngine.virtualWrite(address, value);
         }
 
         template<typename T>
-        inline T virtualRead(uint32 address) {
+        T virtualRead(uint32 address) {
             return nativeEngine.virtualRead<T>(address);
         }
 
-        inline static Cranked *fromLuaContext(lua_State *context) {
+        static Cranked *fromLuaContext(lua_State *context) {
             Cranked *cranked;
             lua_getallocf(context, (void **) &cranked);
             return cranked;
         }
 
-        inline lua_State *getLuaContext() {
+        lua_State *getLuaContext() const {
             return luaEngine.getContext();
         }
 
-        inline cref_t getEmulatedStringLiteral(const string &message) {
+        cref_t getEmulatedStringLiteral(const string &message) {
             return nativeEngine.getEmulatedStringLiteral(message);
         }
 
@@ -91,18 +91,22 @@ namespace cranked {
             return change;
         }
 
+        float getFrameDelta() {
+            return lastFrameDelta;
+        }
+
         // Todo: Clean up logging, should probably send pre-formatted string and filter based on a configured log level (And use C++20 std::format)
-        inline static void logMessageCallback(Cranked &cranked, LogLevel level, const char *fmt, va_list args) {
+        static void logMessageCallback(Cranked &cranked, LogLevel level, const char *fmt, va_list args) {
             vprintf(fmt, args);
             printf("\n");
         }
 
-        inline void logMessageVA(LogLevel level, const char *fmt, va_list args) {
+        void logMessageVA(LogLevel level, const char *fmt, va_list args) {
             if (config.loggingCallback)
                 config.loggingCallback(*this, level, fmt, args);
         }
 
-        inline void logMessage(LogLevel level, const char *fmt, ...) {
+        void logMessage(LogLevel level, const char *fmt, ...) {
             va_list args;
             va_start(args, fmt);
             logMessageVA(level, fmt, args);
@@ -154,6 +158,7 @@ namespace cranked {
         void init();
 
         bool initialized{};
+        float lastFrameDelta;
     };
 
 }

@@ -48,7 +48,6 @@ likely crash at the moment and there is little in the way of useful debug output
 - Respect all graphical context options like clip rect
 - Embed system files like fonts somehow
 - Finish C JSON decoding
-- Finish C Lua API
 - Test building on Windows/Mac
 - Create a testing framework to compare console output to the official simulator (Graphics, Collisions)
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
@@ -57,7 +56,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - Scoreboard support
 - Investigate Catalog app (Web API already documented)
 - See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
-- System UI/software from SDK
+- System UI/software from SDK (Create replacement assets, *Darker Grotesque* should be able to be adopted in place of *Roobert* system font)
 - Investigate pre-2.0.0 binaries to handle uncompressed data
 - Emulator API wrapper to hide all the messy internals, possible C compatible
 - Values checks, since plenty of null/illegal API parameters will cause a native seg-fault
@@ -67,6 +66,63 @@ likely crash at the moment and there is little in the way of useful debug output
 - Better execution model (The current approach works, but has limitations, coroutines might be elegant, avoiding recursive Lua invocation would be good)
 - C++ std::function callbacks may help to support both Lua and C++ with the same interface (With Lua/Native resource references, as well)
 - Fix git submodules to not get in detached head state
+- Can't currently build in release due to false uninitialized variable errors in Capstone
+- Native Cranked API for profiling and such, maybe exposed at a fixed address or at the end of the main PD API struct
+
+## Example Compatibility
+- [x] Hello World
+- [x] Sprite Collisions
+- [ ] Sprite Game
+- [x] Particles
+- [x] Life
+- [ ] Exposure
+- [ ] bach.mid
+- [ ] Array
+- [ ] 3D Library (Works until memory bug occurs)
+- [ ] Sprite Collision Masks
+- [ ] Pathfinder
+- [ ] Mode 7 Driver
+- [ ] MIDI Player
+- [ ] Level 1-1
+- [ ] Hammer Down
+- [ ] Game Template
+- [ ] Flippy Fish
+- [ ] Drum Machine
+- [ ] Controller Test
+- [ ] Asheteroids
+- [ ] Accelerometer Test
+- [ ] 2020
+- Single File Examples
+  - [ ] Animator
+  - [ ] Arcs
+  - [ ] Audio
+  - [ ] Balls
+  - [ ] Blur Dither
+  - [ ] Collisions
+  - [ ] Crank
+  - [ ] Draw Mode
+  - [ ] Draw Sampled
+  - [ ] Draw Sampled 2
+  - [ ] Fade Fast
+  - [ ] File
+  - [ ] Grid View
+  - [ ] Icosohedron
+  - [ ] Image Sample
+  - [ ] Pachinko
+  - [ ] Perlin Distribution
+  - [ ] Perlin
+  - [ ] Perlin 1
+  - [ ] Perlin 2
+  - [ ] Perlin 3
+  - [ ] Perlin 4
+  - [ ] Perlin Fild
+  - [ ] Snd Test
+  - [ ] Sprite Scaling
+  - [ ] Stencil
+  - [ ] Synth
+  - [ ] Tile Map Test
+  - [ ] Wave Table
+  - [ ] Zorder
 
 ## Internals
 - Unicorn to provide Arm CPU emulation
@@ -82,21 +138,38 @@ Requires gdb-multiarch and is run from the project directory with `gdb-multiarch
 - Set symbols: `add-symbol-file pdex.elf 0x60000020` (Or add `-ex 'add-symbol-file "pdex.elf" 0x60000020'` to gdb-multiarch command)
 - Use normal commands like `break`, `step`, `continue`, `ctrl+c`, etc.
 
+## Profiling
+### Building
+A built Tracy profiler server is required to view profiled data (Prebuilt releases available for windows).
+See [Tracy](https://github.com/wolfpld/tracy) documentation for full instructions and dependencies.
+```bash
+# Unix building example
+cd core/libs/tracy/profiler
+mkdir build && cd build
+cmake -DLEGACY .. # Legacy flag needed only for X11
+make
+```
+### Usage
+Run the Tracy Profiler server and the Cranked client should connect and start streaming data when run. 
+All C++ functions which start with a `ZoneScoped` statement will be profiled. Lua code can also be
+profiled with `tracy.ZoneBegin()` and `tracy.ZoneEnd()` around code tp be profiled.
+
 ## Updating Submodules
 ```
 git submodule foreach git pull
 ```
 
 ## Libraries and Resources
-- [libzippp](https://github.com/ctabin/libzippp)
-- [ImGui](https://github.com/ocornut/imgui)
-- [Lua54 fork](https://github.com/scratchminer/lua54)
-- [Nlohmann Json](https://github.com/nlohmann/json)
-- [Unicorn](https://github.com/unicorn-engine/unicorn)
-- [Libretro header](https://raw.githubusercontent.com/libretro/libretro-common/master/include/libretro.h)
-- [Capstone](https://github.com/capstone-engine/capstone)
-- [Bump](https://github.com/kikito/bump.lua)
-- [Encoded Asheville Sans 24 Light font from Playdate SDK](https://play.date/dev/)
+- [libzippp](https://github.com/ctabin/libzippp) for .pdx.zip archives
+- [ImGui](https://github.com/ocornut/imgui) for desktop program UI
+- [Lua54 fork](https://github.com/scratchminer/lua54) for Lua execution
+- [Nlohmann Json](https://github.com/nlohmann/json) for JSON manipulation
+- [Unicorn](https://github.com/unicorn-engine/unicorn) for native emulation
+- [Libretro header](https://raw.githubusercontent.com/libretro/libretro-common/master/include/libretro.h) for building Libretro core
+- [Capstone](https://github.com/capstone-engine/capstone) for disassembly
+- [Bump](https://github.com/kikito/bump.lua) for collision handling reference
+- [Encoded Asheville SansLight font from Playdate SDK (CC BY 4.0)](https://play.date/dev/) for system font
+- [Tracy](https://github.com/wolfpld/tracy) for profiling
 
 ## Sources
 - https://sdk.play.date/inside-playdate

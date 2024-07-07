@@ -441,6 +441,7 @@ string NativeEngine::dumpCore() {
             dump += '\n';
     }
     pc &= ~0x1;
+#if USE_CAPSTONE
     auto disassembly = cranked.debugger.getDisassembly();
     int disassemblySize = cranked.debugger.getDisassemblySize();
     for (int i = -8; i < 16; i++) {
@@ -453,6 +454,7 @@ string NativeEngine::dumpCore() {
             }
         }
     }
+#endif
     return dump;
 }
 

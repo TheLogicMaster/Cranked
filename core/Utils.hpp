@@ -7,13 +7,20 @@
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
 #include "unicorn/unicorn.h"
+
+#ifdef USE_CAPSTONE
 #include "capstone/platform.h"
 #include "capstone/capstone.h"
+#endif
+
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
 #include "libzippp.h"
 #include "zlib.h"
+
+#include "tracy/Tracy.hpp"
+#include "tracy/TracyLua.hpp"
 
 #include <vector>
 #include <memory>
@@ -61,18 +68,18 @@ namespace cranked {
     using std::optional, std::tuple, std::make_tuple, std::tie, std::ignore, std::pair, std::make_pair;
     using std::variant, std::get, std::get_if, std::holds_alternative;
     using std::false_type, std::tuple_element_t, std::is_same_v, std::is_pointer_v, std::is_class_v, std::remove_pointer_t, std::is_enum_v, std::is_void_v;
+    using std::derived_from, std::integral, std::floating_point, std::is_standard_layout_v, std::is_trivial_v;
     using std::hash, std::equal_to, std::less;
     using std::char_traits, std::numeric_limits;
     using std::size_t, std::time_t;
-    using std::derived_from, std::integral, std::floating_point, std::is_standard_layout_v, std::is_trivial_v;
     using std::ostringstream, std::istringstream, std::ifstream, std::getline, std::ios;
     using std::free, std::bad_alloc, std::aligned_alloc, std::addressof;
-    using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap;
+    using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap, std::mismatch;
     using std::unique_ptr, std::shared_ptr, std::make_shared, std::make_unique;
     using std::format, std::vformat, std::make_format_args;
     using std::regex, std::regex_match, std::match_results, std::cmatch;
 
-    namespace filesystem = std::filesystem;
+    namespace fs = std::filesystem;
     namespace chrono = std::chrono;
     namespace this_thread = std::this_thread;
 
@@ -187,7 +194,7 @@ namespace cranked {
     inline static Version VERSION_2_4_1{"2.4.1"};
 
     template<typename TP>
-    inline time_t to_time_t(TP tp) {
+    time_t to_time_t(TP tp) {
 #if __ANDROID__
         return chrono::system_clock::to_time_t(chrono::time_point_cast<chrono::system_clock::duration>(tp - TP::clock::now() + chrono::system_clock::now()));
 #else
@@ -196,7 +203,7 @@ namespace cranked {
     }
 
     template<class T2, class T1>
-    inline T2 bit_cast(T1 t1) {
+    T2 bit_cast(T1 t1) {
 #if __ANDROID__
         static_assert(sizeof(T1) == sizeof(T2), "Types must match sizes");
         static_assert(is_standard_layout_v<T1> and is_trivial_v<T1>, "Requires POD input");
@@ -213,7 +220,7 @@ namespace cranked {
 
     inline vector<uint8> readFileData(const string &path) {
         vector<uint8> data;
-        if (!filesystem::is_regular_file(path))
+        if (!fs::is_regular_file(path))
             throw CrankedError("No such file: {}", path);
         ifstream input(path, ios::binary | ios::ate);
         auto size = input.tellg();
@@ -259,7 +266,7 @@ namespace cranked {
     }
 
     template<typename T>
-    inline string formatHex(T value) {
+    string formatHex(T value) {
         ostringstream stream;
         stream << std::hex << value;
         return stream.str();
@@ -290,13 +297,13 @@ namespace cranked {
     }
 
     template<typename S, typename T>
-    constexpr inline T nearestValue(T a, T b, S test) {
+    constexpr T nearestValue(T a, T b, S test) {
         T val = T(test);
         return abs(a - val) < abs(b - val) ? a : b;
     }
 
     template<typename T, typename V>
-    inline bool eraseByEquivalentKey(unordered_set<T> &set, const V &value) {
+    bool eraseByEquivalentKey(unordered_set<T> &set, const V &value) {
         auto found = set.find(value);
         if (found != set.end()) {
             set.erase(found);
@@ -322,6 +329,28 @@ namespace cranked {
         static constexpr size_t ArgCount = sizeof...(Args);
         template<size_t N>
         using NthArg = tuple_element_t<N, ArgTypes>;
+    };
+
+    template<numeric_type T, int N>
+    class RollingAverage {
+    public:
+        void addSample(T val) {
+            buffer[index] = val;
+            index = (index + 1) % N;
+        }
+
+        constexpr T value() {
+            T sum{};
+            for (int i = 0; i < N; i++) {
+                int offset = index - 1 - i;
+                sum += buffer[offset >= 0 ? offset : N + offset];
+            }
+            return sum / N;
+        }
+
+    private:
+        array<T, N> buffer{};
+        int index{}; // Index where to place next
     };
 
 }

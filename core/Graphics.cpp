@@ -1,11 +1,10 @@
 #include "Graphics.hpp"
 #include "Cranked.hpp"
-#include "gen/SystemFont.hpp"
 
 using namespace cranked;
 
 Graphics::Graphics(Cranked &cranked)
-        : cranked(cranked), heap(cranked.heap), systemFontSource(Rom::readFont(SYSTEM_FONT, sizeof(SYSTEM_FONT))) {}
+        : cranked(cranked), heap(cranked.heap), systemFontSource(Rom::readSystemFont("Asheville-Sans-14-Light.pft")) {}
 
 LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked) : NativeResource(cranked) {}
 
@@ -41,6 +40,16 @@ LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) 
     bitmaps = other.bitmaps;
     cellsPerRow = other.cellsPerRow;
     return *this;
+}
+
+// Todo: These pixel functions should be used less and live in the header
+
+tuple<int, int> LCDBitmap_32::getBufferPixelLocation(int x, int y) {
+    if (x < 0 or x >= width or y < 0 or y >= height)
+        return { 0, 0 };
+    int offset = 7 - x % 8;
+    auto stride = (int) ceil((float) width / 8);
+    return { y * stride + x / 8, 1 << offset };
 }
 
 bool LCDBitmap_32::getBufferPixel(int x, int y) {
@@ -181,8 +190,38 @@ void LCDSprite_32::update() {
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t>(updateFunction, this);
 }
 
-void Graphics::pushContext(Bitmap target) {
-    displayContextStack.emplace_back(target ? target : frameBuffer.get());
+Sprite LCDSprite_32::copy() {
+    // Todo: What should not be copied?
+    auto other = cranked.heap.construct<LCDSprite_32>(cranked);
+    other->bounds = bounds;
+    other->image = image;
+    other->center = center;
+    other->visible = visible;
+    other->updatesEnabled = updatesEnabled;
+    other->dontRedrawOnImageChange = dontRedrawOnImageChange;
+    other->ignoresDrawOffset = ignoresDrawOffset;
+    other->opaque = opaque;
+    other->collisionsEnabled = collisionsEnabled;
+    other->collideRect = collideRect;
+    other->groupMask = groupMask;
+    other->zIndex = zIndex;
+    other->scale = scale;
+    other->clipRect = clipRect;
+    other->tag = tag;
+    other->drawMode = drawMode;
+    other->flip = flip;
+    other->stencil = stencil;
+    other->stencilTiled = stencilTiled;
+    other->updateFunction = updateFunction;
+    other->drawFunction = drawFunction;
+    other->collideResponseFunction = collideResponseFunction;
+    other->userdata = userdata;
+    return other;
+}
+
+DisplayContext &Graphics::pushContext(Bitmap target) {
+    // Todo: Should this copy the existing context?
+    return displayContextStack.emplace_back(target ? target : frameBuffer.get());
 }
 
 void Graphics::popContext() {
@@ -192,6 +231,7 @@ void Graphics::popContext() {
 }
 
 void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
+    ZoneScoped;
     auto &context = getCurrentDisplayContext();
     auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
@@ -240,6 +280,14 @@ void Graphics::fillRect(int x, int y, int width, int height, LCDColor color) {
         drawLine(x, y + i, x + width - 1, y + i, 1, color);
 }
 
+void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
+    // Todo
+}
+
+void Graphics::fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
+    // Todo
+}
+
 void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
     auto lineWidth = getCurrentDisplayContext().lineWidth;
     drawLine(x1, y1, x2, y2, lineWidth, color);
@@ -248,6 +296,8 @@ void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
 }
 
 void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, optional<IntRect> sourceRect) {
+    ZoneScoped;
+    // Todo: This could be heavly optimized with bitwise operations
     auto &context = getCurrentDisplayContext();
     auto mode = context.bitmapDrawMode;
     bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
@@ -294,7 +344,22 @@ void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool 
         }
 }
 
+void Graphics::drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, LCDBitmapFlip flip) {
+    int right = x + width, bottom = y + height;
+    int bitmapWidth = bitmap->width, bitmapHeight = bitmap->height;
+    if (bitmap->data.empty()) // Prevent infinite loop
+        return;
+    for (int i = y; i < bottom; i += bitmapHeight) {
+        for (int j = x; j < right; j += bitmapWidth) {
+            bool truncate = i + bitmapHeight > bottom or j + bitmapWidth > right;
+            optional<IntRect> sourceRect = truncate ? IntRect{ min(bitmapWidth, right - j), min(bitmapHeight, bottom - i) } : optional<IntRect>{};
+            drawBitmap(bitmap, j, i, flip, false, sourceRect);
+        }
+    }
+}
+
 void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, Font font) {
+    ZoneScoped;
     // Todo: Support encodings
     // Todo: Kerning
     const char *string = (const char *) text;
@@ -454,6 +519,51 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
     }
 }
 
+void Graphics::fillPolygon(int32 *coords, int32 points, LCDColor color, LCDPolygonFillRule fillType) {
+
+}
+
+void Graphics::drawPolygon(int32 *coords, int32 points, LCDColor color) {
+    if (!points)
+        return;
+    for (int i = 0; i < points - 1; i++)
+        drawLine(coords[i * 2 + 0], coords[i * 2 + 1], coords[i * 2 + 2], coords[i * 2 + 3], getCurrentDisplayContext().lineWidth, color);
+    drawLine(coords[0], coords[1], coords[points * 2 - 2], coords[points * 2 - 1], getCurrentDisplayContext().lineWidth, color);
+}
+
+void Graphics::drawScaledBitmap(Bitmap bitmap, int x, int y, float xScale, float yScale) {
+    // Todo: Making a copy each time is probably not particularly efficient
+    BitmapRef ref = scaleBitmap(bitmap, xScale, yScale);
+    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+}
+
+Bitmap Graphics::scaleBitmap(Bitmap bitmap, float xScale, float yScale) {
+    // Todo: Should any filtering be done?
+    float xInv = 1 / xScale, yInv = 1 / yScale;
+    int width = (int)((float)bitmap->width * xScale), height = (int)((float)bitmap->height * yScale);
+    auto scaled = heap.construct<LCDBitmap_32>(cranked, width, height);
+    if (bitmap->mask)
+        scaled->mask = scaleBitmap(bitmap->mask.get(), xScale, yScale);
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            scaled->setBufferPixel(x, y, bitmap->getBufferPixel((int)((float)x * xInv), (int)((float)y * yInv)));
+    return scaled;
+}
+
+void Graphics::drawRotatedBitmap(Bitmap bitmap, int x, int y, float angle, float centerX, float centerY, float xScale, float yScale) {
+    // Todo: Making a copy each time is probably not particularly efficient
+    BitmapRef ref = rotateBitmap(bitmap, angle, centerX, centerY, xScale, yScale);
+    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+}
+
+Bitmap Graphics::rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale) {
+    auto rotated = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height); // Actual size will be different
+    if (bitmap->mask)
+        rotated->mask = rotateBitmap(bitmap->mask.get(), angle, centerX, centerY, xScale, yScale);
+    // Todo
+    return rotated;
+}
+
 void Graphics::updateSprites() {
     // Todo: Supposed to be updated in sorted order?
     for (auto &sprite : spriteDrawList) {
@@ -554,11 +664,13 @@ void Graphics::reset() {
     displayInverted = false;
     displayFlippedX = displayFlippedY = false;
     displayMosaic = {};
-    framerate = 20;
+    framerate = 30;
 }
 
 void Graphics::update() {
+    ZoneScoped;
     frameBufferContext.clipRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
+    // Todo: Is this supposed to be done here?
     while (!displayContextStack.empty())
         popContext();
 }
@@ -587,4 +699,6 @@ void Graphics::flushDisplayBuffer() {
     memcpy(previousFrameBuffer->data.data(), frameBuffer->data.data(), frameBuffer->data.size());
 
     cranked.menu.render();
+
+    FrameImage(displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, false);
 }

@@ -14,13 +14,17 @@ void LuaEngine::init() {
     if (!cranked.rom->hasLua or (cranked.nativeEngine.isLoaded() and cranked.nativeEngine.hasUpdateCallback()))
         return; // Don't load Lua chunks in native-only mode
 
-    luaInterpreter = lua_newstate(luaAllocator, this);
+    luaInterpreter = lua_newstate(luaAllocator, &cranked);
+
     lua_atpanic(luaInterpreter, [](lua_State *context) -> int {
         auto message = lua_tostring(context, -1);
         throw CrankedError("Lua panic: {}", message ? message : "");
     });
+
     luaL_openlibs(luaInterpreter);
     registerLuaGlobals();
+    tracy::LuaRegister(luaInterpreter);
+
     lua_settop(luaInterpreter, 0);
     lua_sethook(luaInterpreter, luaHook, LUA_MASKCOUNT, 10000); // Todo: Tune count param to a few milliseconds or so
 
@@ -58,12 +62,12 @@ void LuaEngine::reset() {
         lua_close(luaInterpreter);
     luaInterpreter = nullptr;
 
-    luaReferences.clear();
     loadedLuaFiles.clear();
 }
 
 void LuaEngine::runUpdateLoop() {
-    getQualifiedLuaGlobal("playdate.update");
+    if (!getQualifiedLuaGlobal("playdate.update"))
+        return;
     lua_xmove(luaInterpreter, luaUpdateThread, 1);
     int results{};
     inLuaUpdate = true;
@@ -81,15 +85,39 @@ void LuaEngine::runUpdateLoop() {
     inLuaUpdate = false;
 }
 
+LuaVal LuaEngine::pushImage(Bitmap image) const {
+    return pushUserdataResource(image, "playdate.graphics.image");
+}
+
+LuaVal LuaEngine::pushSprite(Sprite sprite) const {
+    return pushUserdataResource(sprite, "playdate.graphics.sprite");
+}
+
+LuaVal LuaEngine::pushFont(Font font) const {
+    return pushUserdataResource(font, "playdate.graphics.font");
+}
+
+LuaVal LuaEngine::pushFile(File file) const {
+    return pushUserdataResource(file, "playdate.file.file");
+}
+
+LuaVal LuaEngine::pushMenuItem(MenuItem item) const {
+    return pushUserdataResource(item, "playdate.menu.item");
+}
+
 void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {
+    static const auto luaHeapProfileName = "Lua Heap";
     auto cranked = (Cranked *) userData;
+    TracySecureFreeN(ptr, luaHeapProfileName);
     if (nsize == 0) {
         cranked->heap.free(ptr);
         return nullptr;
     }
     try {
-        return cranked->heap.reallocate(ptr, (int) nsize);
-    } catch (exception &ex) {
+        auto allocated = cranked->heap.reallocate(ptr, (int)nsize);
+        TracySecureAllocN(allocated, (int)nsize, luaHeapProfileName);
+        return allocated;
+    } catch (exception &) {
         return nullptr;
     }
 }

@@ -58,18 +58,18 @@ namespace cranked {
 
         int tell(File file);
 
-        bool isFileOpen(File file) {
-            return openFiles.find(file) != openFiles.end();
+        bool isFileOpen(File file) const {
+            return openFiles.contains(file);
         }
 
         Cranked &cranked;
 
         unordered_set<FileRef> openFiles{};
-        filesystem::path appDataPath = "./appData/";
+        fs::path appDataPath = "./appData/";
         cref_t lastError{};
 
     private:
-        filesystem::path romDataPath;
+        fs::path romDataPath;
     };
 
 }

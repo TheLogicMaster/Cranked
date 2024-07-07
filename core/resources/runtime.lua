@@ -16,7 +16,7 @@ cranked = {
     printNewlines = true,
     inputHandlers = { { handler = playdate, masks = false } },
     menuCallbacks = {},
-    references = {}, -- Mapping of native resources to owner tables for internally used resources
+    preserved = {}, -- Mapping of value to reference count for preserved Lua values
     updateThread = nil,
 }
 

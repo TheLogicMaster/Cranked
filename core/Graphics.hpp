@@ -13,8 +13,8 @@ namespace cranked {
     class Cranked;
 
     union LCDColor {
-        inline LCDColor(uint32 value) : pattern(value) {} // NOLINT(*-explicit-constructor)
-        inline LCDColor(LCDSolidColor value) : color(value) {} // NOLINT(*-explicit-constructor)
+        LCDColor(uint32 value) : pattern(value) {} // NOLINT(*-explicit-constructor)
+        LCDColor(LCDSolidColor value) : color(value) {} // NOLINT(*-explicit-constructor)
 
         LCDSolidColor color;
         cref_t pattern;
@@ -41,6 +41,8 @@ namespace cranked {
         ~LCDBitmap_32() override = default;
 
         LCDBitmap_32 &operator=(const LCDBitmap_32 &other);
+
+        tuple<int, int> getBufferPixelLocation(int x, int y);
 
         bool getBufferPixel(int x, int y);
 
@@ -133,6 +135,8 @@ namespace cranked {
 
         void update();
 
+        Sprite copy();
+
         Rect bounds{};
         BitmapRef image{};
         Vec2 center{ 0.5f, 0.5f };
@@ -152,12 +156,11 @@ namespace cranked {
         LCDBitmapFlip flip{};
         BitmapRef stencil{};
         bool stencilTiled{};
-        uint8 stencilPattern[8]{};
         cref_t updateFunction{};
         cref_t drawFunction{};
         cref_t collideResponseFunction{};
         cref_t userdata{};
-        bool dirty{};
+        bool dirty = true;
         vector<LCDRect_32> dirtyRects;
     };
 
@@ -222,11 +225,24 @@ namespace cranked {
             stencilImage.reset();
             focusedImage.reset();
             font.reset();
+            boldFont.reset();
+            italicFont.reset();
+        }
+
+        FontRef &getFont(PDFontVariant variant) {
+            switch (variant) {
+                case PDFontVariant::Bold:
+                    return boldFont;
+                case PDFontVariant::Italic:
+                    return italicFont;
+                default:
+                    return font;
+            }
         }
 
         BitmapRef bitmap;
         IntVec2 drawOffset{};
-        IntRect clipRect{}; // In world-space (Offset by drawOffset)
+        IntRect clipRect{0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT}; // In world-space (Offset by drawOffset)
         LCDSolidColor drawingColor{};
         LCDSolidColor backgroundColor = LCDSolidColor::White;
         int lineWidth = 1;
@@ -239,6 +255,8 @@ namespace cranked {
         BitmapRef focusedImage; // Todo: Is this global or context specific?
         LCDBitmapDrawMode bitmapDrawMode{};
         FontRef font{};
+        FontRef boldFont{};
+        FontRef italicFont{};
         LCDPolygonFillRule polygonFillRule{};
         int textTracking{};
         int textLeading{};
@@ -256,16 +274,16 @@ namespace cranked {
 
         void flushDisplayBuffer();
 
-        inline DisplayContext &getCurrentDisplayContext() {
+        DisplayContext &getCurrentDisplayContext() {
             return displayContextStack.empty() ? frameBufferContext : displayContextStack.back();
         }
 
-        inline Bitmap getTargetBitmap() {
+        Bitmap getTargetBitmap() {
             auto &context = getCurrentDisplayContext();
             return (context.focusedImage ? context.focusedImage : context.bitmap).get();
         }
 
-        void pushContext(Bitmap target);
+        DisplayContext &pushContext(Bitmap target);
 
         void popContext();
 
@@ -279,17 +297,15 @@ namespace cranked {
 
         void fillRect(int x, int y, int width, int height, LCDColor color);
 
-        inline void drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
-            // Todo
-        }
+        void drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color);
 
-        inline void fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
-            // Todo
-        }
+        void fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color);
 
         void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
 
         void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
+
+        void drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, LCDBitmapFlip flip);
 
         void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, Font font = nullptr);
 
@@ -297,19 +313,31 @@ namespace cranked {
 
         void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, LCDColor color, bool filled);
 
+        void fillPolygon(int32 *coords, int32 points, LCDColor color, LCDPolygonFillRule fillType);
+
+        void drawPolygon(int32 *coords, int32 points, LCDColor color);
+
+        void drawScaledBitmap(Bitmap bitmap, int x, int y, float xScale, float yScale);
+
+        Bitmap scaleBitmap(Bitmap bitmap, float xScale, float yScale);
+
+        void drawRotatedBitmap(Bitmap bitmap, int x, int y, float angle, float centerX, float centerY, float xScale, float yScale);
+
+        Bitmap rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale);
+
         void updateSprites();
 
         void drawSprites();
 
-        inline Sprite createSprite() {
+        Sprite createSprite() {
             return heap.construct<LCDSprite_32>(cranked);
         }
 
-        inline Bitmap createBitmap(int width, int height) {
+        Bitmap createBitmap(int width, int height) {
             return heap.construct<LCDBitmap_32>(cranked, width, height);
         }
 
-        inline BitmapTable createBitmapTable(int count) {
+        BitmapTable createBitmapTable(int count) {
             return heap.construct<LCDBitmapTable_32>(cranked, count);
         }
 

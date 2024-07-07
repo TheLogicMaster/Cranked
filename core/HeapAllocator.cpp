@@ -9,7 +9,7 @@ HeapAllocator::HeapAllocator(size_t size) : totalSize(size), freeList(nullptr) {
 }
 
 HeapAllocator::~HeapAllocator() {
-    std::free(startPtr);
+    ::free(startPtr);
 }
 
 void *HeapAllocator::allocate(size_t size) {
@@ -35,7 +35,9 @@ void *HeapAllocator::allocate(size_t size) {
         node->size = blockSize;
 
     auto ptr = (void *)((intptr_t) node + sizeof(Node));
-    memset(ptr, 0, size); // No need to bother with heap garbage
+    memset(ptr, 0, size); // No need to bother with heap garbage, should help identify memory bugs
+
+    TracySecureAlloc(ptr, (int)size);
 
     return ptr;
 }
@@ -55,6 +57,8 @@ void *HeapAllocator::reallocate(void *ptr, size_t size) {
 void HeapAllocator::free(void *ptr) {
     if (!ptr)
         return;
+
+    TracySecureFree(ptr);
 
     Node *node = (Node *)((intptr_t) ptr - sizeof(Node));
 

@@ -1,8 +1,9 @@
+// ReSharper disable CppParameterMayBeConstPtrOrRef
+// ReSharper disable CppParameterMayBeConst
+// NOLINTBEGIN(*-non-const-parameter)
+
 #include "Cranked.hpp"
 #include "gen/PlaydateAPI.hpp"
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "readability-non-const-parameter"
 
 using namespace cranked;
 
@@ -95,11 +96,11 @@ void cranked::playdate_graphics_popContext(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_drawBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, int32 flip) {
-    cranked->graphics.drawBitmap(bitmap, x, y, LCDBitmapFlip(flip));
+    cranked->graphics.drawBitmap(bitmap, x, y, (LCDBitmapFlip)flip);
 }
 
 void cranked::playdate_graphics_tileBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, int32 width, int32 height, int32 flip) {
-    // Todo
+    cranked->graphics.drawBitmapTiled(bitmap, x, y, width, height, (LCDBitmapFlip)flip);
 }
 
 void cranked::playdate_graphics_drawLine(Cranked *cranked, int32 x1, int32 y1, int32 x2, int32 y2, int32 width, uint32 color) {
@@ -161,7 +162,7 @@ Bitmap cranked::playdate_graphics_copyBitmap(Cranked *cranked, Bitmap bitmap) {
 
 void cranked::playdate_graphics_loadIntoBitmap(Cranked *cranked, uint8 *path, Bitmap bitmap, cref_t *outerr) {
     try {
-        ResourceRef<LCDBitmap_32> loaded(cranked->graphics.getImage((const char *) path));
+        ResourceRef loaded(cranked->graphics.getImage((const char *) path));
         *bitmap = *loaded;
     } catch (exception &ex) {
         if (outerr)
@@ -209,7 +210,7 @@ BitmapTable cranked::playdate_graphics_loadBitmapTable(Cranked *cranked, uint8 *
 
 void cranked::playdate_graphics_loadIntoBitmapTable(Cranked *cranked, uint8 *path, BitmapTable table, cref_t *outerr) {
     try {
-        ResourceRef<LCDBitmapTable_32> loaded(cranked->graphics.getBitmapTable((const char *) path));
+        ResourceRef loaded(cranked->graphics.getBitmapTable((const char *) path));
         *table = *loaded;
     } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
@@ -234,7 +235,7 @@ Font cranked::playdate_graphics_loadFont(Cranked *cranked, uint8 *path, cref_t *
 FontPage cranked::playdate_graphics_getFontPage(Cranked *cranked, Font font, uint32 c) {
     try {
         return font->pages.at((int)c / 256).get();
-    } catch (out_of_range &ex) { // Todo: Don't use exceptions
+    } catch (out_of_range &) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
@@ -247,7 +248,7 @@ LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, FontP
         if (advance)
             *advance = glyph->advance;
         return glyph.get();
-    } catch (out_of_range &ex) { // Todo: Don't use exceptions
+    } catch (out_of_range &) { // Todo: Don't use exceptions
         return nullptr;
     }
 }
@@ -255,7 +256,7 @@ LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, FontP
 int32 cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_32 *glyph, uint32 glyphcode, uint32 nextcode) {
     try {
         return nextcode < 256 ? glyph->shortKerningTable.at((int)nextcode) : glyph->longKerningTable.at((int)nextcode);
-    } catch (out_of_range &ex) { // Todo: Don't use exceptions
+    } catch (out_of_range &) { // Todo: Don't use exceptions
         return 0;
     }
 }
@@ -270,7 +271,7 @@ int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void 
         size += font->glyphWidth;
         try {
             glyph = font->pages.at(character / 256)->glyphs.at(character % 256).get();
-        } catch (out_of_range &ex) {}
+        } catch (out_of_range &) {}
         if (glyph) {
             size += glyph->advance;
             // Todo: Kerning
@@ -283,11 +284,11 @@ int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void 
 }
 
 uint8 *cranked::playdate_graphics_getFrame(Cranked *cranked) {
-    return (uint8 *) cranked->graphics.frameBuffer->data.data();
+    return cranked->graphics.frameBuffer->data.data();
 }
 
 uint8 *cranked::playdate_graphics_getDisplayFrame(Cranked *cranked) {
-    return (uint8 *) cranked->graphics.previousFrameBuffer->data.data();
+    return cranked->graphics.previousFrameBuffer->data.data();
 }
 
 Bitmap cranked::playdate_graphics_copyFrameBufferBitmap(Cranked *cranked) {
@@ -303,25 +304,45 @@ void cranked::playdate_graphics_display(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_setColorToPattern(Cranked *cranked, uint32 *color, Bitmap bitmap, int32 x, int32 y) {
-    // Todo
+    auto colorVal = (LCDColor *)color;
+    auto [ offset, bit ] = bitmap->getBufferPixelLocation(x, y);
+    colorVal->pattern = cranked->nativeEngine.toVirtualAddress(&bitmap->data[offset]); // Todo: Does this even work?
 }
 
 int32 cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, Bitmap bitmap1, int32 x1, int32 y1, int32 flip1, Bitmap bitmap2, int32 x2, int32 y2, int32 flip2, LCDRect_32 rect) {
-    // Todo
-    return 0;
+    // Todo: This could be optimized with bitwise operations
+    IntRect rect1 = { x1, y1, bitmap1->width, bitmap1->height };
+    IntRect rect2 = { x2, y2, bitmap2->width, bitmap2->height };
+    bool flip1X = flip1 & 0b01, flip1Y = flip1 & 0b10;
+    bool flip2X = flip2 & 0b01, flip2Y = flip2 & 0b10;
+    const IntRect intersection = rect1.intersection(rect2);
+    if (!intersection)
+        return false;
+    if (!bitmap1->mask or !bitmap2->mask)
+        return true;
+    for (int y = intersection.pos.y; y < intersection.pos.y + intersection.size.y; y++) {
+        int t1y = flip1Y ? bitmap1->height - 1 - (y - y1) : y - y1;
+        int t2y = flip2Y ? bitmap2->height - 1 - (y - y2) : y - y2;
+        for (int x = intersection.pos.x; x < intersection.pos.x + intersection.size.x; x++) {
+            int t1x = flip1X ? bitmap1->width - 1 - (x - x1) : x - x1;
+            int t2x = flip2X ? bitmap2->width - 1 - (x - x2) : x - x2;
+            if (bitmap1->mask->getBufferPixel(t1x, t1y) and bitmap2->mask->getBufferPixel(t2x, t2y))
+                return true;
+        }
+    }
+    return false;
 }
 
 void cranked::playdate_graphics_setScreenClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
-    cranked->graphics.getCurrentDisplayContext().clipRect = {x, y, width, height};
+    cranked->graphics.getCurrentDisplayContext().clipRect = { x, y, width, height };
 }
 
 void cranked::playdate_graphics_fillPolygon(Cranked *cranked, int32 nPoints, int32 *coords, uint32 color, int32 fillrule) {
-    // Todo
+    cranked->graphics.fillPolygon(coords, nPoints, color, (LCDPolygonFillRule)fillrule);
 }
 
 uint8 cranked::playdate_graphics_getFontHeight(Cranked *cranked, Font font) {
-    // Todo
-    return 0;
+    return font->glyphHeight;
 }
 
 Bitmap cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
@@ -362,25 +383,26 @@ int32 cranked::playdate_graphics_getTextTracking(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_setPixel(Cranked *cranked, int32 x, int32 y, uint32 c) {
-    // Todo
+    cranked->graphics.drawPixel(x, y, c);
 }
 
 int32 cranked::playdate_graphics_getBitmapPixel(Cranked *cranked, Bitmap bitmap, int32 x, int32 y) {
-    // Todo
-    return 0;
+    return (int)bitmap->getPixel(x, y);
 }
 
 void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable table, int32 *count, int32 *width) {
-    // Todo
+    if (count)
+        *count = (int)table->bitmaps.size();
+    if (width)
+        *width = table->bitmaps.empty() ? 0 : table->bitmaps[0]->width;
 }
 
 void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32 size) {
-    // Todo: Check for objects that need to be user freed and call destructors
     if (size == 0) {
         cranked->nativeEngine.freeResource(ptr);
         return nullptr;
-    } else
-        return cranked->heap.reallocate(ptr, size);
+    }
+    return cranked->heap.reallocate(ptr, size);
 }
 
 int32 cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8 *fmt, ...) {
@@ -421,16 +443,21 @@ uint32 cranked::playdate_sys_getCurrentTimeMilliseconds(Cranked *cranked) {
 }
 
 uint32 cranked::playdate_sys_getSecondsSinceEpoch([[maybe_unused]] Cranked *cranked, uint32 *milliseconds) {
-    return duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count();
+    auto millis = duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+    if (milliseconds)
+        *milliseconds = uint32(millis % 1000);
+    return uint32(millis / 1000);
 }
 
 void cranked::playdate_sys_drawFPS(Cranked *cranked, int32 x, int32 y) {
-    // Todo: Why does this not work?
-    auto delta = duration_cast<chrono::milliseconds>((chrono::system_clock::now() - cranked->lastFrameTime)).count();
-    auto string = to_string(int(1000.0f / (float)delta));
+    // Todo: Match the official FPS count better
+    auto delta = max(cranked->getFrameDelta(), 1.0f);
+    auto string = to_string((int)round(1000.0f / delta));
+    if (string.length() < 2)
+        string = "0" + string;
     cranked->graphics.fillRect(x - 2, y - 2, 14 * (int)string.size() + 2, 30, LCDSolidColor::White);
-    cranked->graphics.pushContext(cranked->graphics.frameBuffer.get());
-    cranked->graphics.getCurrentDisplayContext().bitmapDrawMode = LCDBitmapDrawMode::Copy;
+    auto context = cranked->graphics.pushContext(cranked->graphics.frameBuffer.get());
+    context.bitmapDrawMode = LCDBitmapDrawMode::Copy;
     cranked->graphics.drawText(string.c_str(), (int)string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont.get());
     cranked->graphics.popContext();
 }
@@ -440,9 +467,12 @@ void cranked::playdate_sys_setUpdateCallback(Cranked *cranked, cref_t update, vo
 }
 
 void cranked::playdate_sys_getButtonState(Cranked *cranked, int32 *current, int32 *pushed, int32 *released) {
-    *current = cranked->currentInputs;
-    *pushed = cranked->pressedInputs;
-    *released = cranked->releasedInputs;
+    if (current)
+        *current = cranked->currentInputs;
+    if (pushed)
+        *pushed = cranked->pressedInputs;
+    if (released)
+        *released = cranked->releasedInputs;
 }
 
 void cranked::playdate_sys_setPeripheralsEnabled(Cranked *cranked, int32 mask) {
@@ -450,9 +480,12 @@ void cranked::playdate_sys_setPeripheralsEnabled(Cranked *cranked, int32 mask) {
 }
 
 void cranked::playdate_sys_getAccelerometer(Cranked *cranked, float *outx, float *outy, float *outz) {
-    *outx = cranked->accelerometerX;
-    *outy = cranked->accelerometerY;
-    *outz = cranked->accelerometerZ;
+    if (outx)
+        *outx = cranked->accelerometerX;
+    if (outy)
+        *outy = cranked->accelerometerY;
+    if (outz)
+        *outz = cranked->accelerometerZ;
 }
 
 float cranked::playdate_sys_getCrankChange(Cranked *cranked) {
@@ -570,7 +603,7 @@ uint32 cranked::playdate_sys_convertDateTimeToEpoch(Cranked *cranked, PDDateTime
 }
 
 void cranked::playdate_sys_clearICache(Cranked *cranked) {
-    // Todo
+    cranked->nativeEngine.flushCaches();
 }
 
 void cranked::playdate_sys_setButtonCallback(Cranked *cranked, cref_t cb, void *buttonud, int32 queuesize) {
@@ -595,7 +628,7 @@ int32 cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, uin
         void *string = cranked->heap.allocate(size);
         memcpy(string, buffer, size);
         *outstr = cranked->toVirtualAddress(string);
-    } catch (bad_alloc &ex) {
+    } catch (bad_alloc &) {
         size = -1;
     } catch (...) {
         free(buffer);
@@ -813,25 +846,25 @@ int32 cranked::playdate_sys_parseString(Cranked *cranked, uint8 *str, uint8 *fmt
                             *va_arg(list, int8 *) = (int8)result;
                             break;
                         case ArgType::uint8_t:
-                            *va_arg(list, uint8 *) = result;
+                            *va_arg(list, uint8 *) = (uint8)uresult;
                             break;
                         case ArgType::int16_t:
                             *va_arg(list, int16 *) = (int16)result;
                             break;
                         case ArgType::uint16_t:
-                            *va_arg(list, uint16 *) = result;
+                            *va_arg(list, uint16 *) = (uint16)uresult;
                             break;
                         case ArgType::int32_t:
                             *va_arg(list, int32 *) = (int32)result;
                             break;
                         case ArgType::uint32_t:
-                            *va_arg(list, uint32 *) = result;
+                            *va_arg(list, uint32 *) = (uint32)uresult;
                             break;
                         case ArgType::int64_t:
                             *va_arg(list, int64 *) = result;
                             break;
                         case ArgType::uint64_t:
-                            *va_arg(list, uint64 *) = result;
+                            *va_arg(list, uint64 *) = uresult;
                             break;
                     }
                 }
@@ -908,23 +941,61 @@ int32 cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8 *name,
     if (!cranked->getLuaContext()) {
         if (outErr)
             *outErr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
-        return 0;
+        return false;
     }
     cranked->nativeEngine.pushEmulatedLuaFunction(f);
     cranked->luaEngine.setQualifiedLuaGlobal((const char *) name);
     if (outErr)
         *outErr = 0;
-    return 1;
+    return true;
 }
 
+// Todo: Figure out which version the old registerClass was depreciated, not compatible at present (Before SDK 1.9 at least)
 int32 cranked::playdate_lua_registerClass(Cranked *cranked, uint8 *name, lua_reg_32 *reg, lua_val_32 *vals, int32 isstatic, cref_t *outErr) {
-    if (!cranked->getLuaContext()) {
+    auto context = cranked->getLuaContext();
+    if (!context) {
         if (outErr)
             *outErr = cranked->getEmulatedStringLiteral("Lua environment not initialized");
-        return 0;
+        return false;
     }
-    // Todo
-    return 0;
+    // Todo: Is there a benefit to respecting isstatic?
+    lua_newtable(context);
+    lua_pushstring(context, "__index");
+    lua_pushvalue(context, -2);
+    lua_rawset(context, -3);
+    lua_pushstring(context, "__name");
+    lua_pushstring(context, (char *)name);
+    lua_rawset(context, -3);
+
+    while (reg and reg->func and reg->name) {
+        lua_pushstring(context, cranked->nativeEngine.fromVirtualAddress<char>(reg->name));
+        cranked->nativeEngine.pushEmulatedLuaFunction(reg->func);
+        lua_rawset(context, -3);
+        reg++;
+    }
+    while (vals and vals->name) {
+        lua_pushstring(context, cranked->nativeEngine.fromVirtualAddress<char>(vals->name));
+        switch (vals->type) {
+            case 0: // Int
+                lua_pushinteger(context, (int)vals->v.intval);
+                break;
+            case 1: // Float
+                lua_pushnumber(context, vals->v.floatval);
+                break;
+            case 2: // String
+                lua_pushstring(context, cranked->nativeEngine.fromVirtualAddress<char>(vals->v.strval));
+                break;
+            default: // Todo: Error on unknown type?
+                lua_pushnil(context);
+                break;
+        }
+        lua_rawset(context, -3);
+        vals++;
+    }
+    cranked->luaEngine.setQualifiedLuaGlobal((char *)name);
+    if (outErr)
+        *outErr = 0; // Todo: Error conditions (Already exists?)
+    return true;
 }
 
 void cranked::playdate_lua_pushFunction(Cranked *cranked, cref_t f) {
@@ -933,8 +1004,17 @@ void cranked::playdate_lua_pushFunction(Cranked *cranked, cref_t f) {
 }
 
 int32 cranked::playdate_lua_indexMetatable(Cranked *cranked) {
-    // Todo
-    return 0;
+    auto context = cranked->getLuaContext();
+    if (!context)
+        return false;
+    if (!lua_getmetatable(context, 1))
+        return false;
+    lua_pushvalue(context, 2);
+    if (!lua_rawget(context, 1)) {
+        lua_pop(context, 1);
+        return false;
+    }
+    return true;
 }
 
 void cranked::playdate_lua_stop(Cranked *cranked) {
@@ -948,24 +1028,40 @@ void cranked::playdate_lua_start(Cranked *cranked) {
 int32 cranked::playdate_lua_getArgCount(Cranked *cranked) {
     if (!cranked->getLuaContext())
         return 0;
-    return lua_gettop(cranked->getLuaContext());
+    return lua_gettop(cranked->getLuaContext()); // Todo: Is this sufficient? Or should it not change when the stack top moves?
 }
 
 int32 cranked::playdate_lua_getArgType(Cranked *cranked, int32 pos, cref_t *outClass) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (!context) {
+        if (outClass)
+            *outClass = 0;
         return 0;
-    return 0;
+    }
+    int type = lua_type(context, pos);
+    if (outClass) {
+        if (lua_getmetatable(context, pos)) {
+            lua_pushstring(context, "__name");
+            lua_rawget(context, -2);
+            *outClass = cranked->nativeEngine.getEmulatedStringLiteral(lua_tostring(context, -1));
+            lua_pop(context, 2);
+        } else
+            *outClass = 0;
+    }
+    return type;
 }
 
 int32 cranked::playdate_lua_argIsNil(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
-        return 0;
+        return false;
     return lua_isnil(cranked->getLuaContext(), pos);
 }
 
+// Todo: Do the getArg functions convert the argument if the type is different? Or should these be making copies first?
+
 int32 cranked::playdate_lua_getArgBool(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
-        return 0;
+        return false;
     return lua_toboolean(cranked->getLuaContext(), pos);
 }
 
@@ -997,24 +1093,35 @@ uint8 *cranked::playdate_lua_getArgBytes(Cranked *cranked, int32 pos, uint32 *ou
 }
 
 void *cranked::playdate_lua_getArgObject(Cranked *cranked, int32 pos, uint8 *type, cref_t *outud) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (outud)
+        *outud = 0;
+    if (!context)
         return nullptr;
-    // Todo
-    return nullptr;
+    if (!lua_getmetatable(context, pos))
+        return nullptr;
+    lua_pushstring(context, "__name");
+    lua_rawget(context, -2);
+    auto name = lua_tostring(context, -1);
+    bool good = name and string(name) == (char *)type;
+    lua_pop(context, 2);
+    if (!good)
+        return nullptr;
+    if (outud)
+        *outud = HEAP_ADDRESS + lua_gettop(context);
+    return *(void **)lua_touserdata(context, pos);
 }
 
 Bitmap cranked::playdate_lua_getBitmap(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
-    // Todo
-    return nullptr;
+    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<LCDBitmap_32>(); // Todo: Should this add a reference?
 }
 
 Sprite cranked::playdate_lua_getSprite(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
-    // Todo
-    return nullptr;
+    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<LCDSprite_32>(); // Todo: Should this add a reference?
 }
 
 void cranked::playdate_lua_pushNil(Cranked *cranked) {
@@ -1056,46 +1163,59 @@ void cranked::playdate_lua_pushBytes(Cranked *cranked, uint8 *str, uint32 len) {
 void cranked::playdate_lua_pushBitmap(Cranked *cranked, Bitmap bitmap) {
     if (!cranked->getLuaContext())
         return;
-    // Todo: Ownership?
+    cranked->luaEngine.pushImage(bitmap);
 }
 
 void cranked::playdate_lua_pushSprite(Cranked *cranked, Sprite sprite) {
     if (!cranked->getLuaContext())
         return;
-    // Todo: Ownership?
+    cranked->luaEngine.pushSprite(sprite);
 }
 
 LuaUDObject_32 *cranked::playdate_lua_pushObject(Cranked *cranked, void* obj, uint8 *type, int32 nValues) {
-    if (!cranked->getLuaContext())
+    // Todo: Behavior on missing class? Just return null and push nothing? Push Nil?
+    auto context = cranked->getLuaContext();
+    if (!context)
         return nullptr;
-    // Todo
-    return nullptr;
+    auto data = (void **)lua_newuserdatauv(context, sizeof(void *), nValues); // Just store a single pointer in the data block
+    *data = obj;
+    int pos = lua_gettop(context);
+    cranked->luaEngine.getQualifiedLuaGlobal((char *)type);
+    lua_setmetatable(context, -2);
+    return (LuaUDObject_32 *)((char *)cranked->heap.baseAddress() + pos);
 }
 
 LuaUDObject_32 *cranked::playdate_lua_retainObject(Cranked *cranked, LuaUDObject_32 *obj) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (!context)
         return nullptr;
-    // Todo: Presumably this should hold a strong reference in an internal global table so object isn't GC'd and so it can be referenced with a C pointer off the stack
-    return nullptr;
+    int pos = int((intptr_t)obj - (intptr_t)cranked->heap.baseAddress());
+    cranked->luaEngine.preserveLuaValue(pos);
+    return obj;
 }
 
 void cranked::playdate_lua_releaseObject(Cranked *cranked, LuaUDObject_32 *obj) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (!context)
         return;
-    // Todo
+    int pos = int((intptr_t)obj - (intptr_t)cranked->heap.baseAddress());;
+    cranked->luaEngine.releaseLuaValue(pos);
 }
 
 void cranked::playdate_lua_setUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32 slot) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (!context)
         return;
-    // Todo
+    lua_pushvalue(context, -1); // Todo: Verify that this should copy
+    lua_setiuservalue(context, int((intptr_t)obj - (intptr_t)cranked->heap.baseAddress()), (int)slot);
 }
 
 int32 cranked::playdate_lua_getUserValue(Cranked *cranked, LuaUDObject_32 *obj, uint32 slot) {
-    if (!cranked->getLuaContext())
+    auto context = cranked->getLuaContext();
+    if (!context)
         return 0;
-    // Todo
-    return 0;
+    lua_getiuservalue(context, int((intptr_t)obj - (intptr_t)cranked->heap.baseAddress()), (int)slot);
+    return lua_gettop(context);
 }
 
 void cranked::playdate_lua_callFunction_deprecated(Cranked *cranked, uint8 *name, int32 nargs) {
@@ -1129,7 +1249,7 @@ int32 cranked::playdate_lua_callFunction(Cranked *cranked, uint8 *name, int32 na
 }
 
 void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encoder, cref_t write, void *userdata, int32 pretty) {
-    // Encoder API is stored directly after Playdate API, as subtract json_encoder_32 struct size from API size to get address
+    // Encoder API is stored directly after Playdate API, subtract json_encoder_32 struct size from API size to get address
     *encoder = *cranked->fromVirtualAddress<json_encoder_32>(API_ADDRESS + cranked->nativeEngine.getApiSize() - sizeof(json_encoder_32));
     encoder->writeStringFunc = write;
     encoder->userdata = cranked->toVirtualAddress(userdata);
@@ -1139,7 +1259,7 @@ void cranked::playdate_json_initEncoder(Cranked *cranked, json_encoder_32 *encod
 // Todo: Fix this mess
 static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_32 *outval, const string &data) {
     struct JsonContext {
-        inline JsonContext(Cranked *emu, json_decoder_32 *decoder, const vector<char> &path) : decoder(*decoder), path(path.begin(), path.end(), emu->heap.allocator<char>()) {}
+        JsonContext(Cranked *emu, json_decoder_32 *decoder, const vector<char> &path) : decoder(*decoder), path(path.begin(), path.end(), emu->heap.allocator<char>()) {}
         json_decoder_32 decoder;
         vheap_vector<char> path;
         bool inArray{};
@@ -1147,7 +1267,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
         string lastKey;
     };
     const string rootString = "_root";
-    vheap_vector<JsonContext> stack(cranked->heap.allocator<JsonContext>());
+    vheap_vector stack(cranked->heap.allocator<JsonContext>());
     nlohmann::json::parser_callback_t cb = [&](int depth, nlohmann::json::parse_event_t event, nlohmann::json &parsed) -> bool {
         switch (event) {
             case nlohmann::json::parse_event_t::object_start:
@@ -1155,7 +1275,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 bool isRoot = stack.empty();
                 bool isArray = event == nlohmann::json::parse_event_t::array_start;
                 if (isRoot)
-                    stack.emplace_back(cranked, functions, vector<char>(rootString.begin(), rootString.end() + 1));
+                    stack.emplace_back(cranked, functions, vector(rootString.begin(), rootString.end() + 1));
                 auto &context = stack.back();
                 bool inArray = context.inArray;
                 bool willDecode = not inArray;
@@ -1171,11 +1291,11 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
 //                        stack.back().arrayIndex++;
                         string path(context.path.begin(), context.path.end());
                         path += "[" + to_string(context.arrayIndex) + "]";
-                        stack.emplace_back(cranked, &context.decoder, vector<char>(path.begin(), path.end() + 1)); // Todo: Does this copy the original or the current context?
+                        stack.emplace_back(cranked, &context.decoder, vector(path.begin(), path.end() + 1)); // Todo: Does this copy the original or the current context?
                     } else {
                         string path(context.path.begin(), context.path.end());
                         path += "." + context.lastKey;
-                        stack.emplace_back(cranked, &context.decoder, vector<char>(path.begin(), path.end() + 1));
+                        stack.emplace_back(cranked, &context.decoder, vector(path.begin(), path.end() + 1));
                     }
                 }
                 auto &newContext = stack.back();
@@ -1214,7 +1334,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                             cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeArrayValue, &parentContext.decoder, parentContext.arrayIndex, sublist);
                     } else {
-                        auto keyData = vheap_vector<char>(parentContext.lastKey.begin(), parentContext.lastKey.end() + 1, cranked->heap.allocator<char>());
+                        auto keyData = vheap_vector(parentContext.lastKey.begin(), parentContext.lastKey.end() + 1, cranked->heap.allocator<char>());
                         if (parentContext.decoder.didDecodeTableValue)
                             cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeTableValue, &parentContext.decoder, keyData.data(), sublist);
@@ -1232,7 +1352,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 if (context.decoder.returnString)
                     return true;
                 auto key = parsed.get<string>();
-                auto keyData = vheap_vector<char>(key.begin(), key.end(), cranked->heap.allocator<char>());
+                auto keyData = vheap_vector(key.begin(), key.end(), cranked->heap.allocator<char>());
                 bool shouldDecode = true;
                 context.lastKey = key;
                 if (context.decoder.shouldDecodeTableValueForKey)
@@ -1247,7 +1367,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 auto &context = stack.back();
                 if (context.decoder.returnString)
                     return true;
-                auto stringValue = vheap_vector<char>(cranked->heap.allocator<char>()); // Todo: Is this expected to be valid after the `didDecode` functions?
+                auto stringValue = vheap_vector(cranked->heap.allocator<char>()); // Todo: Is this expected to be valid after the `didDecode` functions?
                 auto parseValue = [&]{
                     json_value_32 value{};
                     if (parsed.is_null())
@@ -1269,7 +1389,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                         value.type = (int) JsonValueType::Float;
                     } else
                         throw CrankedError("Invalid JSON value type");
-                    return value;
+                    return value; // NOLINT: Value is not uninitialized
                 };
                 if (context.inArray) {
                     bool shouldDecode = true;
@@ -1283,7 +1403,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                                     (context.decoder.didDecodeArrayValue, &stack.back().decoder, context.arrayIndex, parseValue());
                     }
                 } else {
-                    auto keyData = vheap_vector<char>(context.lastKey.begin(), context.lastKey.end(), cranked->heap.allocator<char>());
+                    auto keyData = vheap_vector(context.lastKey.begin(), context.lastKey.end(), cranked->heap.allocator<char>());
                     if (context.decoder.didDecodeTableValue)
                         cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                 (context.decoder.didDecodeTableValue, &stack.back().decoder, keyData.data(), parseValue());
@@ -1308,7 +1428,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
 int32 cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functions, json_reader_32 reader, json_value_32 *outval) {
     constexpr int BUFFER_SEGMENT = 512;
     int size = 0;
-    vheap_vector<char> buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
+    vheap_vector buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
     while (true) {
         int returned = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
                 (reader.read, reader.userdata, buffer.data() + size, buffer.size() - size);
@@ -1324,18 +1444,18 @@ int32 cranked::playdate_json_decodeString(Cranked *cranked, json_decoder_32 *fun
     return json_decode(cranked, functions, outval, (const char *) jsonString);
 }
 
-inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, cref_t string, int len) {
+static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, cref_t string, int len) {
     cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint32_t, ArgType::uint32_t, ArgType::int32_t>
             (encoder->writeStringFunc, encoder->userdata, string, len);
 }
 
-inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const char *string) {
+static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const char *string) {
     encoderWrite(cranked, encoder, cranked->getEmulatedStringLiteral(string), (int)strlen(string));
 }
 
-inline static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const string &string) {
+static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const string &string) {
     // Use vector rather than heap_string to prevent non-heap addresses for small strings
-    auto data = vheap_vector<char>(string.c_str(), string.c_str() + string.size(), cranked->heap.allocator<char>());
+    auto data = vheap_vector(string.c_str(), string.c_str() + string.size(), cranked->heap.allocator<char>());
     encoderWrite(cranked, encoder, cranked->toVirtualAddress(data.data()), (int)string.length());
 }
 
@@ -1506,8 +1626,9 @@ void cranked::playdate_sprite_freeSprite(Cranked *cranked, Sprite sprite) {
 }
 
 Sprite cranked::playdate_sprite_copy(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return nullptr;
+    auto copy = sprite->copy();
+    copy->reference();
+    return copy;
 }
 
 void cranked::playdate_sprite_addSprite(Cranked *cranked, Sprite sprite) {
@@ -1522,7 +1643,7 @@ void cranked::playdate_sprite_removeSprites(Cranked *cranked, cref_t *sprites, i
     auto &drawList = cranked->graphics.spriteDrawList;
     for (int i = 0; i < count; i++) {
         auto *sprite = cranked->nativeEngine.fromVirtualAddress<LCDSprite_32>(sprites[i]);
-        eraseByEquivalentKey(cranked->graphics.spriteDrawList, sprite);
+        eraseByEquivalentKey(drawList, sprite);
     }
 }
 
@@ -1661,11 +1782,11 @@ void cranked::playdate_sprite_setDrawFunction(Cranked *cranked, Sprite sprite, c
 }
 
 void cranked::playdate_sprite_getPosition(Cranked *cranked, Sprite sprite, float *x, float *y) {
-    auto pos = sprite->getPosition();
+    auto [posX, posY] = sprite->getPosition();
     if (x)
-        *x = pos.x;
+        *x = posX;
     if(y)
-        *y = pos.y;
+        *y = posY;
 }
 
 void cranked::playdate_sprite_resetCollisionWorld(Cranked *cranked) {
@@ -1733,19 +1854,28 @@ SpriteCollisionInfo_32 *cranked::playdate_sprite_moveWithCollisions(Cranked *cra
     return moveOrCheckCollisions(cranked, sprite, goalX, goalY, actualX, actualY, len, false);
 }
 
+static cref_t *returnSpriteList(Cranked *cranked, const vector<Sprite> &sprites, int32 *len) {
+    int count = (int)sprites.size();
+    if (len)
+        *len = count;
+    if (count == 0)
+        return nullptr;
+    auto results = (cref_t *)cranked->heap.allocate(sizeof(cref_t) * count);
+    for (int i = 0; i < count; i++)
+        results[i] = cranked->nativeEngine.toVirtualAddress(sprites[i]);
+    return results;
+}
+
 cref_t *cranked::playdate_sprite_querySpritesAtPoint(Cranked *cranked, float x, float y, int32 *len) {
-    // Todo
-    return nullptr;
+    return returnSpriteList(cranked, cranked->bump.queryPoint({ x, y }), len);
 }
 
 cref_t *cranked::playdate_sprite_querySpritesInRect(Cranked *cranked, float x, float y, float width, float height, int32 *len) {
-    // Todo
-    return nullptr;
+    return returnSpriteList(cranked, cranked->bump.queryRect({ x, y, width, height }), len);
 }
 
 cref_t *cranked::playdate_sprite_querySpritesAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32 *len) {
-    // Todo
-    return nullptr;
+    return returnSpriteList(cranked, cranked->bump.querySegment({ x1, y1, x2, y2 }), len);
 }
 
 SpriteQueryInfo_32 *cranked::playdate_sprite_querySpriteInfoAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32 *len) {
@@ -1766,21 +1896,31 @@ SpriteQueryInfo_32 *cranked::playdate_sprite_querySpriteInfoAlongLine(Cranked *c
 }
 
 cref_t *cranked::playdate_sprite_overlappingSprites(Cranked *cranked, Sprite sprite, int32 *len) {
-    // Todo
-    return nullptr;
+    return returnSpriteList(cranked, cranked->bump.queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; }), len);
 }
 
 cref_t *cranked::playdate_sprite_allOverlappingSprites(Cranked *cranked, int32 *len) {
-    // Todo
-    return nullptr;
+    unordered_map<Sprite, unordered_set<Sprite>> overlapping;
+    std::vector<Sprite> results;
+    for (const SpriteRef &ref : cranked->graphics.spriteDrawList) {
+        for (auto sprite = ref.get(); auto overlap : cranked->bump.queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; })) {
+            if (overlapping[overlap].contains(sprite) or !overlapping[sprite].emplace(overlap).second)
+                continue;
+            results.emplace_back(sprite);
+            results.emplace_back(overlap);
+        }
+    }
+    return returnSpriteList(cranked, results, len);
 }
 
-void cranked::playdate_sprite_setStencilPattern(Cranked *cranked, Sprite sprite, uint8 pattern) {
-    // Todo
+void cranked::playdate_sprite_setStencilPattern(Cranked *cranked, Sprite sprite, uint8 *pattern) {
+    sprite->stencil = cranked->heap.construct<LCDBitmap_32>(*cranked, 8, 8);
+    memcpy(sprite->stencil->data.data(), pattern, 8);
+    sprite->stencilTiled = true; // Is this right?
 }
 
 void cranked::playdate_sprite_clearStencil(Cranked *cranked, Sprite sprite) {
-    // Todo
+    sprite->stencil = nullptr;
 }
 
 void cranked::playdate_sprite_setUserdata(Cranked *cranked, Sprite sprite, void *userdata) {
@@ -1792,7 +1932,8 @@ void *cranked::playdate_sprite_getUserdata(Cranked *cranked, Sprite sprite) {
 }
 
 void cranked::playdate_sprite_setStencilImage(Cranked *cranked, Sprite sprite, Bitmap stencil, int32 tile) {
-    // Todo
+    sprite->stencil = stencil;
+    sprite->stencilTiled = tile;
 }
 
 void cranked::playdate_sprite_setCenter(Cranked *cranked, Sprite s, float x, float y) {
@@ -1812,8 +1953,10 @@ void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource c, f
 }
 
 void cranked::playdate_sound_source_getVolume(Cranked *cranked, SoundSource c, float *outl, float *outr) {
-    *outl = c->leftVolume;
-    *outr = c->rightVolume;
+    if (outl)
+        *outl = c->leftVolume;
+    if (outr)
+        *outr = c->rightVolume;
 }
 
 int32 cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource c) {
@@ -1866,8 +2009,10 @@ void cranked::playdate_sound_fileplayer_setVolume(Cranked *cranked, FilePlayer p
 }
 
 void cranked::playdate_sound_fileplayer_getVolume(Cranked *cranked, FilePlayer player, float *left, float *right) {
-    *left = player->leftVolume;
-    *right = player->rightVolume;
+    if (left)
+        *left = player->leftVolume;
+    if (right)
+        *right = player->rightVolume;
 }
 
 float cranked::playdate_sound_fileplayer_getLength(Cranked *cranked, FilePlayer player) {
@@ -1996,8 +2141,10 @@ void cranked::playdate_sound_sampleplayer_setVolume(Cranked *cranked, SamplePlay
 }
 
 void cranked::playdate_sound_sampleplayer_getVolume(Cranked *cranked, SamplePlayer player, float *left, float *right) {
-    *left = player->leftVolume;
-    *right = player->rightVolume;
+    if (left)
+        *left = player->leftVolume;
+    if (right)
+        *right = player->rightVolume;
 }
 
 float cranked::playdate_sound_sampleplayer_getLength(Cranked *cranked, SamplePlayer player) {
@@ -2193,11 +2340,11 @@ void cranked::playdate_sound_synth_setWaveform(Cranked *cranked, Synth synth, in
 }
 
 void cranked::playdate_sound_synth_setGenerator(Cranked *cranked, Synth synth, int32 stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void *userdata) {
-    cranked::playdate_sound_synth_setGenerator_deprecated(cranked, synth, stereo, render, noteOn, release, setparam, dealloc, userdata);
+    playdate_sound_synth_setGenerator_deprecated(cranked, synth, stereo, render, noteOn, release, setparam, dealloc, userdata);
     synth->generatorCopyUserdataFunc = copyUserdata;
 }
 
-Synth  cranked::playdate_sound_synth_copy(Cranked *cranked, Synth  synth) {
+Synth cranked::playdate_sound_synth_copy(Cranked *cranked, Synth synth) {
     return nullptr; // Todo
 }
 
@@ -2294,8 +2441,10 @@ void cranked::playdate_sound_synth_setVolume(Cranked *cranked, Synth synth, floa
 }
 
 void cranked::playdate_sound_synth_getVolume(Cranked *cranked, Synth synth, float *left, float *right) {
-    *left = synth->leftVolume;
-    *right = synth->rightVolume;
+    if (left)
+        *left = synth->leftVolume;
+    if (right)
+        *right = synth->rightVolume;
 }
 
 int32 cranked::playdate_sound_synth_isPlaying(Cranked *cranked, Synth synth) {
@@ -2306,7 +2455,7 @@ SynthEnvelope cranked::playdate_sound_synth_getEnvelope(Cranked *cranked, Synth 
     return synth->envelope.get();
 }
 
-int32 cranked::playdate_sound_synth_setWavetable(Cranked *cranked, Synth  synth, AudioSample sample, int32 log2size, int32 columns, int32 rows) {
+int32 cranked::playdate_sound_synth_setWavetable(Cranked *cranked, Synth synth, AudioSample sample, int32 log2size, int32 columns, int32 rows) {
     return 0; // Todo
 }
 
@@ -2387,8 +2536,10 @@ void cranked::playdate_sound_instrument_setVolume(Cranked *cranked, SynthInstrum
 }
 
 void cranked::playdate_sound_instrument_getVolume(Cranked *cranked, SynthInstrument inst, float *left, float *right) {
-    *left = inst->leftVolume;
-    *right = inst->rightVolume;
+    if (left)
+        *left = inst->leftVolume;
+    if (right)
+        *right = inst->rightVolume;
 }
 
 int32 cranked::playdate_sound_instrument_activeVoiceCount(Cranked *cranked, SynthInstrument inst) {
@@ -2917,7 +3068,7 @@ int32 cranked::playdate_display_getHeight(Cranked *cranked) {
 }
 
 void cranked::playdate_display_setRefreshRate(Cranked *cranked, float rate) {
-    cranked->graphics.framerate = max(1.0f, rate);
+    cranked->graphics.framerate = rate;
 }
 
 void cranked::playdate_display_setInverted(Cranked *cranked, int32 flag) {
@@ -2976,4 +3127,4 @@ void cranked::playdate_scoreboards_freeScoresList(Cranked *cranked, PDScoresList
     // Todo
 }
 
-#pragma clang diagnostic pop
+// NOLINTEND(*-non-const-parameter)

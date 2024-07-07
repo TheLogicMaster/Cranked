@@ -30,13 +30,15 @@ NULL_STRUCT_FIELDS = {
 
 
 class CType:
-    def __init__(self, c_type: str, emu_type=None, wrapper_type=None, array=''):
+    def __init__(self, c_type: str, emu_type=None, wrapper_type=None):
         self.c_type = c_type.strip()
         if emu_type is not None:
             self.emu_type = emu_type
             self.wrapper_type = wrapper_type
             return
-        ptr = array.count('[')
+        ptr = c_type.count('[')
+        if ptr > 0:
+            c_type = c_type.split('[', 1)[0]
         c_type = re.sub(r'(?:(?<!\w)const\s)+', '', c_type, re.MULTILINE)
         c_type = c_type.strip()
         if match := re.match(r'\s*struct (\w+)\s*\*', c_type):
@@ -275,7 +277,7 @@ def main():
                                 elif ptr_match := re.match(rf'{FUNC_PTR_PATTERN}$', arg):
                                     args.append(CField(ptr_match[2], CType(arg, emu_type='uint32_t', wrapper_type='cref_t')))
                                 elif ptr_match := re.match(rf'{PARAM_PATTERN}$', arg):
-                                    args.append(CField(ptr_match[2], get_type(ptr_match[1])))
+                                    args.append(CField(ptr_match[2], get_type(ptr_match[1] + (ptr_match[3] if ptr_match[3] else ''))))
                                 else:
                                     raise Exception(f'Failed to parse function pointer arg: `{arg}`')
                         return args

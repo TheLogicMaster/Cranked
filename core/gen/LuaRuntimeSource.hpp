@@ -21,7 +21,7 @@ constexpr char LUA_RUNTIME_SOURCE[] =
 	"    printNewlines = true,\n"
 	"    inputHandlers = { { handler = playdate, masks = false } },\n"
 	"    menuCallbacks = {},\n"
-	"    references = {}, -- Mapping of native resources to owner tables for internally used resources\n"
+	"    preserved = {}, -- Mapping of value to reference count for preserved Lua values\n"
 	"    updateThread = nil,\n"
 	"}\n"
 	"\n"

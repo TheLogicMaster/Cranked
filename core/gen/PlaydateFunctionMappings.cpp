@@ -188,7 +188,7 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_sprite_querySpriteInfoAlongLine", (void *) playdate_sprite_querySpriteInfoAlongLine, { ArgType::float_t, ArgType::float_t, ArgType::float_t, ArgType::float_t, ArgType::ptr_t }, ArgType::ptr_t },
 	{ "playdate_sprite_overlappingSprites", (void *) playdate_sprite_overlappingSprites, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::ptr_t },
 	{ "playdate_sprite_allOverlappingSprites", (void *) playdate_sprite_allOverlappingSprites, { ArgType::ptr_t }, ArgType::ptr_t },
-	{ "playdate_sprite_setStencilPattern", (void *) playdate_sprite_setStencilPattern, { ArgType::ptr_t, ArgType::uint8_t }, ArgType::void_t },
+	{ "playdate_sprite_setStencilPattern", (void *) playdate_sprite_setStencilPattern, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_sprite_clearStencil", (void *) playdate_sprite_clearStencil, { ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_sprite_setUserdata", (void *) playdate_sprite_setUserdata, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_sprite_getUserdata", (void *) playdate_sprite_getUserdata, { ArgType::ptr_t }, ArgType::ptr_t },

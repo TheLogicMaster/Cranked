@@ -17,8 +17,8 @@ Files::Files(Cranked &cranked) : cranked(cranked) {}
 
 void Files::init() {
     romDataPath = appDataPath / cranked.rom->getBundleID();
-    filesystem::create_directory(appDataPath);
-    filesystem::create_directory(romDataPath);
+    create_directory(appDataPath);
+    create_directory(romDataPath);
 }
 
 void Files::reset() {
@@ -34,21 +34,21 @@ void Files::reset() {
     lastError = 0;
 }
 
-static string sanitizePath(const string &path) {
+static string sanitizePath(const string &path) { // Todo: Should use lexically_normal
     return regex_replace(path, regex("\\.\\."), ""); // This is pretty crude, but should hopefully protect against inadvertent directory traversal
 }
 
 int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
-    auto base = filesystem::path(path ? path : "").lexically_normal();
+    auto base = fs::path(path ? path : "").lexically_normal();
 
     bool exists = false;
 
     auto dataPath = base.empty() ? romDataPath : romDataPath / base;
-    if (filesystem::exists(dataPath) and filesystem::is_directory(dataPath)) {
+    if (fs::exists(dataPath) and is_directory(dataPath)) {
         try {
-            for (auto &entry: filesystem::directory_iterator(dataPath))
+            for (auto &entry: fs::directory_iterator(dataPath))
                 if (showHidden or !entry.path().filename().string().starts_with("."))
-                    files.emplace_back(string(filesystem::path(entry).lexically_relative(dataPath)) + (entry.is_directory() ? "/" : ""));
+                    files.emplace_back(string(fs::path(entry).lexically_relative(dataPath)) + (entry.is_directory() ? "/" : ""));
         } catch (exception &ex) {
             lastError = cranked.getEmulatedStringLiteral(ex.what());
             return -1;
@@ -59,7 +59,7 @@ int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
     if (base.empty() or cranked.rom->findRomFile(base)) {
         auto romFiles = cranked.rom->listRomFiles(base, false);
         for (auto &file : romFiles) {
-            if (!showHidden and filesystem::path(file).filename().string().starts_with('.'))
+            if (!showHidden and fs::path(file).filename().string().starts_with('.'))
                  continue;
             files.emplace_back(file);
         }
@@ -70,7 +70,7 @@ int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
 }
 
 bool Files::exists(const string &path) {
-    if (filesystem::exists(romDataPath / path))
+    if (fs::exists(romDataPath / path))
         return true;
     return cranked.rom->findRomFile(path) != nullptr;
 }
@@ -78,7 +78,7 @@ bool Files::exists(const string &path) {
 int Files::mkdir(const string &path) {
     // Documentation lies, both Lua and C API create intermediate directories
     try {
-        filesystem::create_directories(romDataPath / sanitizePath(path));
+        create_directories(romDataPath / sanitizePath(path));
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -88,7 +88,7 @@ int Files::mkdir(const string &path) {
 
 int Files::rename(const string &path, const string &newPath) {
     try {
-        filesystem::rename(romDataPath / sanitizePath(path), romDataPath / sanitizePath(newPath));
+        fs::rename(romDataPath / sanitizePath(path), romDataPath / sanitizePath(newPath));
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -100,9 +100,9 @@ int Files::unlink(const string &path, bool recursive) {
     auto sanitized = sanitizePath(path);
     try {
         if (recursive)
-            filesystem::remove_all(romDataPath / sanitized);
+            remove_all(romDataPath / sanitized);
         else
-            filesystem::remove(romDataPath / sanitized);
+            fs::remove(romDataPath / sanitized);
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -131,12 +131,13 @@ int Files::stat(const string &path, FileStat_32 &stat) {
         stat.m_minute = (int) time.minutes().count();
         stat.m_second = (int) time.seconds().count();
     };
-    if (filesystem::exists(dataPath)) {
-        stat.isdir = filesystem::is_directory(dataPath);
-        stat.size = (uint32) filesystem::file_size(dataPath);
-        setTime(to_time_t(filesystem::last_write_time(dataPath)));
+    if (fs::exists(dataPath)) {
+        stat.isdir = is_directory(dataPath);
+        stat.size = (uint32)file_size(dataPath);
+        setTime(to_time_t(last_write_time(dataPath)));
         return 0;
-    } else if (romFile) {
+    }
+    if (romFile) {
         stat.isdir = false;
         stat.size = (uint32) romFile->data.size();
         setTime(romFile->modTime);
@@ -150,7 +151,7 @@ File Files::open(const char *path, FileOptions mode) {
         lastError = cranked.getEmulatedStringLiteral("Invalid path");
         return nullptr;
     }
-    auto normalized = filesystem::path(path).lexically_normal();
+    auto normalized = fs::path(path).lexically_normal();
 
     auto dataPath = romDataPath / normalized;
     if (mode == FileOptions::Write or mode == FileOptions::Append) {
@@ -166,7 +167,7 @@ File Files::open(const char *path, FileOptions mode) {
     }
 
     if (mode == FileOptions::ReadData or mode == FileOptions::ReadDataFallback) {
-        if (filesystem::exists(dataPath) and !filesystem::is_directory(dataPath)) {
+        if (fs::exists(dataPath) and !is_directory(dataPath)) {
             auto fd = fopen(dataPath.c_str(), "rb");
             if (!fd) {
                 lastError = cranked.getEmulatedStringLiteral("Failed to open file");
@@ -245,7 +246,7 @@ string Files::readline(File file) {
             break;
         if (value == '\n')
             break;
-        else if (value == '\r') {
+        if (value == '\r') {
             read(file, &value, 1); // Read presumed following '\n', ignoring all errors
         } else
             line += value;
@@ -271,15 +272,14 @@ int Files::read(File file, void *buf, int len) {
             ((char *) buf)[i] = (char) c;
         }
         return len;
-    } else {
-        auto romData = file->romData;
-        auto length = min(len, (int) romData->size() - file->romFilePosition);
-        if (length <= 0)
-            return 0;
-        memcpy(buf, romData->data() + file->romFilePosition, length);
-        file->romFilePosition += length;
-        return length;
     }
+    auto romData = file->romData;
+    auto length = min(len, (int) romData->size() - file->romFilePosition);
+    if (length <= 0)
+        return 0;
+    memcpy(buf, romData->data() + file->romFilePosition, length);
+    file->romFilePosition += length;
+    return length;
 }
 
 int Files::write(File file, void *buf, int len) {
@@ -302,26 +302,24 @@ int Files::seek(File file, int pos, int whence) {
     }
     if (file->file)
         return fseek(file->file, pos, whence) ? -1 : 0;
+    auto romData = file->romData;
+    int target;
+    if (whence == SEEK_END)
+        target = (int) romData->size() + pos;
+    else if (whence == SEEK_CUR)
+        target = file->romFilePosition + pos;
+    else if (whence == SEEK_SET)
+        target = pos;
     else {
-        auto romData = file->romData;
-        int target;
-        if (whence == SEEK_END)
-            target = (int) romData->size() + pos;
-        else if (whence == SEEK_CUR)
-            target = file->romFilePosition + pos;
-        else if (whence == SEEK_SET)
-            target = pos;
-        else {
-            lastError = cranked.getEmulatedStringLiteral("Invalid seek whence");
-            return -1;
-        }
-        if (target > romData->size()) {
-            lastError = cranked.getEmulatedStringLiteral("Invalid seek offset");
-            return -1;
-        }
-        file->romFilePosition = target;
-        return 0;
+        lastError = cranked.getEmulatedStringLiteral("Invalid seek whence");
+        return -1;
     }
+    if (target > romData->size()) {
+        lastError = cranked.getEmulatedStringLiteral("Invalid seek offset");
+        return -1;
+    }
+    file->romFilePosition = target;
+    return 0;
 }
 
 int Files::tell(File file) {
@@ -331,6 +329,5 @@ int Files::tell(File file) {
     }
     if (file->file)
         return (int) ftell(file->file);
-    else
-        return file->romFilePosition;
+    return file->romFilePosition;
 }

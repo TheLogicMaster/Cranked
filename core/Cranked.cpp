@@ -68,7 +68,10 @@ void Cranked::update() {
     auto currentMillisStart = chrono::system_clock::now();
 
     auto currentTime = chrono::system_clock::now();
-    if (currentTime > lastFrameTime + chrono::milliseconds(int(1 / graphics.framerate))) {
+    if (graphics.framerate <= 0 or currentTime > lastFrameTime + chrono::milliseconds(int(1000 / graphics.framerate))) {
+        lastFrameDelta = (float)chrono::duration_cast<chrono::microseconds>(currentTime - lastFrameTime).count() / 1000.0f;
+        lastFrameTime = currentTime;
+
         pressedInputs = currentInputs & ~previousInputs;
         releasedInputs = ~currentInputs & previousInputs;
 
@@ -148,7 +151,6 @@ void Cranked::update() {
             }
 
             if (!disableUpdateLoop and currentTime > suspendUpdateLoopUntil) {
-                lastFrameTime = currentTime;
                 if (nativeEngine.hasUpdateCallback()) {
                     if (nativeEngine.invokeUpdateCallback())
                         graphics.flushDisplayBuffer();
@@ -166,6 +168,8 @@ void Cranked::update() {
     updateInternals();
 
     currentMillis += duration_cast<chrono::milliseconds>((chrono::system_clock::now() - currentMillisStart)).count(); // Todo: Does this increase while locked/in-menu?
+
+    FrameMark; // Todo: This isn't ideal since a single update call can span multiple frames at present
 }
 
 void Cranked::start() {

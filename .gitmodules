@@ -59,3 +59,6 @@
 	path = core/libs/asio
 	url = https://github.com/boostorg/asio
 	update = merge
+[submodule "core/libs/tracy"]
+	path = core/libs/tracy
+	url = https://github.com/wolfpld/tracy

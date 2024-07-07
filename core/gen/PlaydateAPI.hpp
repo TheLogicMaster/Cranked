@@ -967,7 +967,7 @@ cref_t * playdate_sprite_querySpritesAlongLine(Cranked *cranked, float x1, float
 SpriteQueryInfo_32 * playdate_sprite_querySpriteInfoAlongLine(Cranked *cranked, float x1, float y1, float x2, float y2, int32_t * len);
 cref_t * playdate_sprite_overlappingSprites(Cranked *cranked, LCDSprite_32 * sprite, int32_t * len);
 cref_t * playdate_sprite_allOverlappingSprites(Cranked *cranked, int32_t * len);
-void playdate_sprite_setStencilPattern(Cranked *cranked, LCDSprite_32 * sprite, uint8_t pattern);
+void playdate_sprite_setStencilPattern(Cranked *cranked, LCDSprite_32 * sprite, uint8_t * pattern);
 void playdate_sprite_clearStencil(Cranked *cranked, LCDSprite_32 * sprite);
 void playdate_sprite_setUserdata(Cranked *cranked, LCDSprite_32 * sprite, void * userdata);
 void * playdate_sprite_getUserdata(Cranked *cranked, LCDSprite_32 * sprite);

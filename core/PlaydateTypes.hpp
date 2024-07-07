@@ -66,6 +66,12 @@ namespace cranked {
         Unknown,
     };
 
+    enum class PDFontVariant : int32 {
+        Normal,
+        Bold,
+        Italic,
+    };
+
     enum class PDPeripherals : int32 {
         None,
         Accelerometer,
@@ -116,12 +122,14 @@ namespace cranked {
         Inverted,
     };
 
-    enum class LCDBitmapFlip : int32 {
+    enum class GraphicsFlip : int32 {
         Unflipped,
         FlippedX,
         FlippedY,
         FlippedXY,
     };
+
+    typedef GraphicsFlip LCDBitmapFlip;
 
     enum class LCDSolidColor : int32 {
         Black,
@@ -134,12 +142,6 @@ namespace cranked {
         Butt,
         Square,
         Round,
-    };
-
-    enum class LCDFontLanguage : int32 {
-        English,
-        Japanese,
-        Unknown,
     };
 
     enum class PDStringEncoding : int32 {
@@ -240,9 +242,7 @@ namespace cranked {
     typedef SDFile_32 *File;
     typedef ResourceRef<SDFile_32> FileRef;
 
-    struct LuaUDObject_32 {
-        // Todo: Possibly void* equivalent, maybe holds either a stack index or a global table key, maybe a structure that can point to a global table
-    };
+    struct LuaUDObject_32; // Opaque pointer, just store stack offset int in pointer relative to HEAP_ADDRESS
 
     struct LCDSprite_32;
     typedef LCDSprite_32 *Sprite;
