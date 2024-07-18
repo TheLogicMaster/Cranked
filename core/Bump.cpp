@@ -27,12 +27,12 @@ bool Bump::getSegmentIntersectionIndices(Rect rect, LineSeg seg, bool huge1, boo
             if (p < 0) {
                 if (r > ti2)
                     return false;
-                else if (r > ti1)
+                if (r > ti1)
                     ti1 = r, n1 = n;
             } else {
                 if (r < ti1)
                     return false;
-                else if (r < ti2)
+                if (r < ti2)
                     ti2 = r, n2 = n;
             }
         }
@@ -45,7 +45,7 @@ optional<Bump::Collision> Bump::detectCollision(Rect entity, Rect other, Vec2 go
     Rect diff = rectDiff(entity, other);
     bool overlaps = false;
     float ti;
-    Vec2 normal;
+    Vec2 normal{};
 
     if (containsPoint(diff, Vec2(0, 0))) {
         Vec2 corner = diff.nearestCorner(Vec2{0, 0});
@@ -135,7 +135,7 @@ void Bump::traverseGrid(LineSeg seg, const function<void(IntVec2)> &func) {
         func(c2.as<int32 >());
 }
 
-vector<Bump::Collision> Bump::project(Sprite sprite, Rect rect, Vec2 goal, const Bump::ResponseFilter &filter) {
+vector<Bump::Collision> Bump::project(Sprite sprite, Rect rect, Vec2 goal, const ResponseFilter &filter) {
     vector<Collision> collisions;
     unordered_set<Sprite> visited;
     float tl = min(goal.x, rect.pos.x);
@@ -195,7 +195,7 @@ vector<Bump::SpriteSegmentIntersectionInfo> Bump::querySegmentInfo(LineSeg seg, 
     return info;
 }
 
-tuple<Vec2, vector<Bump::Collision>> Bump::check(Sprite sprite, Vec2 goal, const Bump::ResponseFilter &filter) {
+tuple<Vec2, vector<Bump::Collision>> Bump::check(Sprite sprite, Vec2 goal, const ResponseFilter &filter) {
     unordered_set<Sprite> visited{ sprite };
     std::vector<Collision> collisions;
 
@@ -210,13 +210,29 @@ tuple<Vec2, vector<Bump::Collision>> Bump::check(Sprite sprite, Vec2 goal, const
 
     while (!projected.empty()) {
         auto &col = collisions.emplace_back(projected.front());
+        visited.emplace(col.other);
         tie(goal, projected) = invoke(responseFunctions[(int)col.type], this, col, rect, goal, visitedFilter);
     }
 
     return { goal, collisions };
 }
 
-tuple<Vec2, vector<Bump::Collision>> Bump::move(Sprite sprite, Vec2 goal, bool simulate, const Bump::ResponseFilter &filter) {
+vector<Sprite> Bump::getAllOverlappingSprites() {
+    unordered_map<Sprite, unordered_set<Sprite>> overlapping;
+    std::vector<Sprite> results;
+    for (const SpriteRef &ref : cranked.graphics.spriteDrawList) {
+        for (auto sprite = ref.get(); auto overlap : queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; })) {
+            if (overlapping[overlap].contains(sprite) or !overlapping[sprite].emplace(overlap).second)
+                continue;
+            results.emplace_back(sprite);
+            results.emplace_back(overlap);
+        }
+    }
+    return results;
+}
+
+tuple<Vec2, vector<Bump::Collision>> Bump::move(Sprite sprite, Vec2 goal, bool simulate, const ResponseFilter &filter) {
+    goal -= sprite->getCollisionRectToCenterOffset();
     auto [actual, collisions] = check(sprite, goal, filter);
     Rect actualRect = { actual, sprite->collideRect.size };
     Rect startRect = sprite->getWorldCollideRect();
@@ -257,5 +273,5 @@ tuple<Vec2, vector<Bump::Collision>> Bump::move(Sprite sprite, Vec2 goal, bool s
         sprite->bounds.pos = actual - sprite->collideRect.pos;
     }
 
-    return { actual, collisions };
+    return { actual + sprite->getCollisionRectToCenterOffset(), collisions };
 }

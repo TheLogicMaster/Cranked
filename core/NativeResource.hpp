@@ -10,36 +10,41 @@ namespace cranked {
     public:
         explicit NativeResource(Cranked &cranked);
 
-        // Reference count and disposed flag are not copied when moving or copying, since they referred to the previous object's memory
-        NativeResource(const NativeResource &other) : cranked(other.cranked) {}
+        NativeResource(const NativeResource &other) = delete;
 
-        // There's no point in moving resources since they are always referred to by pointer
         NativeResource(NativeResource &&other) = delete;
 
         virtual ~NativeResource();
 
         void reference() {
+            if (disposed)
+                throw CrankedError("Attempted to reference disposed resource");
             refCount++;
         }
 
         bool dereference();
 
-        [[nodiscard]] inline int getRefCount() const {
+        [[nodiscard]] int getRefCount() const {
             return refCount;
         }
 
-        [[nodiscard]] inline bool isDisposed() const {
+        [[nodiscard]] bool isDisposed() const {
             return disposed;
+        }
+
+        [[nodiscard]] bool isDisposing() const {
+            return disposing;
         }
 
         Cranked &cranked;
 
     private:
         int refCount{};
+        bool disposing{}; // This is needed to prevent any references temporarily made during destruction from causing an infinite loop
         bool disposed{};
     };
 
-    template<typename T> // Can't use a constraint here, or it would be impossible to use recursively due to incomplete typing
+    template<typename T> // Can't use a NativeResource constraint here, or it would be impossible to use recursively due to incomplete typing
     class ResourceRef {
     public:
 
@@ -64,6 +69,8 @@ namespace cranked {
         }
 
         void reset(T *newResource) {
+            if (resource == newResource)
+                return;
             if (resource)
                 resource->dereference();
             resource = newResource;
@@ -71,13 +78,14 @@ namespace cranked {
                 newResource->reference();
         }
 
-        /// Meant to be used for resetting system components without worrying about heap corruption exceptions
+        /// Meant to be used for resetting system components without worrying about heap corruption exceptions and such
         void reset(bool throws = false) {
             try {
                 reset(nullptr);
-            } catch (exception &ex) {
+            } catch (exception &) {
                 if (throws)
-                    throw ex;
+                    throw;
+                resource = nullptr;
             }
         }
 
@@ -89,6 +97,14 @@ namespace cranked {
         ResourceRef &operator=(const ResourceRef &other) {
             if (&other != this)
                 reset(other.resource);
+            return *this;
+        }
+
+        ResourceRef &operator=(ResourceRef &&other) noexcept {
+            if (resource)
+                resource->dereference();
+            resource = other.resource;
+            other.resource = nullptr;
             return *this;
         }
 
@@ -114,13 +130,32 @@ namespace cranked {
         T *resource;
     };
 
-}
+    template <typename T>
+    concept is_resource = is_base_of_v<NativeResource, T>;
 
-template<typename T>
-struct std::hash<cranked::ResourceRef<T>> // NOLINT(*-dcl58-cpp)
-{
-    size_t operator()(const cranked::ResourceRef<T>& s) const noexcept
+    template <typename T>
+    concept is_resource_ptr = is_base_of_v<NativeResource, remove_pointer_t<T>>;
+
+    template<typename T>
+    struct resource_hash
     {
-        return (size_t)s.get();
-    }
-};
+        using is_transparent = void;
+
+        size_t operator()(const ResourceRef<T>& s) const
+        {
+            return (size_t)s.get();
+        }
+
+        size_t operator()(const T* s) const
+        {
+            return (size_t)s;
+        }
+    };
+
+    template<typename R> requires is_pointer_v<R>
+    using unordered_resource_set = unordered_set<ResourceRef<remove_pointer_t<R>>, resource_hash<remove_pointer_t<R>>, equal_to<>>;
+
+    template<typename R, typename T> requires is_pointer_v<R>
+    using unordered_resource_map = unordered_map<ResourceRef<remove_pointer_t<R>>, T, resource_hash<remove_pointer_t<R>>, equal_to<>>;
+
+}

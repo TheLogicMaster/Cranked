@@ -55,6 +55,7 @@ set(cranked_sources
         Menu.cpp
         NativeEngine.cpp
         NativeResource.cpp
+        PathFinding.cpp
         Rom.cpp
         Runtime.cpp
         Utils.cpp

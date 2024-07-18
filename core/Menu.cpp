@@ -20,11 +20,13 @@ void Menu::reset() {
 void Menu::update() {
     if (cranked.pressedInputs & int(PDButtons::Menu)) {
         if (isOpen) {
-            cranked.luaEngine.invokeLuaCallback("gameWillResume");
+            if (cranked.luaEngine.isLoaded())
+                cranked.luaEngine.invokeLuaCallback("gameWillResume");
             if (cranked.nativeEngine.isLoaded())
                 cranked.nativeEngine.invokeEventCallback(PDSystemEvent::Resume, 0);
         } else {
-            cranked.luaEngine.invokeLuaCallback("gameWillPause");
+            if (cranked.luaEngine.isLoaded())
+                cranked.luaEngine.invokeLuaCallback("gameWillPause");
             if (cranked.nativeEngine.isLoaded())
                 cranked.nativeEngine.invokeEventCallback(PDSystemEvent::Pause, 0);
         }

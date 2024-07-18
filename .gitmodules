@@ -62,3 +62,6 @@
 [submodule "core/libs/tracy"]
 	path = core/libs/tracy
 	url = https://github.com/wolfpld/tracy
+[submodule "core/libs/gif-h"]
+	path = core/libs/gif-h
+	url = https://github.com/charlietangora/gif-h

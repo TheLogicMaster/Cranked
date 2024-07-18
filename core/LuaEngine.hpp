@@ -3,6 +3,7 @@
 #include "gen/PlaydateAPI.hpp"
 #include "Rom.hpp"
 #include "Geometry.hpp"
+#include "Bump.hpp"
 
 namespace cranked {
 
@@ -54,12 +55,20 @@ namespace cranked {
             return lua_isnumber(context, index);
         }
 
+        [[nodiscard]] bool isNumeric() const {
+            return isFloat() or isInt();
+        }
+
         [[nodiscard]] bool isBool() const {
             return lua_isboolean(context, index);
         }
 
         [[nodiscard]] bool isLightUserdata() const {
             return lua_islightuserdata(context, index);
+        }
+
+        [[nodiscard]] bool isFunction() const {
+            return lua_isfunction(context, index); // Doesn't respect `__call`
         }
 
         [[nodiscard]] bool isUserdataObject() const {
@@ -94,16 +103,21 @@ namespace cranked {
             return lua_toboolean(context, index);
         }
 
+        template<typename T> requires is_enum_v<T>
+        [[nodiscard]] T asEnum() const {
+            return (T)lua_tointeger(context, index);
+        }
+
         [[nodiscard]] void *asLightUserdata() const {
             return lua_touserdata(context, index);
         }
 
         template<typename T>
-        [[nodiscard]] T *asUserdataObject() const {
+        [[nodiscard]] T asUserdataObject() const {
             if (!lua_istable(context, index))
                 return nullptr;
             lua_getfield(context, index, "userdata");
-            auto value = (T *) lua_touserdata(context, -1);
+            auto value = (T) lua_touserdata(context, -1);
             lua_pop(context, 1);
             return value;
         }
@@ -114,6 +128,26 @@ namespace cranked {
 
         [[nodiscard]] IntRect asIntRect() const {
             return {getIntField("x"), getIntField("y"), getIntField("width"), getIntField("height")};
+        }
+
+        [[nodiscard]] LineSeg asLineSeg() const {
+            return {getFloatField("x1"), getFloatField("y1"), getFloatField("x2"), getFloatField("y2")};
+        }
+
+        [[nodiscard]] IntLineSeg asIntLineSeg() const {
+            return {getIntField("x1"), getIntField("y1"), getIntField("x2"), getIntField("y2")};
+        }
+
+        [[nodiscard]] Vec2 asVec() const {
+            return {getFloatField("dx"), getFloatField("dy")};
+        }
+
+        [[nodiscard]] IntVec2 asPoint() const {
+            return {getIntField("x"), getIntField("y")};
+        }
+
+        [[nodiscard]] IntVec2 asIntPoint() const {
+            return {getIntField("x"), getIntField("y")};
         }
 
         [[nodiscard]] chrono::system_clock::time_point asTime() const {
@@ -171,6 +205,44 @@ namespace cranked {
             return PDLanguage::English;
         }
 
+        [[nodiscard]] PDButtons asButton() const {
+            if (isInt())
+                return (PDButtons)asInt();
+            if (isString()) {
+                auto str = string(asString());
+                if (str == "left")
+                    return PDButtons::Left;
+                if (str == "right")
+                    return PDButtons::Right;
+                if (str == "up")
+                    return PDButtons::Up;
+                if (str == "down")
+                    return PDButtons::Down;
+                if (str == "b")
+                    return PDButtons::B;
+                if (str == "a")
+                    return PDButtons::A;
+            }
+            return {};
+        }
+
+        [[nodiscard]] Bump::ResponseType asCollisionResponse() const {
+            if (isInt())
+                return (Bump::ResponseType)asInt();
+            if (isString()) {
+                auto str = string(asString());
+                if (str == "slide")
+                    return Bump::ResponseType::Slide;
+                if (str == "freeze")
+                    return Bump::ResponseType::Freeze;
+                if (str == "overlap")
+                    return Bump::ResponseType::Overlap;
+                if (str == "bounce")
+                    return Bump::ResponseType::Bounce;
+            }
+            return Bump::ResponseType::Freeze;
+        }
+
         void setStringElement(int n, const char *value) const {
             lua_pushstring(context, value);
             lua_seti(context, index, n);
@@ -193,6 +265,11 @@ namespace cranked {
 
         void setLightUserdataElement(int n, void *value) const {
             lua_pushlightuserdata(context, value);
+            lua_seti(context, index, n);
+        }
+
+        void setElement(int n, LuaVal value) const {
+            lua_pushvalue(context, value);
             lua_seti(context, index, n);
         }
 
@@ -232,7 +309,7 @@ namespace cranked {
         }
 
         template<typename T>
-        T *getUserdataObjectElement(int n) {
+        T getUserdataObjectElement(int n) {
             lua_geti(context, index, n);
             auto value = LuaVal(context, -1).asUserdataObject<T>();
             lua_pop(context, 1);
@@ -300,7 +377,7 @@ namespace cranked {
         }
 
         template<typename T>
-        [[nodiscard]] T *getUserdataObjectField(const char *name) const {
+        [[nodiscard]] T getUserdataObjectField(const char *name) const {
             lua_getfield(context, index, name);
             auto value = LuaVal(context, -1).asUserdataObject<T>();
             lua_pop(context, 1);
@@ -314,7 +391,7 @@ namespace cranked {
 
         [[nodiscard]] LuaVal getFieldRaw(const char *name) const {
             lua_getfield(context, index, name);
-            return {context, lua_gettop(context)};
+            return LuaVal(context);
         }
 
         /**
@@ -324,7 +401,12 @@ namespace cranked {
 
         [[nodiscard]] LuaVal getElementRaw(int n) const {
             lua_geti(context, index, n);
-            return {context, lua_gettop(context)};
+            return LuaVal(context);
+        }
+
+        [[nodiscard]] LuaVal getMetaTable() const {
+            lua_getmetatable(context, index);
+            return LuaVal(context);
         }
     };
 
@@ -379,6 +461,8 @@ namespace cranked {
         void runUpdateLoop();
 
         lua_State *getContext() const {
+            if (!luaInterpreter)
+                throw CrankedError("Lua context not available");
             return inLuaUpdate ? luaUpdateThread : luaInterpreter;
         }
 
@@ -431,18 +515,21 @@ namespace cranked {
             return object;
         }
 
-        LuaVal pushImage(Bitmap image) const;
+        template<is_resource_ptr R>
+        LuaVal pushResource(R resource) const;
 
-        LuaVal pushSprite(Sprite sprite) const;
-
-        LuaVal pushFont(Font font) const;
-
-        LuaVal pushFile(File file) const;
-
-        LuaVal pushMenuItem(MenuItem item) const;
-
-        LuaVal pushNil() const {
+        LuaVal pushNil () {
             lua_pushnil(getContext());
+            return LuaVal{getContext()};
+        }
+
+        LuaVal pushBool(bool value) const {
+            lua_pushboolean(getContext(), value);
+            return LuaVal{getContext()};
+        }
+
+        LuaVal pushString(const char *str) const {
+            lua_pushstring(getContext(), str);
             return LuaVal{getContext()};
         }
 
@@ -457,7 +544,7 @@ namespace cranked {
         }
 
         template<typename T>
-        LuaVal pushRect(const Rectangle<T> &rect) {
+        LuaVal pushRect(Rectangle<T> rect) {
             LuaVal val = pushTable();
             if (!getQualifiedLuaGlobal("playdate.geometry.rect"))
                 throw CrankedError("Rect table missing");
@@ -467,6 +554,30 @@ namespace cranked {
             val.setFloatField("y", floatRect.pos.y);
             val.setFloatField("width", floatRect.size.x);
             val.setFloatField("height", floatRect.size.y);
+            return val;
+        }
+
+        template<typename T>
+        LuaVal pushVec(Vector2<T> point) {
+            LuaVal val = pushTable();
+            if (!getQualifiedLuaGlobal("playdate.geometry.vector2D"))
+                throw CrankedError("Vector table missing");
+            lua_setmetatable(getContext(), -2);
+            auto floatPoint = point.template as<float>();
+            val.setFloatField("dx", floatPoint.x);
+            val.setFloatField("dy", floatPoint.y);
+            return val;
+        }
+
+        template<typename T>
+        LuaVal pushPoint(Vector2<T> point) {
+            LuaVal val = pushTable();
+            if (!getQualifiedLuaGlobal("playdate.geometry.point"))
+                throw CrankedError("Point table missing");
+            lua_setmetatable(getContext(), -2);
+            auto floatPoint = point.template as<float>();
+            val.setFloatField("x", floatPoint.x);
+            val.setFloatField("y", floatPoint.y);
             return val;
         }
 
@@ -483,6 +594,70 @@ namespace cranked {
             table.setIntField("second", (int) hms.seconds().count());
             table.setIntField("millisecond", (int) duration_cast<chrono::milliseconds>(timeOffset).count());
             return table;
+        }
+
+        template<is_resource_ptr R>
+        void setResourceElement(LuaVal val, int n, R resource) const {
+            pushResource(resource);
+            lua_seti(val.context, val.index, n);
+        }
+
+        template<is_resource_ptr R>
+        void setResourceField(LuaVal val, const char *name, R resource) const {
+            pushResource(resource);
+            lua_setfield(val.context, val.index, name);
+        }
+
+        template<numeric_type T>
+        void setVecElement(LuaVal val, int n, Vector2<T> vec) {
+            pushVec(vec);
+            lua_seti(val.context, val.index, n);
+        }
+
+        template<numeric_type T>
+        void setVecField(LuaVal val, const char *name, Vector2<T> vec) {
+            pushVec(vec);
+            lua_setfield(val.context, val.index, name);
+        }
+
+        template<numeric_type T>
+        void setPointElement(LuaVal val, int n, Vector2<T> point) {
+            pushPoint(point);
+            lua_seti(val.context, val.index, n);
+        }
+
+        template<numeric_type T>
+        void setPointField(LuaVal val, const char *name, Vector2<T> point) {
+            pushPoint(point);
+            lua_setfield(val.context, val.index, name);
+        }
+
+        template<numeric_type T>
+        void setRectElement(LuaVal val, int n, Rectangle<T> rect) {
+            pushRect(rect);
+            lua_seti(val.context, val.index, n);
+        }
+
+        template<numeric_type T>
+        void setRectField(LuaVal val, const char *name, Rectangle<T> rect) {
+            pushRect(rect);
+            lua_setfield(val.context, val.index, name);
+        }
+
+        [[nodiscard]] bool indexMetatable() const {
+            auto context = getContext();
+            if (!context)
+                return false;
+            if (!lua_getmetatable(context, 1))
+                return false;
+            lua_pushvalue(context, 2);
+            if (!lua_rawget(context, 1)) {
+                lua_pop(context, 2);
+                return false;
+            }
+            lua_copy(context, -1, -2);
+            lua_pop(context, 1);
+            return true;
         }
 
         void setQualifiedLuaGlobal(const char *name) const {
@@ -537,6 +712,34 @@ namespace cranked {
             return getField(true);
         }
 
+        /**
+         * Iterates over the key-value pairs in a given table. The stack must remain balanced after func calls.
+         * Return `true` to break out of iteration.
+         */
+        void iterateTable(LuaVal table, const function<bool(LuaVal, LuaVal)> &func) const {
+            if (!table.isTable())
+                return;
+            auto context = getContext();
+            lua_pushvalue(context, table.index);
+            while (lua_next(context, -2)) {
+                lua_pushvalue(context, -2);
+                if (func(LuaVal{context, -1}, LuaVal{context, -2}))
+                    break;
+                lua_pop(context, 2);
+            }
+            lua_pop(context, 1);
+        }
+
+        void iterateArray(LuaVal array, const function<bool(LuaVal)> &func) const {
+            if (!array.isTable())
+                return;
+            for (int i = 1;; i++) {
+                auto val = array.getElement(i);
+                if (val.val.isNil() or func(val.val))
+                    break;
+            }
+        }
+
         void invokeLuaCallback(const string &name) const {
             if (!getContext())
                 return;
@@ -561,6 +764,40 @@ namespace cranked {
             bool handled = lua_toboolean(getContext(), -1);
             lua_settop(getContext(), start);
             return handled;
+        }
+
+        /**
+         * Store a Lua value weakly by light userdata pointer
+         */
+        void storeResourceValue(void *ptr, LuaVal val) const {
+            if (!getQualifiedLuaGlobal("cranked.resources"))
+                throw CrankedError("Preserved table missing");
+            auto context = getContext();
+            lua_pushlightuserdata(context, ptr);
+            lua_pushvalue(context, val);
+            lua_rawset(context, -3);
+            lua_pop(context, 1);
+        }
+
+        LuaVal getResourceValue(void *ptr) const {
+            if (!getQualifiedLuaGlobal("cranked.resources"))
+                throw CrankedError("Preserved table missing");
+            auto context = getContext();
+            lua_pushlightuserdata(context, ptr);
+            lua_rawget(context, -2);
+            lua_copy(context, -1, -2);
+            lua_pop(context, 1);
+            return LuaVal(context);
+        }
+
+        void clearResourceValue(void *ptr) const {
+            if (!getQualifiedLuaGlobal("cranked.resources"))
+                throw CrankedError("Preserved table missing");
+            auto context = getContext();
+            lua_pushlightuserdata(context, ptr);
+            lua_pushnil(context);
+            lua_rawset(context, -3);
+            lua_pop(context, 1);
         }
 
         /**
@@ -613,4 +850,5 @@ namespace cranked {
         lua_State *luaUpdateThread{};
         bool inLuaUpdate{};
     };
+
 }

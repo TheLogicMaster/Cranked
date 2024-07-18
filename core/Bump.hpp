@@ -69,7 +69,7 @@ namespace cranked {
             bool enabled = sprite->collisionsEnabled and sprite->collideRect;
             for (auto &row : cells)
                 for (auto &cell : row.second)
-                    cell.second.sprites.erase(sprite);
+                    eraseByEquivalentKey(cell.second.sprites, sprite);
             if (enabled) {
                 auto rect = worldToCellRect(sprite->getWorldCollideRect());
                 for (int y = rect.pos.y; y < rect.pos.y + rect.size.y; y++)
@@ -77,6 +77,18 @@ namespace cranked {
                         addSpriteToCell(sprite, { x, y });
             }
         }
+
+        void removeSprite(Sprite sprite) {
+            for (auto &row : cells)
+                for (auto &cell : row.second)
+                    eraseByEquivalentKey(cell.second.sprites, sprite);
+        }
+
+        vector<Sprite> getOverlappingSprites(Sprite sprite) {
+            return queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; });
+        }
+
+        [[nodiscard]] vector<Sprite> getAllOverlappingSprites();
 
         /// Moves (Or just simulates) a sprite towards the given goal position after filtering for other sprites to collide with
         tuple<Vec2, vector<Collision>> move(Sprite sprite, Vec2 goal, bool simulate, const ResponseFilter &filter);
@@ -130,7 +142,7 @@ namespace cranked {
 
         struct Cell {
             IntVec2 pos{};
-            unordered_set<SpriteRef> sprites;
+            unordered_resource_set<Sprite> sprites;
         };
 
         static bool getSegmentIntersectionIndices(Rect rect, LineSeg seg, bool huge1, bool huge2, float &ti1, float &ti2, Vec2 &n1, Vec2 &n2);
@@ -220,7 +232,7 @@ namespace cranked {
         }
 
         void removeSpriteFromCell(Sprite sprite, IntVec2 pos) {
-            cells[pos.y][pos.x].sprites.erase(sprite);
+            eraseByEquivalentKey(cells[pos.y][pos.x].sprites, sprite);
         }
 
         vector<Sprite> getSpritesInCellRect(IntRect rect) {
@@ -247,7 +259,7 @@ namespace cranked {
 
         Cranked &cranked;
         unordered_map<int, unordered_map<int, Cell>> cells;
-        const array<ResponseFunc, int(ResponseType::Ignore)> responseFunctions{ &Bump::touch, &Bump::cross, &Bump::slide, &Bump::bounce };
+        const array<ResponseFunc, int(ResponseType::Ignore)> responseFunctions{ &Bump::slide, &Bump::touch, &Bump::cross, &Bump::bounce };
     };
 
 }

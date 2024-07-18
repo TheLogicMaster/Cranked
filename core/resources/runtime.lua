@@ -18,7 +18,9 @@ cranked = {
     menuCallbacks = {},
     preserved = {}, -- Mapping of value to reference count for preserved Lua values
     updateThread = nil,
+    resources = {}, -- Weak mapping between light userdata and lua values
 }
+setmetatable(cranked.resources, { __mode = "v" })
 
 playdate.argv = {}
 

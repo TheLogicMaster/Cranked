@@ -37,24 +37,19 @@ likely crash at the moment and there is little in the way of useful debug output
 - Finish Sprites (Collision occasionally phases a sprite off-screen in Sprite Collision example)
 - Graphical effects
 - Pattern/stencil drawing
-- Polygon, rounded rect drawing
-- Perlin noise
-- Pathfinding
-- Video
-- Bitmap Tables
+- Polygon, rounded rect drawing, Mode 7, image rotation and affine transforms
 - Audio
 - Full font support
-- GIF and WAV writing
+- WAV writing
 - Respect all graphical context options like clip rect
-- Embed system files like fonts somehow
 - Finish C JSON decoding
 - Test building on Windows/Mac
 - Create a testing framework to compare console output to the official simulator (Graphics, Collisions)
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
 - Java library with native libs for Android app consumption
-- Ensuring that all resource reference counting is done correctly
 - Scoreboard support
 - Investigate Catalog app (Web API already documented)
+- Ability to act as simulator
 - See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
 - System UI/software from SDK (Create replacement assets, *Darker Grotesque* should be able to be adopted in place of *Roobert* system font)
 - Investigate pre-2.0.0 binaries to handle uncompressed data
@@ -64,15 +59,15 @@ likely crash at the moment and there is little in the way of useful debug output
 - GitHub Actions release builds
 - USB serial functionality (As controller, dump saves, backup games?)
 - Better execution model (The current approach works, but has limitations, coroutines might be elegant, avoiding recursive Lua invocation would be good)
-- C++ std::function callbacks may help to support both Lua and C++ with the same interface (With Lua/Native resource references, as well)
 - Fix git submodules to not get in detached head state
 - Can't currently build in release due to false uninitialized variable errors in Capstone
 - Native Cranked API for profiling and such, maybe exposed at a fixed address or at the end of the main PD API struct
 
 ## Example Compatibility
+(Not all tested yet)
 - [x] Hello World
 - [x] Sprite Collisions
-- [ ] Sprite Game
+- [x] Sprite Game
 - [x] Particles
 - [x] Life
 - [ ] Exposure

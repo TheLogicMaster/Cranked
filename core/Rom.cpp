@@ -642,6 +642,24 @@ Rom::FileType Rom::getFileType(const uint8 *header) {
     return FileType::UNKNOWN;
 }
 
+vector<uint8> Rom::writeImage(Bitmap image) {
+    vector<uint8> buffer;
+    bufferAddStr(buffer, IMAGE_MAGIC);
+    bufferAddVal<uint32>(buffer, 0); // Flags
+    bufferAddVal<uint16>(buffer, image->width); // Clip width
+    bufferAddVal<uint16>(buffer, image->height); // Clip height
+    bufferAddVal<uint16>(buffer, (int) ceil((float) image->width / 8)); // Stride
+    bufferAddVal<uint16>(buffer, 0); // Clip left
+    bufferAddVal<uint16>(buffer, 0); // Clip right
+    bufferAddVal<uint16>(buffer, 0); // Clip top
+    bufferAddVal<uint16>(buffer, 0); // Clip bottom
+    bufferAddVal<uint16>(buffer, (bool)image->mask * 0b1); // Cell flags
+    buffer.insert(buffer.end(), image->data.begin(), image->data.end());
+    if (image->mask)
+        buffer.insert(buffer.end(), image->mask->data.begin(), image->mask->data.end());
+    return buffer;
+}
+
 Rom::File *Rom::findSystemFile(const string &path) {
     // Todo: Path should be normalized a bit
     if (auto it = systemFiles.find(path); it != systemFiles.end())

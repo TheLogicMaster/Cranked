@@ -126,7 +126,7 @@ namespace cranked {
         void handleCmdSupported(const vector<string> &args);
         void handleCmdAttached(const vector<string> &args);
 
-        const unordered_map<string, void(Debugger::*)(const vector<string> &args)> packetHandlers {
+        const unordered_string_map<void(Debugger::*)(const vector<string> &args)> packetHandlers { // Todo: Use transparent hash lookup like unordered_resource_set
                 {"?", &Debugger::handleCmdHaltReason},
                 {"g", &Debugger::handleCmdReadReg},
                 {"G", &Debugger::handleCmdWriteReg},

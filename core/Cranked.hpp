@@ -9,6 +9,7 @@
 #include "LuaEngine.hpp"
 #include "Debugger.hpp"
 #include "Bump.hpp"
+#include "PathFinding.hpp"
 
 namespace cranked {
 
@@ -158,7 +159,7 @@ namespace cranked {
         void init();
 
         bool initialized{};
-        float lastFrameDelta;
+        float lastFrameDelta{}; // Todo: Move to Graphics
     };
 
 }

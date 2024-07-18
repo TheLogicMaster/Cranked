@@ -1,4 +1,5 @@
 #include "Utils.hpp"
+#include "gif-h/gif.h"
 
 using namespace cranked;
 
@@ -24,4 +25,11 @@ vector<uint8> cranked::decompressData(const uint8 *data, size_t length, size_t e
     buffer.resize(inflater.total_out);
     inflateEnd(&inflater);
     return buffer;
+}
+
+void cranked::writeGIF(const char *path, const uint8 *data, int width, int height) {
+    GifWriter g;
+    GifBegin(&g, path, width, height, 0);
+    GifWriteFrame(&g, data, width, height, 0);
+    GifEnd(&g);
 }

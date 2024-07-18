@@ -8,19 +8,18 @@
 #include "dynarmic/interface/A32/config.h"
 #include "unicorn/unicorn.h"
 
-#ifdef USE_CAPSTONE
-#include "capstone/platform.h"
-#include "capstone/capstone.h"
-#endif
-
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
 #include "libzippp.h"
 #include "zlib.h"
-
 #include "tracy/Tracy.hpp"
 #include "tracy/TracyLua.hpp"
+
+#ifdef USE_CAPSTONE
+#include "capstone/platform.h"
+#include "capstone/capstone.h"
+#endif
 
 #include <vector>
 #include <memory>
@@ -53,6 +52,7 @@
 #include <thread>
 #include <utility>
 #include <variant>
+#include <numbers>
 
 namespace cranked {
 
@@ -61,18 +61,18 @@ namespace cranked {
     using std::stoi, std::stol, std::from_chars, std::to_string, std::isalpha, std::popcount;
     using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round;
     using std::string, std::basic_string, std::string_view;
-    using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue;
+    using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue, std::priority_queue;
     using std::function, std::invoke;
     using std::exception, std::runtime_error, std::range_error, std::out_of_range, std::logic_error;
-    using std::strong_ordering, std::errc;
-    using std::optional, std::tuple, std::make_tuple, std::tie, std::ignore, std::pair, std::make_pair;
+    using std::strong_ordering, std::less, std::greater, std::errc;
+    using std::optional, std::tuple, std::make_tuple, std::tie, std::ignore, std::pair, std::make_pair, std::integer_sequence, std::make_integer_sequence;
     using std::variant, std::get, std::get_if, std::holds_alternative;
     using std::false_type, std::tuple_element_t, std::is_same_v, std::is_pointer_v, std::is_class_v, std::remove_pointer_t, std::is_enum_v, std::is_void_v;
-    using std::derived_from, std::integral, std::floating_point, std::is_standard_layout_v, std::is_trivial_v;
+    using std::derived_from, std::integral, std::floating_point, std::is_standard_layout_v, std::is_trivial_v, std::remove_const_t, std::is_base_of_v, std::invocable;
     using std::hash, std::equal_to, std::less;
     using std::char_traits, std::numeric_limits;
     using std::size_t, std::time_t;
-    using std::ostringstream, std::istringstream, std::ifstream, std::getline, std::ios;
+    using std::ostringstream, std::istringstream, std::ifstream, std::ofstream, std::getline, std::ios;
     using std::free, std::bad_alloc, std::aligned_alloc, std::addressof;
     using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap, std::mismatch;
     using std::unique_ptr, std::shared_ptr, std::make_shared, std::make_unique;
@@ -82,6 +82,7 @@ namespace cranked {
     namespace fs = std::filesystem;
     namespace chrono = std::chrono;
     namespace this_thread = std::this_thread;
+    namespace numbers = std::numbers;
 
     typedef int64_t int64;
     typedef uint64_t uint64;
@@ -232,6 +233,8 @@ namespace cranked {
         return data;
     }
 
+    void writeGIF(const char *path, const uint8 *data, int width, int height);
+
     inline uint32 readUint32LE(const uint8 *data) {
         auto ptr = (uint8 *) data;
         return ptr[0] | ptr[1] << 8 | ptr[2] << 16 | ptr[3] << 24;
@@ -303,13 +306,44 @@ namespace cranked {
     }
 
     template<typename T, typename V>
-    bool eraseByEquivalentKey(unordered_set<T> &set, const V &value) {
-        auto found = set.find(value);
-        if (found != set.end()) {
+    bool eraseByEquivalentValue(vector<T> &vec, const V &value) {
+        if (auto it = find_if(vec.begin(), vec.end(), [&](T &t) { return t == value; }); it != vec.end()) {
+            vec.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T, typename V, typename H, typename P>
+    bool eraseByEquivalentKey(unordered_set<T, H, P> &set, const V &value) {
+        if (auto found = set.template find<V>(value); found != set.end()) {
             set.erase(found);
             return true;
         }
         return false;
+    }
+
+    template<typename K, typename V, typename H, typename P>
+    bool eraseByEquivalentKey(unordered_map<K, V, H, P> &map, const K &key) {
+        if (auto found = map.template find<V>(key); found != map.end()) {
+            map.erase(found);
+            return true;
+        }
+        return false;
+    }
+
+    template<typename K, typename V, typename H, typename P>
+    V &atEquivalentKey(unordered_map<K, V, H, P> &map, const K &key) {
+        if (auto found = map.template find<K>(key); found != map.end())
+            return found->second;
+        throw out_of_range("No such entry for equivalant key");
+    }
+
+    template<typename K, typename V, typename H, typename P>
+    const V &atEquivalentKey(const unordered_map<K, V, H, P> &map, const K &key) {
+        if (auto found = map.template find<K>(key); found != map.end())
+            return found->second;
+        throw out_of_range("No such entry for equivalant key");
     }
 
     template <typename T>
@@ -317,6 +351,12 @@ namespace cranked {
 
     template<typename S>
     struct dependent_false : false_type {};
+
+    template<typename S>
+    inline constexpr bool dependent_false_v = dependent_false<S>{};
+
+    template<typename T, typename ...L>
+    inline constexpr bool is_type_listed = (is_same_v<T, L> or ...);
 
     template<typename F>
     struct FunctionTypeHelper;
@@ -352,5 +392,19 @@ namespace cranked {
         array<T, N> buffer{};
         int index{}; // Index where to place next
     };
+
+    struct string_hash
+    {
+        using hash_type = hash<string_view>;
+        using is_transparent = void;
+        size_t operator()(const char* str) const { return hash_type{}(str); }
+        size_t operator()(string_view str) const { return hash_type{}(str); }
+        size_t operator()(string const& str) const { return hash_type{}(str); }
+    };
+
+    using unordered_string_set = unordered_set<string, string_hash, equal_to<>>;
+
+    template<typename T>
+    using unordered_string_map = unordered_map<string, T, string_hash, equal_to<>>;
 
 }

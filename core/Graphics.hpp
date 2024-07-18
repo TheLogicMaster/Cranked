@@ -20,37 +20,36 @@ namespace cranked {
         cref_t pattern;
     };
 
-    struct LCDVideoPlayer_32 : NativeResource {
-        explicit LCDVideoPlayer_32(Cranked &cranked);
+    struct LCDVideoPlayer_32 final : NativeResource {
+        explicit LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size);
 
-        LCDVideoPlayer_32(const LCDVideoPlayer_32 &other) = delete;
-        LCDVideoPlayer_32(LCDVideoPlayer_32 &&other) = delete;
-        ~LCDVideoPlayer_32() override = default;
+        float frameRate;
+        IntVec2 size;
+        vector<BitmapRef> frames;
+        BitmapRef target;
+        int currentFrame{}; // Todo: Is this meant to be the previously rendered frame?
+        cref_t lastError{};
     };
 
 /**
  * The operations implemented here aren't affected by draw offsets or clipping rects (Except for display buffer writes, which are affected by display offsets)
  */
-    struct LCDBitmap_32 : NativeResource {
+    struct LCDBitmap_32 final : NativeResource {
         LCDBitmap_32(Cranked &cranked, int width, int height);
 
         LCDBitmap_32(const LCDBitmap_32 &other);
 
-        LCDBitmap_32(LCDBitmap_32 &&other) = delete;
-
-        ~LCDBitmap_32() override = default;
-
         LCDBitmap_32 &operator=(const LCDBitmap_32 &other);
 
-        tuple<int, int> getBufferPixelLocation(int x, int y);
+        [[nodiscard]] tuple<int, int> getBufferPixelLocation(int x, int y) const;
 
-        bool getBufferPixel(int x, int y);
+        [[nodiscard]] bool getBufferPixel(int x, int y) const;
 
         void setBufferPixel(int x, int y, bool color);
 
         void drawPixel(int x, int y, LCDColor color);
 
-        LCDSolidColor getPixel(int x, int y);
+        [[nodiscard]] LCDSolidColor getPixel(int x, int y) const;
 
         void clear(LCDColor color);
 
@@ -58,6 +57,10 @@ namespace cranked {
 
         // Todo: Can be more efficient since it's done in horizontal segments
         void fillRect(int x, int y, int w, int h, LCDColor color);
+
+        void drawBitmap(Bitmap image, int x, int y, int w = -1, int h = -1, int sourceX = 0, int sourceY = 0); // Todo: Support more options
+
+        [[nodiscard]] vector<uint8> toRGB() const;
 
         // Todo: Rotate bitmaps using three shears method: https://gautamnagrawal.medium.com/rotating-image-by-any-angle-shear-transformation-using-only-numpy-d28d16eb5076
 
@@ -71,11 +74,9 @@ namespace cranked {
     struct LCDSprite_32 : NativeResource {
         explicit LCDSprite_32(Cranked &cranked);
 
-        LCDSprite_32(const LCDSprite_32 &other) = delete;
-        LCDSprite_32(LCDSprite_32 &&other) = delete;
         ~LCDSprite_32() override;
 
-        Rect getWorldCollideRect() {
+        [[nodiscard]] Rect getWorldCollideRect() const {
             return { bounds.pos + collideRect.pos, collideRect.size };
         }
 
@@ -95,7 +96,7 @@ namespace cranked {
         /// Sets the bounding rect in screen space (Before draw offset, and size is overridden if an image is present)
         void setBounds(Rect rect) {
             bounds = rect;
-            if (image) // Todo: Is this correct?
+            if (image)
                 bounds.size = { (float)image->width, (float)image->height };
             updateCollisionWorld();
         }
@@ -112,7 +113,7 @@ namespace cranked {
         }
 
         /// Sets the image and adjusts the bounds to maintain the same position
-        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip) {
+        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip, float xScale = 1, float yScale = 1) {
             // Todo: Figure out how this relates to stencil
             if (!dontRedrawOnImageChange)
                 dirty = true;
@@ -120,15 +121,26 @@ namespace cranked {
                 opaque = true;
             image = bitmap;
             flip = bitmapFlip;
+            scale = { xScale, yScale };
             Vec2 pos = getPosition();
             if (bitmap)
                 bounds.size = { (float)bitmap->width, (float)bitmap->height };
             setPosition(pos);
         }
 
-        /// Returns the offset from the world space top-left corner that is considered the sprite's position
+        /// Returns the offset from the world space top-left corner to the sprite's considered position
         [[nodiscard]] Vec2 getCenterOffset() const {
             return { center.x * bounds.size.x, center.y * bounds.size.y };
+        }
+
+        /// Returns the offset from the world space collision rect position to the sprite's considered position
+        [[nodiscard]] Vec2 getCollisionRectToCenterOffset() const {
+            return getCenterOffset() - collideRect.pos;
+        }
+
+        void setImage(Bitmap bitmap) {
+            image = bitmap;
+            collideRectFlip = GraphicsFlip::Unflipped;
         }
 
         void draw();
@@ -139,6 +151,7 @@ namespace cranked {
 
         Rect bounds{};
         BitmapRef image{};
+        TileMapRef tileMap{}; // Todo: Behavior compared to image (Replaces image?)
         Vec2 center{ 0.5f, 0.5f };
         bool visible = true;
         bool updatesEnabled = true;
@@ -147,13 +160,16 @@ namespace cranked {
         bool opaque{};
         bool collisionsEnabled = true;
         Rect collideRect{};
-        uint32 groupMask{}; // Todo: Only present on Lua side, just filters after Bump output? Or filter passed into bump calls?
+        GraphicsFlip collideRectFlip{}; // Todo
+        uint32 groupMask{}; // Only used by Lua
+        uint32 collidesWithGroupMask{};
         int16 zIndex{};
-        Rect scale{};
+        Vec2 scale{ 1.0f, 1.0f };
+        float rotation{};
         IntRect clipRect{};
         uint8 tag{};
-        LCDBitmapDrawMode drawMode{};
-        LCDBitmapFlip flip{};
+        BitmapDrawMode drawMode{};
+        GraphicsFlip flip{};
         BitmapRef stencil{};
         bool stencilTiled{};
         cref_t updateFunction{};
@@ -162,27 +178,34 @@ namespace cranked {
         cref_t userdata{};
         bool dirty = true;
         vector<LCDRect_32> dirtyRects;
+        bool inDrawList; // Only set from Graphics
     };
 
     struct LCDBitmapTable_32 : NativeResource {
         LCDBitmapTable_32(Cranked &cranked, int cellsPerRow);
 
-        LCDBitmapTable_32(const LCDBitmapTable_32 &other) = default;
-        LCDBitmapTable_32(LCDBitmapTable_32 &&other) = delete;
-        ~LCDBitmapTable_32() override = default;
-
         LCDBitmapTable_32 &operator=(const LCDBitmapTable_32 &other);
+
+        [[nodiscard]] IntVec2 getBitmapSize() const;
 
         int cellsPerRow{};
         vector<BitmapRef> bitmaps;
     };
 
+    struct LCDTileMap_32 : NativeResource {
+        explicit LCDTileMap_32(Cranked &cranked);
+
+        [[nodiscard]] int getHeight() const {
+            return (int)tiles.size() / width;
+        }
+
+        BitmapTableRef table;
+        int width{};
+        vector<int> tiles;
+    };
+
     struct LCDFontGlyph_32 : NativeResource {
         explicit LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable);
-
-        LCDFontGlyph_32(const LCDFontGlyph_32 &other) = delete;
-        LCDFontGlyph_32(LCDFontGlyph_32 &&other) = delete;
-        ~LCDFontGlyph_32() override = default;
 
         int advance;
         map<int, int8> shortKerningTable; // Page 0 entries
@@ -193,19 +216,11 @@ namespace cranked {
     struct LCDFontPage_32 : NativeResource {
         explicit LCDFontPage_32(Cranked &cranked);
 
-        LCDFontPage_32(const LCDFontPage_32 &other) = delete;
-        LCDFontPage_32(LCDFontPage_32 &&other) = delete;
-        ~LCDFontPage_32() override = default;
-
         unordered_map<int, FontGlyphRef> glyphs;
     };
 
     struct LCDFont_32 : NativeResource {
         explicit LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight);
-
-        LCDFont_32(const LCDFont_32 &other) = delete;
-        LCDFont_32(LCDFont_32 &&other) = delete;
-        ~LCDFont_32() override = default;
 
         int tracking;
         int glyphWidth;
@@ -213,12 +228,8 @@ namespace cranked {
         unordered_map<int, FontPageRef> pages;
     };
 
-    struct DisplayContext { // Todo: Lua native resources used here should be saved into a `set` table to prevent garbage collection until popped/reset
+    struct DisplayContext {
         explicit DisplayContext(Bitmap bitmap) : bitmap(bitmap) {}
-
-        DisplayContext(const DisplayContext &other) = default;
-        DisplayContext(DisplayContext &&other) = delete;
-        DisplayContext &operator=(const DisplayContext &other) = default;
 
         void reset() {
             bitmap.reset();
@@ -253,6 +264,9 @@ namespace cranked {
         uint8 stencilPattern[8]{}; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
         bool usingStencil{};
         BitmapRef focusedImage; // Todo: Is this global or context specific?
+        bool usingDither{};
+        DitherType ditherPattern{};
+        float ditherAlpha{};
         LCDBitmapDrawMode bitmapDrawMode{};
         FontRef font{};
         FontRef boldFont{};
@@ -303,10 +317,6 @@ namespace cranked {
 
         void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
 
-        void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
-
-        void drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, LCDBitmapFlip flip);
-
         void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, Font font = nullptr);
 
         void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
@@ -317,6 +327,10 @@ namespace cranked {
 
         void drawPolygon(int32 *coords, int32 points, LCDColor color);
 
+        void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip = GraphicsFlip::Unflipped, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
+
+        void drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, LCDBitmapFlip flip);
+
         void drawScaledBitmap(Bitmap bitmap, int x, int y, float xScale, float yScale);
 
         Bitmap scaleBitmap(Bitmap bitmap, float xScale, float yScale);
@@ -325,9 +339,47 @@ namespace cranked {
 
         Bitmap rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale);
 
+        void drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase);
+
+        Bitmap blurredBitmap(Bitmap bitmap, float radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase);
+
+        void drawFadedBitmap(Bitmap bitmap, int x, int y, float alpha, DitherType type);
+
+        Bitmap fadedBitmap(Bitmap bitmap, float alpha, DitherType type);
+
+        Bitmap invertedBitmap(Bitmap bitmap);
+
+        Bitmap blendedBitmap(Bitmap bitmap, Bitmap other, float alpha, DitherType type);
+
+        Bitmap vcrPauseFilteredBitmap(Bitmap bitmap);
+
+        void drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
+
+        static bool checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect);
+
         void updateSprites();
 
         void drawSprites();
+
+        void setSpriteClipRectsInRage(IntRect rect, int startZ, int endZ) const {
+            for (auto sprite : allocatedSprites) {
+                if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
+                    sprite->clipRect = rect;
+            }
+        }
+
+        void clearSpriteClipRectsInRage(int startZ, int endZ) const {
+            for (auto sprite : allocatedSprites) {
+                if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
+                    sprite->clipRect = {};
+            }
+        }
+
+        void addSpriteToDrawList(Sprite sprite);
+
+        void removeSpriteFromDrawList(Sprite sprite);
+
+        void clearSpriteDrawList();
 
         Sprite createSprite() {
             return heap.construct<LCDSprite_32>(cranked);
@@ -343,6 +395,8 @@ namespace cranked {
 
         BitmapTable getBitmapTable(const string &path);
 
+        VideoPlayer getVideoPlayer(const string &path);
+
         Bitmap getImage(const string &path);
 
         Bitmap getImage(const Rom::ImageCell &source);
@@ -353,10 +407,12 @@ namespace cranked {
 
         Font getFont(const uint8 *data, bool wide);
 
+        Font getSystemFont(PDFontVariant variant = PDFontVariant::Normal);
+
         Cranked &cranked;
         HeapAllocator &heap;
-        Rom::Font systemFontSource;
-        FontRef systemFont;
+        Rom::Font systemFontSources[3]{};
+        FontRef systemFonts[3]{};
         uint32 displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
         bool displayBufferNativeEndian = false;
         uint32 displayBufferOnColor = 0xB0AEA7FF;
@@ -372,7 +428,7 @@ namespace cranked {
         float framerate{};
         bool alwaysRedrawSprites{};
         unordered_set<Sprite> allocatedSprites;
-        unordered_set<SpriteRef> spriteDrawList;
+        vector<SpriteRef> spriteDrawList;
     };
 
 }

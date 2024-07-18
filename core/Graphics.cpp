@@ -4,15 +4,15 @@
 using namespace cranked;
 
 Graphics::Graphics(Cranked &cranked)
-        : cranked(cranked), heap(cranked.heap), systemFontSource(Rom::readSystemFont("Asheville-Sans-14-Light.pft")) {}
+        : cranked(cranked), heap(cranked.heap), systemFontSources(Rom::readSystemFont("Asheville-Sans-14-Light.pft"), Rom::readSystemFont("Asheville-Sans-14-Bold.pft"), Rom::readSystemFont("Asheville-Sans-14-Light-Oblique.pft")) {}
 
-LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked) : NativeResource(cranked) {}
+LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked), frameRate(frameRate), size(size) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked), width(width), height(height), data(vheap_vector<uint8>(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
+        : NativeResource(cranked), width(width), height(height), data(vheap_vector(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
-        : NativeResource(other), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
+        : NativeResource(cranked), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
 
 LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     if (&other == this)
@@ -25,7 +25,7 @@ LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
 }
 
 LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable)
-        : NativeResource(bitmap->cranked), bitmap(bitmap), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable) {}
+        : NativeResource(bitmap->cranked), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable), bitmap(bitmap) {}
 
 LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked) {}
 
@@ -42,9 +42,17 @@ LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) 
     return *this;
 }
 
+[[nodiscard]] IntVec2 LCDBitmapTable_32::getBitmapSize() const {
+    if (!bitmaps.empty() and bitmaps[0])
+        return { bitmaps[0]->width, bitmaps[0]->height };
+    return {};
+}
+
+LCDTileMap_32::LCDTileMap_32(Cranked &cranked) : NativeResource(cranked) {}
+
 // Todo: These pixel functions should be used less and live in the header
 
-tuple<int, int> LCDBitmap_32::getBufferPixelLocation(int x, int y) {
+tuple<int, int> LCDBitmap_32::getBufferPixelLocation(int x, int y) const {
     if (x < 0 or x >= width or y < 0 or y >= height)
         return { 0, 0 };
     int offset = 7 - x % 8;
@@ -52,7 +60,7 @@ tuple<int, int> LCDBitmap_32::getBufferPixelLocation(int x, int y) {
     return { y * stride + x / 8, 1 << offset };
 }
 
-bool LCDBitmap_32::getBufferPixel(int x, int y) {
+bool LCDBitmap_32::getBufferPixel(int x, int y) const {
     if (x < 0 or x >= width or y < 0 or y >= height)
         return false;
     int offset = 7 - x % 8;
@@ -98,7 +106,7 @@ void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
         setBufferPixel(x, y, c == LCDSolidColor::White);
 }
 
-LCDSolidColor LCDBitmap_32::getPixel(int x, int y) {
+LCDSolidColor LCDBitmap_32::getPixel(int x, int y) const {
     bool pixel = getBufferPixel(x, y);
     if (inverted)
         pixel = not pixel;
@@ -158,12 +166,34 @@ void LCDBitmap_32::fillRect(int x, int y, int w, int h, LCDColor color) {
     }
 }
 
+// Todo: Can be more efficient
+void LCDBitmap_32::drawBitmap(Bitmap image, int x, int y, int w, int h, int sourceX, int sourceY) {
+    if (w < 0)
+        w = image->width;
+    if (h < 0)
+        h = image->height;
+    w = min(min(w, width - x), image->width - sourceX);
+    h = min(min(h, height - y), image->height - sourceY);
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            drawPixel(j, i, image->getPixel(x, y));
+        }
+    }
+}
+
+[[nodiscard]] vector<uint8> LCDBitmap_32::toRGB() const {
+    vector<uint8_t> frame(width * height);
+    for (int i = 0; i < height; i++)
+        for (int j = 0; j < width; j++)
+            ((uint32 *)frame.data())[i * width + j] = getPixel(j, i) == LCDSolidColor::White ? cranked.graphics.displayBufferOnColor : cranked.graphics.displayBufferOffColor;
+    return frame;
+}
+
 LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {
     cranked.graphics.allocatedSprites.emplace(this);
 }
 
 LCDSprite_32::~LCDSprite_32() {
-    eraseByEquivalentKey(cranked.graphics.spriteDrawList, this);
     cranked.graphics.allocatedSprites.erase(this);
 }
 
@@ -172,11 +202,12 @@ void LCDSprite_32::updateCollisionWorld() {
 }
 
 void LCDSprite_32::draw() {
-    if (!visible)
+    if (!visible or !inDrawList)
         return;
-    Vec2 drawPos = bounds.pos;// - Vec2{center.x * bounds.size.x, center.y * bounds.size.y};
-    if (image and clipRect) {
-        // Todo: Respect clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
+    Vec2 drawPos = bounds.pos;
+    // Todo: Support tilemap
+    if (image) {
+        // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
         cranked.graphics.drawBitmap(image.get(), (int)drawPos.x, (int)drawPos.y, flip, ignoresDrawOffset);
     } else if (drawFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::struct4f_t, ArgType::struct4f_t>
@@ -184,7 +215,7 @@ void LCDSprite_32::draw() {
 }
 
 void LCDSprite_32::update() {
-    if (!updatesEnabled)
+    if (!updatesEnabled or !inDrawList)
         return;
     if (updateFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t>(updateFunction, this);
@@ -195,6 +226,7 @@ Sprite LCDSprite_32::copy() {
     auto other = cranked.heap.construct<LCDSprite_32>(cranked);
     other->bounds = bounds;
     other->image = image;
+    other->tileMap = tileMap;
     other->center = center;
     other->visible = visible;
     other->updatesEnabled = updatesEnabled;
@@ -203,9 +235,12 @@ Sprite LCDSprite_32::copy() {
     other->opaque = opaque;
     other->collisionsEnabled = collisionsEnabled;
     other->collideRect = collideRect;
+    other->collideRectFlip = collideRectFlip;
     other->groupMask = groupMask;
+    other->collidesWithGroupMask = collidesWithGroupMask;
     other->zIndex = zIndex;
     other->scale = scale;
+    other->rotation = rotation;
     other->clipRect = clipRect;
     other->tag = tag;
     other->drawMode = drawMode;
@@ -282,10 +317,12 @@ void Graphics::fillRect(int x, int y, int width, int height, LCDColor color) {
 
 void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
     // Todo
+    drawRect(x, y, width, height, color);
 }
 
 void Graphics::fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
     // Todo
+    fillRect(x, y, width, height, color);
 }
 
 void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
@@ -365,7 +402,7 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
     const char *string = (const char *) text;
     auto &context = getCurrentDisplayContext();
     if (!font)
-        font = (context.font ? context.font : systemFont).get();
+        font = (context.font ? context.font : getSystemFont()).get();
     for (int i = 0; i < len; i++) {
         char character = string[i];
         int pageIndex = 0; // Todo: Temp ascii
@@ -564,9 +601,79 @@ Bitmap Graphics::rotateBitmap(Bitmap bitmap, float angle, float centerX, float c
     return rotated;
 }
 
+void Graphics::drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase) {
+    BitmapRef ref = blurredBitmap(bitmap, radius, numPasses, type, false, xPhase, yPhase);
+    drawBitmap(ref.get(), x, y, flip);
+}
+
+Bitmap Graphics::blurredBitmap(Bitmap bitmap, float radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase) {
+    auto blurred = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
+    // Todo
+    return blurred;
+}
+
+void Graphics::drawFadedBitmap(Bitmap bitmap, int x, int y, float alpha, DitherType type) {
+    BitmapRef ref = fadedBitmap(bitmap, alpha, type);
+    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+}
+
+Bitmap Graphics::fadedBitmap(Bitmap bitmap, float alpha, DitherType type) {
+    auto faded = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
+    // Todo
+    return faded;
+}
+
+Bitmap Graphics::invertedBitmap(Bitmap bitmap) {
+    auto inverted = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
+    for (int i = 0; i < (int)bitmap->data.size(); i++)
+        inverted->data[i] = ~bitmap->data[i]; // Affects row padding bits, which doesn't matter
+    inverted->mask = heap.construct<LCDBitmap_32>(*bitmap->mask);
+    return inverted;
+}
+
+Bitmap Graphics::blendedBitmap(Bitmap bitmap, Bitmap other, float alpha, DitherType type) {
+    auto blended = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height); // Size is probably either intersection or bitmap's
+    // Todo
+    return blended;
+}
+
+Bitmap Graphics::vcrPauseFilteredBitmap(Bitmap bitmap) {
+    auto filtered = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
+    // Todo
+    return filtered;
+}
+
+void Graphics::drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset, optional<IntRect> sourceRect) {
+    // Todo
+}
+
+bool Graphics::checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect) {
+    // Todo: This could be optimized with bitwise operations
+    IntRect rect1 = { x1, y1, bitmap1->width, bitmap1->height };
+    IntRect rect2 = { x2, y2, bitmap2->width, bitmap2->height };
+    bool flip1X = (int)flip1 & 0b01, flip1Y = (int)flip1 & 0b10;
+    bool flip2X = (int)flip2 & 0b01, flip2Y = (int)flip2 & 0b10;
+    const IntRect intersection = rect1.intersection(rect2).intersection(rect);
+    if (!intersection)
+        return false;
+    if (!bitmap1->mask or !bitmap2->mask)
+        return true;
+    for (int y = intersection.pos.y; y < intersection.pos.y + intersection.size.y; y++) {
+        int t1y = flip1Y ? bitmap1->height - 1 - (y - y1) : y - y1;
+        int t2y = flip2Y ? bitmap2->height - 1 - (y - y2) : y - y2;
+        for (int x = intersection.pos.x; x < intersection.pos.x + intersection.size.x; x++) {
+            int t1x = flip1X ? bitmap1->width - 1 - (x - x1) : x - x1;
+            int t2x = flip2X ? bitmap2->width - 1 - (x - x2) : x - x2;
+            if (bitmap1->mask->getBufferPixel(t1x, t1y) and bitmap2->mask->getBufferPixel(t2x, t2y))
+                return true;
+        }
+    }
+    return false;
+}
+
 void Graphics::updateSprites() {
     // Todo: Supposed to be updated in sorted order?
-    for (auto &sprite : spriteDrawList) {
+    for (auto &sprite : vector(spriteDrawList)) { // Guard against modifications in callback
         sprite->update();
     }
 }
@@ -575,10 +682,31 @@ void Graphics::drawSprites() {
     auto &context = getCurrentDisplayContext();
     context.bitmap->clear(context.backgroundColor);
     // Todo: Dirty rect support
-    // Todo: Sort by Z then added order (Stable sort?)
-    for (auto &sprite : spriteDrawList) {
+    auto sprites = vector(spriteDrawList);
+    stable_sort(sprites.begin(), sprites.end(), [](const SpriteRef &a, const SpriteRef &b) { return a->zIndex < b->zIndex; }); // Todo: Does this need to be a stable sort within same Z layer?
+    for (auto &sprite : sprites) {
         sprite->draw();
     }
+}
+
+void Graphics::addSpriteToDrawList(Sprite sprite) {
+    spriteDrawList.emplace_back(sprite);
+    cranked.bump.updateSprite(sprite);
+    sprite->inDrawList = true;
+}
+
+void Graphics::removeSpriteFromDrawList(Sprite sprite) {
+    eraseByEquivalentValue(spriteDrawList, sprite);
+    cranked.bump.removeSprite(sprite);
+    sprite->inDrawList = false;
+}
+
+void Graphics::clearSpriteDrawList() {
+    for (auto &sprite : spriteDrawList) {
+        cranked.bump.removeSprite(sprite.get());
+        sprite->inDrawList = false;
+    }
+    spriteDrawList.clear();
 }
 
 BitmapTable Graphics::getBitmapTable(const string &path) {
@@ -588,6 +716,21 @@ BitmapTable Graphics::getBitmapTable(const string &path) {
     for (auto &bitmap : bitmapTable.cells)
         table->bitmaps.emplace_back(getImage(bitmap));
     return table;
+}
+
+VideoPlayer Graphics::getVideoPlayer(const string &path) {
+    auto video = cranked.rom->getVideo(path);
+    auto stride = (int) ceil((float) video.width / 8);
+    auto player = heap.construct<LCDVideoPlayer_32>(cranked, video.framerate, IntVec2{ video.width, video.height });
+    for (auto data : video.frames) {
+        auto bitmap = heap.construct<LCDBitmap_32>(cranked, video.width, video.height);
+        for (int i = 0; i < video.height; i++)
+            for (int j = 0; j < video.width; j++)
+                if (data[i * video.width + j])
+                    bitmap->data[stride * i + j / 8] |= 0x80 >> (j % 8);
+        player->frames.emplace_back(bitmap);
+    }
+    return player;
 }
 
 Bitmap Graphics::getImage(const string &path) {
@@ -634,17 +777,23 @@ Font Graphics::getFont(const uint8 *data, bool wide) {
     return font;
 }
 
+Font Graphics::getSystemFont(PDFontVariant variant) {
+    return systemFonts[(int)variant].get();
+}
+
 void Graphics::init() {
     frameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     previousFrameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     frameBufferContext = DisplayContext(frameBuffer.get());
-    systemFont = getFont(systemFontSource);
+    for (int i = 0; i < 3; i++)
+        systemFonts[i] = getFont(systemFontSources[i]);
 }
 
 void Graphics::reset() {
     frameBuffer.reset();
     previousFrameBuffer.reset();
-    systemFont.reset();
+    for (auto &font : systemFonts)
+        font.reset();
 
     for (auto &context : displayContextStack)
         context.reset();
@@ -652,7 +801,7 @@ void Graphics::reset() {
 
     frameBufferContext.reset();
 
-    for (SpriteRef &sprite : vector(spriteDrawList.begin(), spriteDrawList.end()))
+    for (SpriteRef &sprite : vector(spriteDrawList))
         sprite.reset();
     spriteDrawList.clear();
 

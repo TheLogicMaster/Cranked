@@ -30,9 +30,7 @@ namespace cranked {
         explicit SoundSource_32(Cranked &cranked);
 
         // Don't copy callbacks
-        SoundSource_32(const SoundSource_32 &other) : NativeResource(other), leftVolume(other.leftVolume), rightVolume(other.rightVolume), playing(other.playing) {}
-
-        SoundSource_32(SoundSource_32 &&other) = delete;
+        SoundSource_32(const SoundSource_32 &other) : NativeResource(cranked), leftVolume(other.leftVolume), rightVolume(other.rightVolume), playing(other.playing) {}
 
         ~SoundSource_32() override;
 
@@ -45,10 +43,6 @@ namespace cranked {
     struct AudioSample_32 : NativeResource {
         AudioSample_32(Cranked &cranked, int size);
 
-        AudioSample_32(const AudioSample_32 &other) = delete;
-        AudioSample_32(AudioSample_32 &&other) = delete;
-        ~AudioSample_32() override = default;
-
         vheap_vector<uint8> data;
         uint32 sampleRate{};
         SoundFormat soundFormat{};
@@ -57,8 +51,6 @@ namespace cranked {
     struct SoundEffect_32 : NativeResource {
         explicit SoundEffect_32(Cranked &cranked);
 
-        SoundEffect_32(const SoundEffect_32 &other) = delete;
-        SoundEffect_32(SoundEffect_32 &&other) = delete;
         ~SoundEffect_32() override;
 
         float mixLevel = 1.0f;
@@ -69,8 +61,6 @@ namespace cranked {
     struct PDSynthSignalValue_32 : NativeResource {
         explicit PDSynthSignalValue_32(Cranked &cranked);
 
-        PDSynthSignalValue_32(const PDSynthSignalValue_32 &other) = delete;
-        PDSynthSignalValue_32(PDSynthSignalValue_32 &&other) = delete;
         ~PDSynthSignalValue_32() override;
 
 //    virtual float stepSignal() = 0; // Todo: ioSamples and interframe value parameters? Note on/off functions?
@@ -80,10 +70,6 @@ namespace cranked {
         struct Signal : PDSynthSignalValue_32 {
             explicit Signal(SoundChannel_32 *channel, bool wet);
 
-            Signal(const Signal &other) = delete;
-            Signal(Signal &&other) = delete;
-            ~Signal() override = default;
-
 //        float stepSignal() override;
             SoundChannel channel;
             const bool wet;
@@ -91,12 +77,10 @@ namespace cranked {
 
         explicit SoundChannel_32(Cranked &cranked);
 
-        SoundChannel_32(const SoundChannel_32 &other) = delete;
-        SoundChannel_32(SoundChannel_32 &&other) = delete;
         ~SoundChannel_32() override;
 
-        unordered_set<SoundSourceRef> sources{};
-        unordered_set<SoundEffectRef> effects{};
+        unordered_resource_set<SoundSource> sources{};
+        unordered_resource_set<SoundEffect> effects{};
         float volume = 1.0f;
         float pan = 0.5f;
         SynthSignalValueRef volumeModulator{};
@@ -109,8 +93,6 @@ namespace cranked {
         explicit AudioPlayerBase(Cranked &cranked);
 
         AudioPlayerBase(const AudioPlayerBase &other) : SoundSource_32(other), rate(other.rate) {}
-        AudioPlayerBase(AudioPlayerBase &&other) = delete;
-        ~AudioPlayerBase() override = default;
 
         int sampleOffset{};
         float rate = 1.0f;
@@ -125,10 +107,6 @@ namespace cranked {
     struct FilePlayer_32 : AudioPlayerBase {
         explicit FilePlayer_32(Cranked &cranked);
 
-        FilePlayer_32(const FilePlayer_32 &other) = delete;
-        FilePlayer_32(FilePlayer_32 &&other) = delete;
-        ~FilePlayer_32() override = default;
-
         FileRef file{};
         bool stopOnUnderrun{};
         bool underran{};
@@ -140,19 +118,11 @@ namespace cranked {
     struct SamplePlayer_32 : AudioPlayerBase {
         explicit SamplePlayer_32(Cranked &cranked);
 
-        SamplePlayer_32(const SamplePlayer_32 &other) = default;
-        SamplePlayer_32(SamplePlayer_32 &&other) = delete;
-        ~SamplePlayer_32() override = default;
-
         AudioSampleRef sample{};
     };
 
     struct PDSynthSignal_32 : PDSynthSignalValue_32 {
         explicit PDSynthSignal_32(Cranked &cranked);
-
-        PDSynthSignal_32(const PDSynthSignal_32 &other) = delete;
-        PDSynthSignal_32(PDSynthSignal_32 &&other) = delete;
-        ~PDSynthSignal_32() override = default;
 
         int offset{};
         float scale{};
@@ -160,10 +130,6 @@ namespace cranked {
 
     struct PDSynthLFO_32 : PDSynthSignal_32 {
         PDSynthLFO_32(Cranked &cranked, LFOType type);
-
-        PDSynthLFO_32(const PDSynthLFO_32 &other) = delete;
-        PDSynthLFO_32(PDSynthLFO_32 &&other) = delete;
-        ~PDSynthLFO_32() override = default;
 
         LFOType type;
         float rate{};
@@ -183,10 +149,6 @@ namespace cranked {
     struct PDSynthEnvelope_32 : PDSynthSignal_32 {
         explicit PDSynthEnvelope_32(Cranked &cranked, float attack = 0, float decay = 0, float sustain = 0, float release = 0);
 
-        PDSynthEnvelope_32(const PDSynthEnvelope_32 &other) = delete;
-        PDSynthEnvelope_32(PDSynthEnvelope_32 &&other) = delete;
-        ~PDSynthEnvelope_32() override = default;
-
         float attack, decay, sustain, release;
         float curvature{};
         float velocitySensitivity{};
@@ -205,10 +167,6 @@ namespace cranked {
 
     struct PDSynth_32 : SoundSource_32 {
         explicit PDSynth_32(Cranked &cranked);
-
-        PDSynth_32(const PDSynth_32 &other) = delete;
-        PDSynth_32(PDSynth_32 &&other) = delete;
-        ~PDSynth_32() override = default;
 
         SoundWaveform waveform{};
         bool generatorStereo{};
@@ -243,10 +201,6 @@ namespace cranked {
 
         explicit ControlSignal_32(Cranked &cranked);
 
-        ControlSignal_32(const ControlSignal_32 &other) = delete;
-        ControlSignal_32(ControlSignal_32 &&other) = delete;
-        ~ControlSignal_32() override = default;
-
         multimap<int32, Event> events{};
         int controllerNumber{};
     };
@@ -254,16 +208,12 @@ namespace cranked {
     struct PDSynthInstrument_32 : SoundSource_32 {
         explicit PDSynthInstrument_32(Cranked &cranked);
 
-        PDSynthInstrument_32(const PDSynthInstrument_32 &other) = delete;
-        PDSynthInstrument_32(PDSynthInstrument_32 &&other) = delete;
-        ~PDSynthInstrument_32() override = default;
-
 //    void playNote(float frequency, float vel, float length, uint32 when);
 //    void setNoteOff(float frequency, uint32 when);
 //    void setAllNotesOff(uint32 when);
 //    int countVoicesPlaying();
 
-        unordered_set<SynthRef> voices{};
+        unordered_resource_set<Synth> voices{};
         float pitchBend{};
         float pitchBendRangeHalfSteps{};
         float transposeHalfSteps{};
@@ -272,20 +222,12 @@ namespace cranked {
     struct SequenceTrack_32 : SoundSource_32 {
         explicit SequenceTrack_32(Cranked &cranked);
 
-        SequenceTrack_32(const SequenceTrack_32 &other) = delete;
-        SequenceTrack_32(SequenceTrack_32 &&other) = delete;
-        ~SequenceTrack_32() override = default;
-
         SynthInstrumentRef instrument{};
         bool muted{};
     };
 
     struct SoundSequence_32 : SoundSource_32 {
         explicit SoundSequence_32(Cranked &cranked);
-
-        SoundSequence_32(const SoundSequence_32 &other) = delete;
-        SoundSequence_32(SoundSequence_32 &&other) = delete;
-        ~SoundSequence_32() override = default;
 
         int time{};
         float tempo{}; // Steps per second
@@ -296,10 +238,6 @@ namespace cranked {
 
     struct TwoPoleFilter_32 : SoundEffect_32 {
         explicit TwoPoleFilter_32(Cranked &cranked);
-
-        TwoPoleFilter_32(const TwoPoleFilter_32 &other) = delete;
-        TwoPoleFilter_32(TwoPoleFilter_32 &&other) = delete;
-        ~TwoPoleFilter_32() override = default;
 
         TwoPoleFilterType type{};
         float frequency{};
@@ -312,20 +250,12 @@ namespace cranked {
     struct OnePoleFilter_32 : SoundEffect_32 {
         explicit OnePoleFilter_32(Cranked &cranked);
 
-        OnePoleFilter_32(const OnePoleFilter_32 &other) = delete;
-        OnePoleFilter_32(OnePoleFilter_32 &&other) = delete;
-        ~OnePoleFilter_32() override = default;
-
         float cutoffFrequency{};
         SynthSignalValueRef cutoffFrequencyModulator{};
     };
 
     struct BitCrusher_32 : SoundEffect_32 {
         explicit BitCrusher_32(Cranked &cranked);
-
-        BitCrusher_32(const BitCrusher_32 &other) = delete;
-        BitCrusher_32(BitCrusher_32 &&other) = delete;
-        ~BitCrusher_32() override = default;
 
         float amount{};
         SynthSignalValueRef amountModulator{};
@@ -336,20 +266,12 @@ namespace cranked {
     struct RingModulator_32 : SoundEffect_32 {
         explicit RingModulator_32(Cranked &cranked);
 
-        RingModulator_32(const RingModulator_32 &other) = delete;
-        RingModulator_32(RingModulator_32 &&other) = delete;
-        ~RingModulator_32() override = default;
-
         float frequency{};
         SynthSignalValueRef frequencyModulator{};
     };
 
     struct DelayLine_32 : SoundEffect_32 {
         explicit DelayLine_32(Cranked &cranked, int length, bool stereo);
-
-        DelayLine_32(const DelayLine_32 &other) = delete;
-        DelayLine_32(DelayLine_32 &&other) = delete;
-        ~DelayLine_32() override = default;
 
         const bool stereo;
         vector<int32> data;
@@ -359,10 +281,6 @@ namespace cranked {
     struct DelayLineTap_32 : SoundSource_32 {
         explicit DelayLineTap_32(Cranked &cranked, DelayLine_32 *delayLine, int delay);
 
-        DelayLineTap_32(const DelayLineTap_32 &other) = delete;
-        DelayLineTap_32(DelayLineTap_32 &&other) = delete;
-        ~DelayLineTap_32() override = default;
-
         DelayLineRef delayLine;
         int delayFrames{};
         SynthSignalValueRef delayModulator{};
@@ -371,10 +289,6 @@ namespace cranked {
 
     struct Overdrive_32 : SoundEffect_32 {
         explicit Overdrive_32(Cranked &cranked);
-
-        Overdrive_32(const Overdrive_32 &other) = delete;
-        Overdrive_32(Overdrive_32 &&other) = delete;
-        ~Overdrive_32() override = default;
 
         float gain{};
         float limit{};
@@ -416,7 +330,7 @@ namespace cranked {
         Cranked &cranked;
         HeapAllocator &heap;
         SoundChannelRef mainChannel;
-        unordered_set<SoundChannelRef> activeChannels{};
+        unordered_resource_set<SoundChannel> activeChannels{};
         int sampleTime{};
         cref_t lastError{};
         cref_t micCallback{};

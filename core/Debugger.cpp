@@ -29,6 +29,8 @@ void Debugger::init() {
     }
 
 #if USE_CAPSTONE
+    if (nativeEngine.getCodeMemory().empty())
+        return;
     if (disassemblySize = (int)cs_disasm(capstoneHandle, nativeEngine.getCodeMemory().data() + CODE_OFFSET, nativeEngine.getCodeMemory().size() - CODE_OFFSET, CODE_ADDRESS, 0, &disassembly); disassemblySize == 0)
         throw CrankedError("Failed to disassemble program: {}", cs_strerror(cs_errno(capstoneHandle)));
 #endif
@@ -170,7 +172,7 @@ void Debugger::processPacket(string_view data) {
         return;
     }
     cranked.logMessage(LogLevel::Verbose, "GDB Packet: `%.*s`", (int)data.length(), data.begin());
-    (this->*packetHandlers.at(results[0]))(results);
+    (this->*atEquivalentKey(packetHandlers, results[0]))(results); // Using janky pointer to member syntax
 }
 
 void Debugger::sendData(string data) {

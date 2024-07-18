@@ -54,13 +54,10 @@ namespace cranked {
         }
 
         cref_t getEmulatedStringLiteral(const string &message) {
-            try { // Todo: Don't try-catch
-                return emulatedStringLiterals.at(message);
-            } catch (out_of_range &ex) {
-                auto ref = toVirtualAddress(heap.allocateString(message.c_str()));
-                emulatedStringLiterals[message] = ref;
-                return ref;
-            }
+            auto &value = emulatedStringLiterals[message];
+            if (!value)
+                value = toVirtualAddress(heap.allocateString(message.c_str()));
+            return value;
         }
 
         void pushEmulatedLuaFunction(cref_t func);
@@ -147,9 +144,9 @@ namespace cranked {
 
         void freeResource(void *ptr);
 
-        template<typename T, typename ...Args> requires derived_from<T, NativeResource>
-        T *createReferencedResource(Args ...args) {
-            T *resource = heap.construct<T>(cranked, args...);
+        template<typename T, typename ...Args> requires is_resource_ptr<T>
+        T createReferencedResource(Args ...args) {
+            T resource = heap.construct<remove_pointer_t<T>>(cranked, args...);
             resource->reference();
             return resource;
         }
@@ -386,7 +383,7 @@ namespace cranked {
         cref_t nativeEventCallback{};
         cref_t nativeUpdateCallback{};
         cref_t nativeUpdateUserdata{};
-        unordered_map<string, cref_t> emulatedStringLiterals;
+        unordered_string_map<cref_t> emulatedStringLiterals;
         vector<cref_t> emulatedLuaFunctions;
         cref_t lastBadAccessAddress{};
         unordered_set<NativeResource *> nativeResources;

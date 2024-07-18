@@ -8,40 +8,57 @@
 using namespace cranked;
 
 VideoPlayer cranked::playdate_video_loadVideo(Cranked *cranked, uint8 *path) {
-    // Todo
-    return nullptr;
+    auto player = cranked->graphics.getVideoPlayer((char *)path);
+    player->reference();
+    return player;
 }
 
 void cranked::playdate_video_freePlayer(Cranked *cranked, VideoPlayer p) {
-    // Todo
+    p->dereference();
 }
 
 int32 cranked::playdate_video_setContext(Cranked *cranked, VideoPlayer p, Bitmap context) {
-    // Todo
-    return 0;
+    // Todo: What errors are possible? Should this check size?
+    p->target = context;
+    return true;
 }
 
 void cranked::playdate_video_useScreenContext(Cranked *cranked, VideoPlayer p) {
-    // Todo
+    p->target = cranked->graphics.frameBufferContext.bitmap;
 }
 
 int32 cranked::playdate_video_renderFrame(Cranked *cranked, VideoPlayer p, int32 n) {
-    // Todo
-    return 0;
+    // Todo: What errors?
+    if (n < 0 or n >= p->frames.size()) {
+        p->lastError = cranked->nativeEngine.getEmulatedStringLiteral("Frame out of bounds");
+        return false;
+    }
+    p->currentFrame = n;
+    p->target->drawBitmap(p->frames[n].get(), 0, 0);
+    return true;
 }
 
 uint8 *cranked::playdate_video_getError(Cranked *cranked, VideoPlayer p) {
-    // Todo
-    return nullptr;
+    return cranked->nativeEngine.fromVirtualAddress<uint8>(p->lastError);
 }
 
 void cranked::playdate_video_getInfo(Cranked *cranked, VideoPlayer p, int32 *outWidth, int32 *outHeight, float *outFrameRate, int32 *outFrameCount, int32 *outCurrentFrame) {
-    // Todo
+    if (outWidth)
+        *outWidth = p->size.x;
+    if (outHeight)
+        *outHeight = p->size.y;
+    if (outFrameRate)
+        *outFrameRate = p->frameRate;
+    if (outFrameCount)
+        *outFrameCount = (int)p->frames.size();
+    if (outCurrentFrame)
+        *outCurrentFrame = p->currentFrame;
 }
 
 Bitmap cranked::playdate_video_getContext(Cranked *cranked, VideoPlayer p) {
-    // Todo
-    return nullptr;
+    if (!p->target)
+        p->target = cranked->heap.construct<LCDBitmap_32>(*cranked, p->size.x, p->size.y);
+    return p->target.get();
 }
 
 void cranked::playdate_graphics_clear(Cranked *cranked, uint32 color) {
@@ -128,7 +145,7 @@ void cranked::playdate_graphics_fillEllipse(Cranked *cranked, int32 x, int32 y, 
 }
 
 void cranked::playdate_graphics_drawScaledBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, float xscale, float yscale) {
-    // Todo
+    cranked->graphics.drawScaledBitmap(bitmap, x, y, xscale, yscale);
 }
 
 int32 cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32 len, int32 encoding, int32 x, int32 y) {
@@ -149,7 +166,9 @@ void cranked::playdate_graphics_freeBitmap(Cranked *cranked, Bitmap ptr) {
 
 Bitmap cranked::playdate_graphics_loadBitmap(Cranked *cranked, uint8 *path, cref_t *outerr) {
     try {
-        return cranked->graphics.getImage((const char *) path);
+        auto image = cranked->graphics.getImage((const char *) path);
+        image->reference();
+        return image;
     } catch (exception &ex) {
         *outerr = cranked->getEmulatedStringLiteral(ex.what());
         return nullptr;
@@ -171,11 +190,16 @@ void cranked::playdate_graphics_loadIntoBitmap(Cranked *cranked, uint8 *path, Bi
 }
 
 void cranked::playdate_graphics_getBitmapData(Cranked *cranked, Bitmap bitmap, int32 *width, int32 *height, int32 *rowbytes, cref_t *mask, cref_t *data) {
-    *width = bitmap->width;
-    *height = bitmap->height;
-    *rowbytes = 1 + bitmap->width / 8;
-    *data = cranked->toVirtualAddress(bitmap->data.data());
-    *mask = cranked->toVirtualAddress(bitmap->mask ? bitmap->mask->data.data() : nullptr);
+    if (width)
+        *width = bitmap->width;
+    if (height)
+        *height = bitmap->height;
+    if (rowbytes)
+        *rowbytes = 1 + bitmap->width / 8;
+    if (data)
+        *data = cranked->toVirtualAddress(bitmap->data.data());
+    if (mask)
+        *mask = cranked->toVirtualAddress(bitmap->mask ? bitmap->mask->data.data() : nullptr);
 }
 
 void cranked::playdate_graphics_clearBitmap(Cranked *cranked, Bitmap bitmap, uint32 bgcolor) {
@@ -183,12 +207,13 @@ void cranked::playdate_graphics_clearBitmap(Cranked *cranked, Bitmap bitmap, uin
 }
 
 Bitmap cranked::playdate_graphics_rotatedBitmap(Cranked *cranked, Bitmap bitmap, float rotation, float xscale, float yscale, int32 *allocedSize) {
-    // Todo
-    return nullptr;
+    auto rotated = cranked->graphics.rotateBitmap(bitmap, rotation, 0.5f, 0.5f, xscale, yscale);
+    rotated->reference();
+    return rotated;
 }
 
 BitmapTable cranked::playdate_graphics_newBitmapTable(Cranked *cranked, int32 count, int32 width, int32 height) {
-    auto table = cranked->graphics.createBitmapTable(count);
+    auto table = cranked->graphics.createBitmapTable(count); // Todo: Do something with size
     table->reference();
     return table;
 }
@@ -304,33 +329,11 @@ void cranked::playdate_graphics_display(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_setColorToPattern(Cranked *cranked, uint32 *color, Bitmap bitmap, int32 x, int32 y) {
-    auto colorVal = (LCDColor *)color;
-    auto [ offset, bit ] = bitmap->getBufferPixelLocation(x, y);
-    colorVal->pattern = cranked->nativeEngine.toVirtualAddress(&bitmap->data[offset]); // Todo: Does this even work?
+    // Todo: Does this set color to a pointer which must be freed by the caller? Or just point to the bitmap data?
 }
 
 int32 cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, Bitmap bitmap1, int32 x1, int32 y1, int32 flip1, Bitmap bitmap2, int32 x2, int32 y2, int32 flip2, LCDRect_32 rect) {
-    // Todo: This could be optimized with bitwise operations
-    IntRect rect1 = { x1, y1, bitmap1->width, bitmap1->height };
-    IntRect rect2 = { x2, y2, bitmap2->width, bitmap2->height };
-    bool flip1X = flip1 & 0b01, flip1Y = flip1 & 0b10;
-    bool flip2X = flip2 & 0b01, flip2Y = flip2 & 0b10;
-    const IntRect intersection = rect1.intersection(rect2);
-    if (!intersection)
-        return false;
-    if (!bitmap1->mask or !bitmap2->mask)
-        return true;
-    for (int y = intersection.pos.y; y < intersection.pos.y + intersection.size.y; y++) {
-        int t1y = flip1Y ? bitmap1->height - 1 - (y - y1) : y - y1;
-        int t2y = flip2Y ? bitmap2->height - 1 - (y - y2) : y - y2;
-        for (int x = intersection.pos.x; x < intersection.pos.x + intersection.size.x; x++) {
-            int t1x = flip1X ? bitmap1->width - 1 - (x - x1) : x - x1;
-            int t2x = flip2X ? bitmap2->width - 1 - (x - x2) : x - x2;
-            if (bitmap1->mask->getBufferPixel(t1x, t1y) and bitmap2->mask->getBufferPixel(t2x, t2y))
-                return true;
-        }
-    }
-    return false;
+    return Graphics::checkBitmapMaskCollision(bitmap1, x1, y1, (GraphicsFlip)flip1, bitmap2, x2, y2, (GraphicsFlip)flip2, toRect(rect));
 }
 
 void cranked::playdate_graphics_setScreenClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
@@ -350,7 +353,7 @@ Bitmap cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
 }
 
 void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, float rotation, float centerx, float centery, float xscale, float yscale) {
-    // Todo
+    cranked->graphics.drawRotatedBitmap(bitmap, x, y, rotation, centerx, centery, xscale, yscale);
 }
 
 void cranked::playdate_graphics_setTextLeading(Cranked *cranked, int32 lineHeightAdustment) {
@@ -406,13 +409,15 @@ void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32 size) {
 }
 
 int32 cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8 *fmt, ...) {
-    va_list args;
+    va_list args, args2;
     va_start(args, fmt);
+    va_copy(args2, args);
     auto size = vsnprintf(nullptr, 0, (const char *) fmt, args);
     auto buffer = (uint8 *) cranked->heap.allocate(size + 1);
     *ret = cranked->toVirtualAddress(buffer);
-    vsprintf((char *) buffer, (const char *) fmt, args);
+    vsprintf((char *) buffer, (const char *) fmt, args2);
     va_end(args);
+    va_end(args2);
     return size;
 }
 
@@ -458,7 +463,7 @@ void cranked::playdate_sys_drawFPS(Cranked *cranked, int32 x, int32 y) {
     cranked->graphics.fillRect(x - 2, y - 2, 14 * (int)string.size() + 2, 30, LCDSolidColor::White);
     auto context = cranked->graphics.pushContext(cranked->graphics.frameBuffer.get());
     context.bitmapDrawMode = LCDBitmapDrawMode::Copy;
-    cranked->graphics.drawText(string.c_str(), (int)string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.systemFont.get());
+    cranked->graphics.drawText(string.c_str(), (int)string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.getSystemFont());
     cranked->graphics.popContext();
 }
 
@@ -1004,17 +1009,7 @@ void cranked::playdate_lua_pushFunction(Cranked *cranked, cref_t f) {
 }
 
 int32 cranked::playdate_lua_indexMetatable(Cranked *cranked) {
-    auto context = cranked->getLuaContext();
-    if (!context)
-        return false;
-    if (!lua_getmetatable(context, 1))
-        return false;
-    lua_pushvalue(context, 2);
-    if (!lua_rawget(context, 1)) {
-        lua_pop(context, 1);
-        return false;
-    }
-    return true;
+    return cranked->luaEngine.indexMetatable();
 }
 
 void cranked::playdate_lua_stop(Cranked *cranked) {
@@ -1115,13 +1110,13 @@ void *cranked::playdate_lua_getArgObject(Cranked *cranked, int32 pos, uint8 *typ
 Bitmap cranked::playdate_lua_getBitmap(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
-    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<LCDBitmap_32>(); // Todo: Should this add a reference?
+    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<Bitmap>(); // Todo: Should this add a reference?
 }
 
 Sprite cranked::playdate_lua_getSprite(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return nullptr;
-    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<LCDSprite_32>(); // Todo: Should this add a reference?
+    return LuaVal(cranked->getLuaContext(), pos).asUserdataObject<Sprite>(); // Todo: Should this add a reference?
 }
 
 void cranked::playdate_lua_pushNil(Cranked *cranked) {
@@ -1163,13 +1158,13 @@ void cranked::playdate_lua_pushBytes(Cranked *cranked, uint8 *str, uint32 len) {
 void cranked::playdate_lua_pushBitmap(Cranked *cranked, Bitmap bitmap) {
     if (!cranked->getLuaContext())
         return;
-    cranked->luaEngine.pushImage(bitmap);
+    cranked->luaEngine.pushResource(bitmap);
 }
 
 void cranked::playdate_lua_pushSprite(Cranked *cranked, Sprite sprite) {
     if (!cranked->getLuaContext())
         return;
-    cranked->luaEngine.pushSprite(sprite);
+    cranked->luaEngine.pushResource(sprite);
 }
 
 LuaUDObject_32 *cranked::playdate_lua_pushObject(Cranked *cranked, void* obj, uint8 *type, int32 nValues) {
@@ -1618,7 +1613,7 @@ void cranked::playdate_sprite_updateAndDrawSprites(Cranked *cranked) {
 }
 
 Sprite cranked::playdate_sprite_newSprite(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<LCDSprite_32>();
+    return cranked->nativeEngine.createReferencedResource<Sprite>();
 }
 
 void cranked::playdate_sprite_freeSprite(Cranked *cranked, Sprite sprite) {
@@ -1632,27 +1627,24 @@ Sprite cranked::playdate_sprite_copy(Cranked *cranked, Sprite sprite) {
 }
 
 void cranked::playdate_sprite_addSprite(Cranked *cranked, Sprite sprite) {
-    cranked->graphics.spriteDrawList.emplace(sprite);
+    cranked->graphics.addSpriteToDrawList(sprite);
 }
 
 void cranked::playdate_sprite_removeSprite(Cranked *cranked, Sprite sprite) {
-    eraseByEquivalentKey(cranked->graphics.spriteDrawList, sprite);
+    cranked->graphics.removeSpriteFromDrawList(sprite);
 }
 
 void cranked::playdate_sprite_removeSprites(Cranked *cranked, cref_t *sprites, int32 count) {
-    auto &drawList = cranked->graphics.spriteDrawList;
-    for (int i = 0; i < count; i++) {
-        auto *sprite = cranked->nativeEngine.fromVirtualAddress<LCDSprite_32>(sprites[i]);
-        eraseByEquivalentKey(drawList, sprite);
-    }
+    for (int i = 0; i < count; i++)
+        cranked->graphics.removeSpriteFromDrawList(cranked->nativeEngine.fromVirtualAddress<LCDSprite_32>(sprites[i]));
 }
 
 void cranked::playdate_sprite_removeAllSprites(Cranked *cranked) {
-    cranked->graphics.spriteDrawList.clear();
+    cranked->graphics.clearSpriteDrawList();
 }
 
 int32 cranked::playdate_sprite_getSpriteCount(Cranked *cranked) {
-    return (int32 ) cranked->graphics.spriteDrawList.size();
+    return (int32) cranked->graphics.spriteDrawList.size();
 }
 
 void cranked::playdate_sprite_setBounds(Cranked *cranked, Sprite sprite, PDRect_32 bounds) {
@@ -1716,17 +1708,11 @@ void cranked::playdate_sprite_clearClipRect(Cranked *cranked, Sprite sprite) {
 }
 
 void cranked::playdate_sprite_setClipRectsInRange(Cranked *cranked, LCDRect_32 clipRect, int32 startZ, int32 endZ) {
-    for (auto sprite : cranked->graphics.allocatedSprites) {
-        if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
-            sprite->clipRect = toRect(clipRect);
-    }
+    cranked->graphics.setSpriteClipRectsInRage(toRect(clipRect), startZ, endZ);
 }
 
 void cranked::playdate_sprite_clearClipRectsInRange(Cranked *cranked, int32 startZ, int32 endZ) {
-    for (auto sprite : cranked->graphics.allocatedSprites) {
-        if (sprite->zIndex >= startZ and sprite->zIndex <= endZ)
-            sprite->clipRect = {};
-    }
+    cranked->graphics.clearSpriteClipRectsInRage(startZ, endZ);
 }
 
 void cranked::playdate_sprite_setUpdatesEnabled(Cranked *cranked, Sprite sprite, int32 flag) {
@@ -1785,7 +1771,7 @@ void cranked::playdate_sprite_getPosition(Cranked *cranked, Sprite sprite, float
     auto [posX, posY] = sprite->getPosition();
     if (x)
         *x = posX;
-    if(y)
+    if (y)
         *y = posY;
 }
 
@@ -1810,14 +1796,13 @@ void cranked::playdate_sprite_setCollisionResponseFunction(Cranked *cranked, Spr
 }
 
 static SpriteCollisionInfo_32 *moveOrCheckCollisions(Cranked *cranked, Sprite sprite, float goalX, float goalY, float *actualX, float *actualY, int32 *len, bool sim) {
-    Vec2 goal = Vec2{ goalX, goalY } - sprite->getCenterOffset();
+    Vec2 goal = { goalX, goalY };
     auto [actual, collisions] = cranked->bump.move(sprite, goal, sim, [&](Sprite a, Sprite b){
         if (sprite->collideResponseFunction)
             return (Bump::ResponseType) cranked->nativeEngine.invokeEmulatedFunction<int32_t, ArgType::int32_t, ArgType::ptr_t, ArgType::ptr_t>
                     (sprite->collideResponseFunction, a, b);
         return Bump::ResponseType::Freeze;
     });
-    actual += sprite->getCenterOffset();
     int count = (int)collisions.size();
     if (len)
         *len = count;
@@ -1896,21 +1881,11 @@ SpriteQueryInfo_32 *cranked::playdate_sprite_querySpriteInfoAlongLine(Cranked *c
 }
 
 cref_t *cranked::playdate_sprite_overlappingSprites(Cranked *cranked, Sprite sprite, int32 *len) {
-    return returnSpriteList(cranked, cranked->bump.queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; }), len);
+    return returnSpriteList(cranked, cranked->bump.getOverlappingSprites(sprite), len);
 }
 
 cref_t *cranked::playdate_sprite_allOverlappingSprites(Cranked *cranked, int32 *len) {
-    unordered_map<Sprite, unordered_set<Sprite>> overlapping;
-    std::vector<Sprite> results;
-    for (const SpriteRef &ref : cranked->graphics.spriteDrawList) {
-        for (auto sprite = ref.get(); auto overlap : cranked->bump.queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; })) {
-            if (overlapping[overlap].contains(sprite) or !overlapping[sprite].emplace(overlap).second)
-                continue;
-            results.emplace_back(sprite);
-            results.emplace_back(overlap);
-        }
-    }
-    return returnSpriteList(cranked, results, len);
+    return returnSpriteList(cranked, cranked->bump.getAllOverlappingSprites(), len);
 }
 
 void cranked::playdate_sprite_setStencilPattern(Cranked *cranked, Sprite sprite, uint8 *pattern) {
@@ -2066,7 +2041,7 @@ void cranked::playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, Fil
 }
 
 AudioSample cranked::playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32 byteCount) {
-    return cranked->nativeEngine.createReferencedResource<AudioSample_32>(byteCount);
+    return cranked->nativeEngine.createReferencedResource<AudioSample>(byteCount);
 }
 
 int32 cranked::playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample sample, uint8 *path) {
@@ -2213,7 +2188,7 @@ uint8 *cranked::playdate_sound_getError(Cranked *cranked) {
 }
 
 SynthLFO cranked::playdate_sound_lfo_newLFO(Cranked *cranked, int32 type) {
-    return cranked->nativeEngine.createReferencedResource<PDSynthLFO_32>((LFOType)type);
+    return cranked->nativeEngine.createReferencedResource<SynthLFO>((LFOType)type);
 }
 
 void cranked::playdate_sound_lfo_freeLFO(Cranked *cranked, SynthLFO lfo) {
@@ -2277,7 +2252,7 @@ void cranked::playdate_sound_lfo_setStartPhase(Cranked *cranked, SynthLFO  lfo, 
 }
 
 SynthEnvelope cranked::playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release) {
-    return cranked->nativeEngine.createReferencedResource<PDSynthEnvelope_32>(attack, decay, sustain, release);
+    return cranked->nativeEngine.createReferencedResource<SynthEnvelope>(attack, decay, sustain, release);
 }
 
 void cranked::playdate_sound_envelope_freeEnvelope(Cranked *cranked, SynthEnvelope env) {
@@ -2460,7 +2435,7 @@ int32 cranked::playdate_sound_synth_setWavetable(Cranked *cranked, Synth synth, 
 }
 
 ControlSignal cranked::playdate_control_signal_newSignal(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<ControlSignal_32>();
+    return cranked->nativeEngine.createReferencedResource<ControlSignal>();
 }
 
 void cranked::playdate_control_signal_freeSignal(Cranked *cranked, ControlSignal signal) {
@@ -2716,7 +2691,7 @@ void cranked::playdate_sound_sequence_setCurrentStep(Cranked *cranked, SoundSequ
 }
 
 TwoPoleFilter cranked::playdate_sound_effect_twopolefilter_newFilter(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<TwoPoleFilter_32>();
+    return cranked->nativeEngine.createReferencedResource<TwoPoleFilter>();
 }
 
 void cranked::playdate_sound_effect_twopolefilter_freeFilter(Cranked *cranked, TwoPoleFilter filter) {
@@ -2756,7 +2731,7 @@ SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getResonanceModula
 }
 
 OnePoleFilter cranked::playdate_sound_effect_onepolefilter_newFilter(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<OnePoleFilter_32>();
+    return cranked->nativeEngine.createReferencedResource<OnePoleFilter>();
 }
 
 void cranked::playdate_sound_effect_onepolefilter_freeFilter(Cranked *cranked, OnePoleFilter filter) {
@@ -2776,7 +2751,7 @@ SynthSignalValue cranked::playdate_sound_effect_onepolefilter_getParameterModula
 }
 
 BitCrusher cranked::playdate_sound_effect_bitcrusher_newBitCrusher(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<BitCrusher_32>();
+    return cranked->nativeEngine.createReferencedResource<BitCrusher>();
 }
 
 void cranked::playdate_sound_effect_bitcrusher_freeBitCrusher(Cranked *cranked, BitCrusher filter) {
@@ -2808,7 +2783,7 @@ SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getUndersampleModulat
 }
 
 RingModulator cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<RingModulator_32>();
+    return cranked->nativeEngine.createReferencedResource<RingModulator>();
 }
 
 void cranked::playdate_sound_effect_ringmodulator_freeRingmod(Cranked *cranked, RingModulator filter) {
@@ -2828,7 +2803,7 @@ SynthSignalValue cranked::playdate_sound_effect_ringmodulator_getFrequencyModula
 }
 
 DelayLine cranked::playdate_sound_effect_delayline_newDelayLine(Cranked *cranked, int32 length, int32 stereo) {
-    return cranked->nativeEngine.createReferencedResource<DelayLine_32>((int) length, (bool) stereo);
+    return cranked->nativeEngine.createReferencedResource<DelayLine>((int) length, (bool) stereo);
 }
 
 void cranked::playdate_sound_effect_delayline_freeDelayLine(Cranked *cranked, DelayLine filter) {
@@ -2869,7 +2844,7 @@ void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cra
 }
 
 Overdrive cranked::playdate_sound_effect_overdrive_newOverdrive(Cranked *cranked) {
-    return cranked->nativeEngine.createReferencedResource<Overdrive_32>();
+    return cranked->nativeEngine.createReferencedResource<Overdrive>();
 }
 
 void cranked::playdate_sound_effect_overdrive_freeOverdrive(Cranked *cranked, Overdrive filter) {
@@ -2934,7 +2909,9 @@ void *cranked::playdate_sound_effect_getUserdata(Cranked *cranked, SoundEffect e
 }
 
 SoundChannel cranked::playdate_sound_channel_newChannel(Cranked *cranked) {
-    return cranked->audio.allocateChannel();
+    auto channel = cranked->audio.allocateChannel();
+    channel->reference();
+    return channel;
 }
 
 void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel channel) {

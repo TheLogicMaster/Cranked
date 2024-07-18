@@ -19,8 +19,13 @@ NativeResource::~NativeResource() {
 bool NativeResource::dereference() {
     if (disposed)
         throw CrankedError("Attempted to dereference disposed resource");
-    if (--refCount <= 0) {
+    if (refCount <= 0)
+        throw CrankedError("Attempted to dereference unreferenced resource");
+    if (int count = --refCount; not disposing and count <= 0) {
+        disposing = true;
         cranked.heap.destruct(this); // Seems sketchy deleting `this`, but it's fine
+        if (count != refCount)
+            throw CrankedError("Attempted resource resurrection detected");
         return true;
     }
     return false;

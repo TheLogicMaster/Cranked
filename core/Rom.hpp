@@ -7,6 +7,8 @@ namespace cranked {
     class Cranked;
 
     // Todo: Validate ROM files to avoid unsafe memory accesses
+    // Todo: Should probably have image formats stored compactly since that's how they are used anyway
+
     class Rom {
     public:
         enum class FileType {
@@ -218,6 +220,8 @@ namespace cranked {
 
         static FileType getFileType(const uint8 *header);
 
+        static vector<uint8> writeImage(Bitmap image);
+
         static File *findSystemFile(const string &path);
 
         static Font readSystemFont(const string &path) {
@@ -253,6 +257,17 @@ namespace cranked {
         constexpr static auto VIDEO_MAGIC = "Playdate VID";
 
         void loadManifest();
+
+        static void bufferAddStr(vector<uint8> &buffer, const char *str) {
+            while (*str)
+                buffer.push_back(*str++);
+        }
+
+        template<typename T>
+        static void bufferAddVal(vector<uint8> &buffer, T val) {
+            for (auto i = 0; i < sizeof(T); i++)
+                buffer.push_back(((uint8 *)&val)[i]);
+        }
 
         static ImageCell readImageCell(const uint8 *start);
 

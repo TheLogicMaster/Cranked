@@ -1,7 +1,10 @@
 #include "LuaRuntime.hpp"
+#include "Perlin.hpp"
 #include "gen/LuaRuntimeSource.hpp"
 
 using namespace cranked;
+
+// Todo: Use new functions (setResourceElement/setResourceField, returnValues, rectFromArgs, intRectFromArgs, LuaValRet without calling pushResource/pushRect/pushVec)
 
 static LuaRet import_lua(Cranked *cranked, const char *name) {
     if (cranked->luaEngine.loadedLuaFiles.contains(name))
@@ -58,48 +61,16 @@ static void playdate_setCrankSoundsDisabled_lua(Cranked *cranked, bool disabled)
     cranked->crankSoundsEnabled = not disabled;
 }
 
-static PDButtons buttonStringToEnum(const string &button) {
-    if (button == "left")
-        return PDButtons::Left;
-    else if (button == "right")
-        return PDButtons::Right;
-    else if (button == "up")
-        return PDButtons::Up;
-    else if (button == "down")
-        return PDButtons::Down;
-    else if (button == "b")
-        return PDButtons::B;
-    else if (button == "a")
-        return PDButtons::A;
-    else
-        return PDButtons(0);
-}
-
 static bool playdate_buttonIsPressed_lua(Cranked *cranked, LuaVal button) {
-    if (button.isInt())
-        return button.asInt() & cranked->currentInputs;
-    auto btnString = button.asString();
-    if (!btnString)
-        return false;
-    return cranked->currentInputs & int(buttonStringToEnum(btnString));
+    return cranked->currentInputs & (int)button.asButton();
 }
 
 static bool playdate_buttonJustPressed_lua(Cranked *cranked, LuaVal button) {
-    if (button.isInt())
-        return button.asInt() & cranked->pressedInputs;
-    auto btnString = button.asString();
-    if (!btnString)
-        return false;
-    return cranked->pressedInputs & int(buttonStringToEnum(btnString));
+    return cranked->pressedInputs & (int)button.asButton();
 }
 
 static bool playdate_buttonJustReleased_lua(Cranked *cranked, LuaVal button) {
-    if (button.isInt())
-        return button.asInt() & cranked->releasedInputs;
-    auto btnString = button.asString();
-    if (!btnString)
-        return false;
-    return cranked->releasedInputs & int(buttonStringToEnum(btnString));
+    return cranked->releasedInputs & (int)button.asButton();
 }
 
 static LuaRet playdate_getButtonState_lua(Cranked *cranked) {
@@ -181,6 +152,7 @@ static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int m
         case kFileRead:
         default:
             openMode = FileOptions::ReadDataFallback;
+            break;
     }
     auto cranked = Cranked::fromLuaContext(context);
     auto file = cranked->files.open(path, openMode);
@@ -189,7 +161,7 @@ static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int m
         lua_pushstring(context, cranked->fromVirtualAddress<const char>(cranked->files.lastError));
         return 2;
     }
-    pushFile(file);
+    pushResource(file);
     return 1;
 }
 
@@ -210,7 +182,7 @@ static LuaRet playdate_file_write_lua(Cranked *context, File file, const char *s
 
 static LuaRet playdate_file_read_lua(Cranked *context, File file, int bytes) {
     vector<uint8> buffer(bytes);
-    auto result = context->files.read(file, (void *) buffer.data(), bytes);
+    auto result = context->files.read(file, buffer.data(), bytes);
     if (result < 0) {
         lua_pushnil(context->getLuaContext());
         lua_pushstring(context->getLuaContext(), context->fromVirtualAddress<const char>(context->files.lastError));
@@ -373,38 +345,45 @@ static bool playdate_datastore_delete_lua(Cranked *context, LuaVal filename) {
     return context->files.unlink(name, false) == 0;
 }
 
-static void playdate_datastore_writeImage_lua(Cranked *cranked, LuaVal image, const char *path) {
-    // Todo
+static void playdate_datastore_writeImage_lua(Cranked *cranked, Bitmap image, const char *path) {
+    auto pathStr = string(path);
+    if (pathStr.find('/') == string::npos)
+        pathStr = "image/" + pathStr;
+    auto dataPath = cranked->files.appDataPath / pathStr;
+    if (pathStr.ends_with(".gif"))
+        writeGIF(pathStr.c_str(), image->toRGB().data(), image->width, image->height);
+    else {
+        auto data = Rom::writeImage(image);
+        ofstream file(dataPath);
+        file.write((char *)data.data(), (int)data.size());
+    }
 }
 
-static LuaRet playdate_datastore_readImage_lua(Cranked *cranked, const char *path) {
+static LuaValRet playdate_datastore_readImage_lua(Cranked *cranked, const char *path) {
     string stringPath(path);
     if (stringPath.find('/') == string::npos)
         stringPath = "images/" + stringPath;
     try {
-        pushImage(cranked->graphics.getImage(stringPath));
-    } catch (exception &ex) {
-        lua_pushnil(cranked->getLuaContext());
+        return pushResource(cranked->graphics.getImage(stringPath));
+    } catch (exception &) {
+        return pushNil(cranked);
     }
-    return 1;
 }
 
-static LuaRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width, int height, int bgcolor) {
+static LuaValRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width, int height, int bgcolor) {
     Bitmap image;
     if (width.isString()) {
         auto path = width.asString();
         try {
             image = cranked->graphics.getImage(path);
-        } catch (exception &ex) {
-            lua_pushnil(cranked->getLuaContext());
-            return 1;
+        } catch (exception &) {
+            return pushNil(cranked);
         }
     } else {
         image = cranked->graphics.createBitmap(width, height);
         image->clear(bgcolor);
     }
-    pushImage(image);
-    return 1;
+    return pushResource(image);
 }
 
 static void playdate_graphics_image_gc_lua(Cranked *cranked, Bitmap image) {
@@ -425,7 +404,7 @@ static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, Bitmap image, c
 }
 
 static LuaRet playdate_graphics_image_copy_lua(Cranked *cranked, Bitmap image) {
-    pushImage(cranked->heap.construct<LCDBitmap_32>(*image));
+    pushResource(cranked->heap.construct<LCDBitmap_32>(*image));
     return 1;
 }
 
@@ -491,23 +470,30 @@ static int playdate_graphics_image_sample_lua(Bitmap image, int x, int y) {
     return (int) image->getPixel(x, y);
 }
 
-static void playdate_graphics_image_drawRotated_lua(Cranked *cranked, Bitmap image, int x, int y, float angle, LuaVal scale, LuaVal yScale) {
-    // Coordinates are centered
-    // Todo
+static tuple<float, float> getArgScaleXY(LuaVal scale, LuaVal yScale) {
+    float scaleX = scale.isNumeric() ? scale.asFloat() : 1.0f;
+    float scaleY = yScale.isNumeric() ? yScale.asFloat() : scaleX;
+    return { scaleX, scaleY };
 }
 
-static LuaRet playdate_graphics_image_rotatedImage_lua(Cranked *cranked, Bitmap image, float angle, LuaVal scale, LuaVal yScale) {
-    // Todo
-    return 0;
+static void playdate_graphics_image_drawRotated_lua(Cranked *cranked, Bitmap image, int x, int y, float angle, LuaVal scale, LuaVal yScale) {
+    auto [ scaleX, scaleY ] = getArgScaleXY(scale, yScale);
+    cranked->graphics.drawRotatedBitmap(image, x, y, angle, 0.5f, 0.5f, scaleX, scaleY);
+}
+
+static LuaValRet playdate_graphics_image_rotatedImage_lua(Cranked *cranked, Bitmap image, float angle, LuaVal scale, LuaVal yScale) {
+    auto [ scaleX, scaleY ] = getArgScaleXY(scale, yScale);
+    return pushResource(cranked->graphics.rotateBitmap(image, angle, 0.5f, 0.5f, scaleX, scaleY));
 }
 
 static void playdate_graphics_image_drawScaled_lua(Cranked *cranked, Bitmap image, int x, int y, float scale, LuaVal yScale) {
-    // Todo
+    float scaleY = yScale.isNumeric() ? yScale.asFloat() : 1.0f;
+    cranked->graphics.drawScaledBitmap(image, x, y, scale, scaleY);
 }
 
-static LuaRet playdate_graphics_image_scaledImage_lua(Cranked *cranked, Bitmap image, float scale, LuaVal yScale) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_scaledImage_lua(Cranked *cranked, Bitmap image, float scale, LuaVal yScale) {
+    float scaleY = yScale.isNumeric() ? yScale.asFloat() : 1.0f;
+    return pushResource(cranked->graphics.scaleBitmap(image, scale, scaleY));
 }
 
 static void playdate_graphics_image_drawWithTransform_lua(Cranked *cranked, Bitmap image, LuaVal xform, int x, int y) {
@@ -529,9 +515,8 @@ static void playdate_graphics_image_setMaskImage_lua(Cranked *cranked, Bitmap im
     image->mask = cranked->heap.construct<LCDBitmap_32>(*maskImage);
 }
 
-static LuaRet playdate_graphics_image_getMaskImage_lua(Cranked *cranked, Bitmap image) {
-    pushImage(image);
-    return 1;
+static LuaValRet playdate_graphics_image_getMaskImage_lua(Cranked *cranked, Bitmap image) {
+    return pushResource(image->mask.get());
 }
 
 static void playdate_graphics_image_addMask_lua(Cranked *cranked, Bitmap image, bool opaque) {
@@ -552,48 +537,66 @@ static void playdate_graphics_image_clearMask_lua(Cranked *cranked, Bitmap image
 }
 
 static void playdate_graphics_image_drawTiled_lua(Cranked *cranked, Bitmap image, LuaVal arg1) {
-    // Todo
+    IntRect rect;
+    GraphicsFlip flip;
+    if (arg1.isNumeric()) {
+        rect = { arg1.asInt(), (arg1 + 1).asInt(), (arg1 + 2).asInt(), (arg1 + 3).asInt() };
+        flip = (arg1 + 4).asFlip();
+    } else {
+        rect = arg1.asIntRect();
+        flip = (arg1 + 1).asFlip();
+    }
+    cranked->graphics.drawBitmapTiled(image, rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, flip);
 }
 
 static void playdate_graphics_image_drawBlurred_lua(Cranked *cranked, Bitmap image, int x, int y, float radius, int numPasses, DitherType ditherType, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
-    // Todo
+    GraphicsFlip flip{};
+    int phaseX{}, phaseY{};
+    if (arg2.isNil())
+        flip = arg1.asFlip();
+    else if (arg3.isNil()) {
+        phaseX = arg1.asInt();
+        phaseY = arg2.asInt();
+    }
+    else {
+        flip = arg1.asFlip();
+        phaseX = arg2.asInt();
+        phaseY = arg3.asInt();
+    }
+    cranked->graphics.drawBlurredBitmap(image, x, y, radius, numPasses, ditherType, flip, phaseX, phaseY);
 }
 
 static void playdate_graphics_image_drawFaded_lua(Cranked *cranked, Bitmap image, int x, int y, float alpha, DitherType ditherType) {
-    // Todo
+    cranked->graphics.drawFadedBitmap(image, x, y, alpha, ditherType);
 }
 
 static void playdate_graphics_image_setInverted_lua(Cranked *cranked, Bitmap image, bool flag) {
     image->inverted = flag;
 }
 
-static LuaRet playdate_graphics_image_invertedImage_lua(Cranked *cranked, Bitmap image) {
-    // Todo: Does this modify the mask?
-    return 0;
+static LuaValRet playdate_graphics_image_invertedImage_lua(Cranked *cranked, Bitmap image) {
+    // Todo: Does this ignore the inverted flag?
+    return pushResource(cranked->graphics.invertedBitmap(image));
 }
 
-static LuaRet playdate_graphics_image_blendWithImage_lua(Cranked *cranked, Bitmap self, Bitmap image, float alpha, DitherType ditherType) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_blendWithImage_lua(Cranked *cranked, Bitmap self, Bitmap image, float alpha, DitherType ditherType) {
+    return pushResource(cranked->graphics.blendedBitmap(self, image, alpha, ditherType));
 }
 
-static LuaRet playdate_graphics_image_blurredImage_lua(Cranked *cranked, Bitmap image, float radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_blurredImage_lua(Cranked *cranked, Bitmap image, float radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
+    return pushResource(cranked->graphics.blurredBitmap(image, radius, numPasses, ditherType, padEdges, xPhase, yPhase));
 }
 
-static LuaRet playdate_graphics_image_fadedImage_lua(Cranked *cranked, Bitmap image, float alpha, DitherType ditherType) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_fadedImage_lua(Cranked *cranked, Bitmap image, float alpha, DitherType ditherType) {
+    return pushResource(cranked->graphics.fadedBitmap(image, alpha, ditherType));
 }
 
-static LuaRet playdate_graphics_image_vcrPauseFilterImage_lua(Cranked *cranked, Bitmap image) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_vcrPauseFilterImage_lua(Cranked *cranked, Bitmap image) {
+    return pushResource(cranked->graphics.vcrPauseFilteredBitmap(image));
 }
 
 static void playdate_graphics_pushContext_lua(Cranked *cranked, LuaVal imageVal) {
-    auto image = imageVal.isUserdataObject() ? imageVal.asUserdataObject<LCDBitmap_32>() : nullptr;
+    auto image = imageVal.isUserdataObject() ? imageVal.asUserdataObject<Bitmap>() : nullptr;
     cranked->graphics.pushContext(image);
 }
 
@@ -601,9 +604,8 @@ static void playdate_graphics_clear_lua(Cranked *cranked, LuaVal color) {
     cranked->graphics.frameBuffer->clear(color.isNil() ? cranked->graphics.getCurrentDisplayContext().backgroundColor : (LCDSolidColor) color.asInt());
 }
 
-static bool playdate_graphics_checkAlphaCollision_lua(Cranked *cranked, Bitmap image1, int x1, int y1, LuaVal flip1, Bitmap image2, int x2, int y2, LuaVal flip2) {
-    // Todo
-    return false;
+static bool playdate_graphics_checkAlphaCollision_lua(Cranked *cranked, Bitmap image1, int x1, int y1, GraphicsFlip flip1, Bitmap image2, int x2, int y2, GraphicsFlip flip2) {
+    return Graphics::checkBitmapMaskCollision(image1, x1, y1, flip1, image2, x2, y2, flip2, { { x1, y1 }, { image1->width, image1->height} });
 }
 
 static void playdate_graphics_setColor_lua(Cranked *cranked, LCDSolidColor color) {
@@ -624,7 +626,11 @@ static void playdate_graphics_setPattern_lua(Cranked *cranked, LuaVal pattern, i
 }
 
 static void playdate_graphics_setDitherPattern_lua(Cranked *cranked, float alpha, DitherType ditherType) {
-    // Todo
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    ctx.ditherAlpha = alpha;
+    ctx.ditherPattern = ditherType;
+    ctx.usingDither = true;
+    ctx.usingStencil = false;
 }
 
 static void playdate_graphics_drawLine_lua(Cranked *cranked, LuaVal x1, int y1, int x2, int y2) {
@@ -714,7 +720,7 @@ static vector<int32> getPolygonPoints(Cranked *cranked, LuaVal arg) {
         }
     } else {
         int top = lua_gettop(context);
-        for (int i = arg.index; i <= top; i++)
+        for (int i = arg; i <= top; i++)
             points.emplace_back(lua_tointeger(context, i));
     }
     return points;
@@ -743,14 +749,19 @@ static void playdate_graphics_fillTriangle_lua(Cranked *cranked, int x1, int y1,
     cranked->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
-static LuaRet playdate_graphics_perlin_lua(Cranked *cranked, float x, float y, float z, float repeat, int octaves, float persistence) {
-    // Todo
-    return 0;
+static float playdate_graphics_perlin_lua(Cranked *cranked, float x, float y, float z, int repeat, int octaves, float persistence) {
+    return Perlin::noise(repeat, x, y, z, octaves, persistence);
 }
 
-static LuaRet playdate_graphics_perlinArray_lua(Cranked *cranked, int count, float x, float dx, LuaVal next) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_perlinArray_lua(Cranked *cranked, int count, float x, float dx, float y, float dy, float z, float dz, int repeat, int octaves, float persistence) {
+    auto table = pushTable(cranked);
+    for (int i = 0; i < count; i++) {
+        table.setFloatElement(i + 1, Perlin::noise(repeat, x, y, z, octaves, persistence));
+        x += dx;
+        y += dy;
+        z += dz;
+    }
+    return table;
 }
 
 static void playdate_graphics_setClipRect_lua(Cranked *cranked, LuaVal arg1, int y, int width, int height) {
@@ -777,8 +788,10 @@ static LuaRet playdate_graphics_getScreenClipRect_lua(Cranked *cranked) {
     return 1;
 }
 
-static void playdate_graphics_setStencilImage_lua(Cranked *cranked, LuaVal image, bool tile) {
-    // Todo
+static void playdate_graphics_setStencilImage_lua(Cranked *cranked, Bitmap image, bool tile) {
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    ctx.stencilImage = image;
+    ctx.stencilTiled = tile;
 }
 
 static void playdate_graphics_setStencilPattern_lua(Cranked *cranked, LuaVal arg1) {
@@ -810,7 +823,7 @@ static StrokeLocation playdate_graphics_getStrokeLocation_lua(Cranked *cranked) 
 }
 
 static void playdate_graphics_lockFocus_lua(Cranked *cranked, LuaVal imageVal) {
-    cranked->graphics.getCurrentDisplayContext().focusedImage = imageVal.asUserdataObject<LCDBitmap_32>();
+    cranked->graphics.getCurrentDisplayContext().focusedImage = imageVal.asUserdataObject<Bitmap>();
 }
 
 static void playdate_graphics_unlockFocus_lua(Cranked *cranked) {
@@ -825,12 +838,12 @@ static LuaRet playdate_graphics_getDrawOffset_lua(Cranked *cranked) {
 }
 
 static LuaRet playdate_graphics_getDisplayImage_lua(Cranked *cranked) {
-    pushImage(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer));
+    pushResource(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.frameBuffer));
     return 1;
 }
 
 static LuaRet playdate_graphics_getWorkingImage_lua(Cranked *cranked) {
-    pushImage(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.previousFrameBuffer));
+    pushResource(cranked->heap.construct<LCDBitmap_32>(*cranked->graphics.previousFrameBuffer));
     return 1;
 }
 
@@ -921,14 +934,13 @@ static LuaRet playdate_getSystemMenu_lua(Cranked *cranked) {
 }
 
 static void playdate_setMenuImage_lua(Cranked *cranked, LuaVal image, int xOffset) {
-    auto bitmap = image.asUserdataObject<LCDBitmap_32>();
+    auto bitmap = image.asUserdataObject<Bitmap>();
     cranked->menu.setImage(bitmap, xOffset);
 }
 
 static LuaRet playdate_menu_addMenuItem_lua(Cranked *cranked, LuaVal menu, const char *title, LuaVal callback) {
-    // Items are all owned by Menu, but assertions should mostly protect against memory corruption after removing items with dangling userdata pointers
     try {
-        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback));
+        pushResource(cranked->menu.addItem(title, PDMenuItem_32::Type::Button, {}, 0, 0, callback));
     } catch (exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -946,7 +958,7 @@ static LuaRet playdate_menu_addCheckmarkMenuItem_lua(Cranked *cranked, LuaVal me
     } else
         callback = arg2;
     try {
-        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback));
+        pushResource(cranked->menu.addItem(title, PDMenuItem_32::Type::Checkmark, {}, initialValue, 0, callback));
     } catch (exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -976,7 +988,7 @@ static LuaRet playdate_menu_addOptionsMenuItem_lua(Cranked *cranked, LuaVal menu
     } else
         callback = arg3;
     try {
-        pushMenuItem(cranked->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback));
+        pushResource(cranked->menu.addItem(title, PDMenuItem_32::Type::Options, options, initialValue, 0, callback));
     } catch (exception &ex) {
         lua_pushnil(cranked->getLuaContext());
         lua_pushstring(cranked->getLuaContext(), ex.what());
@@ -991,7 +1003,7 @@ static LuaRet playdate_menu_getMenuItems_lua(Cranked *cranked, LuaVal menu) {
     for (auto &item : cranked->menu.items) {
         if (!item)
             continue;
-        pushMenuItem(item.get());
+        pushResource(item.get());
         lua_seti(cranked->getLuaContext(), -2, i);
         i++;
     }
@@ -1019,9 +1031,8 @@ static void playdate_menu_item_setTitle_lua(Cranked *cranked, MenuItem item, con
     item->title = title;
 }
 
-static LuaRet playdate_menu_item_getTitle_lua(Cranked *cranked, MenuItem item) {
-    lua_pushstring(cranked->getLuaContext(), item->title.c_str());
-    return 1;
+static const char *playdate_menu_item_getTitle_lua(Cranked *cranked, MenuItem item) {
+    return item->title.c_str();
 }
 
 static void playdate_menu_item_setValue_lua(Cranked *cranked, MenuItem item, LuaVal value) {
@@ -1059,20 +1070,16 @@ static void playdate_menu_item_newindex_lua(Cranked *cranked, MenuItem item, Lua
 }
 
 static LuaRet playdate_menu_item_index_lua(Cranked *cranked, MenuItem item, LuaVal keyArg) {
-    if (!keyArg.isString()) {
-        lua_pushnil(cranked->getLuaContext());
+    if (cranked->luaEngine.indexMetatable())
         return 1;
-    }
+    if (!keyArg.isString())
+        return returnValues(cranked, nullptr);
     string key(keyArg.asString());
     if (key == "value")
-        return playdate_menu_item_getValue_lua(cranked, item);
-    else if (key == "title")
-        return playdate_menu_item_getTitle_lua(cranked, item);
-    else {
-        cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu.item");
-        lua_getfield(cranked->getLuaContext(), -1, key.c_str());
-        return 1;
-    }
+        return returnValues(cranked, item->value);
+    if (key == "title")
+        return returnValues(cranked, item->title.c_str());
+    return returnValues(cranked, nullptr);
 }
 
 static float playdate_display_getRefreshRate_lua(Cranked *cranked) {
@@ -1080,14 +1087,11 @@ static float playdate_display_getRefreshRate_lua(Cranked *cranked) {
 }
 
 static LuaRet playdate_display_getSize_lua(Cranked *cranked) {
-    lua_pushinteger(cranked->getLuaContext(), DISPLAY_WIDTH / cranked->graphics.displayScale);
-    lua_pushinteger(cranked->getLuaContext(), DISPLAY_HEIGHT / cranked->graphics.displayScale);
-    return 2;
+    return returnVecValues(cranked, IntVec2{ DISPLAY_WIDTH, DISPLAY_HEIGHT} / cranked->graphics.displayScale );
 }
 
-static LuaRet playdate_display_getRect_lua(Cranked *cranked) {
-    pushRect(cranked, IntRect {0, 0, DISPLAY_WIDTH / cranked->graphics.displayScale, DISPLAY_HEIGHT / cranked->graphics.displayScale}); // Todo: Includes offset?
-    return 1;
+static LuaValRet playdate_display_getRect_lua(Cranked *cranked) {
+    return pushRect(cranked, IntRect {0, 0, DISPLAY_WIDTH / cranked->graphics.displayScale, DISPLAY_HEIGHT / cranked->graphics.displayScale}); // Todo: Includes offset?
 }
 
 static int playdate_display_getScale_lua(Cranked *cranked) {
@@ -1099,15 +1103,11 @@ static bool playdate_display_getInverted_lua(Cranked *cranked) {
 }
 
 static LuaRet playdate_display_getMosaic_lua(Cranked *cranked) {
-    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayMosaic.x);
-    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayMosaic.y);
-    return 2;
+    return returnVecValues(cranked, cranked->graphics.displayMosaic);
 }
 
 static LuaRet playdate_display_getOffset_lua(Cranked *cranked) {
-    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayOffset.x);
-    lua_pushinteger(cranked->getLuaContext(), cranked->graphics.displayOffset.y);
-    return 2;
+    return returnVecValues(cranked, cranked->graphics.displayOffset);
 }
 
 static void playdate_display_loadImage_lua(Cranked *cranked, const char *path) {
@@ -1135,115 +1135,172 @@ static LuaRet playdate_file_run_lua(Cranked *cranked, const char *path, LuaVal e
     return lua_gettop(cranked->getLuaContext());
 }
 
-static LuaRet playdate_graphics_imagetable_new_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_imagetable_new_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2) {
+    if (arg1.isString()) {
+        try {
+            return returnValues(cranked, cranked->graphics.getBitmapTable(arg1.asString()));
+        } catch (exception &ex) {
+            return returnValues(cranked, nullptr, ex.what());
+        }
+    }
+    auto table = cranked->heap.construct<LCDBitmapTable_32>(*cranked, arg2.asInt());
+    table->bitmaps.resize(arg1.asInt());
+    pushResource(table);
+    return 1;
 }
 
-static LuaRet playdate_graphics_imagetable_getImage_lua(Cranked *cranked, BitmapTable table, LuaVal arg1, LuaVal arg2) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_imagetable_getImage_lua(Cranked *cranked, BitmapTable table, int arg1, LuaVal arg2) {
+    int i = arg2.isNil() ? arg1 - 1 : arg1 * table->cellsPerRow + arg2.asInt() - 1;
+    return i < 0 or i >= table->bitmaps.size() ? pushNil(cranked) : pushResource(table->bitmaps[i].get());
 }
 
-static void playdate_graphics_imagetable_setImage_lua(Cranked *cranked, BitmapTable table, int n, LuaVal image) {
-    // Todo
+static void playdate_graphics_imagetable_setImage_lua(Cranked *cranked, BitmapTable table, int n, Bitmap image) {
+    if (n > 0 and n <= table->bitmaps.size())
+        table->bitmaps[n - 1] = image;
 }
 
 static LuaRet playdate_graphics_imagetable_load_lua(Cranked *cranked, BitmapTable table, const char *path) {
-    // Todo
-    return 0;
+    try {
+        BitmapTableRef tableRef = cranked->graphics.getBitmapTable(path);
+        *table = *tableRef;
+        return returnValues(cranked, true);
+    } catch (exception &ex) {
+        return returnValues(cranked, false, ex.what());
+    }
 }
 
 static int playdate_graphics_imagetable_getLength_lua(Cranked *cranked, BitmapTable table) {
-    // Todo
-    return 0;
+    return (int)table->bitmaps.size();
 }
 
 static LuaRet playdate_graphics_imagetable_getSize_lua(Cranked *cranked, BitmapTable table) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, IntVec2 { table->cellsPerRow, (int)table->bitmaps.size() / table->cellsPerRow });
 }
 
-static void playdate_graphics_imagetable_drawImage_lua(Cranked *cranked, BitmapTable table, int n, int x, int y, LuaVal flip) {
-    // Todo
+static void playdate_graphics_imagetable_drawImage_lua(Cranked *cranked, BitmapTable table, int n, int x, int y, GraphicsFlip flip) {
+    if (n > 0 and n <= table->bitmaps.size())
+        cranked->graphics.drawBitmap(table->bitmaps[n - 1].get(), x, y, flip);
 }
 
-static void playdate_graphics_imagetable_gc_lua(Cranked *cranked, LuaVal table) {
-    // Todo
+static void playdate_graphics_imagetable_gc_lua(Cranked *cranked, BitmapTable table) {
+    table->dereference();
 }
 
-static LuaRet playdate_graphics_imagetable_index_lua(Cranked *cranked, LuaVal table, LuaVal key) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_imagetable_index_lua(Cranked *cranked, BitmapTable table, int n) {
+    if (cranked->luaEngine.indexMetatable())
+        return 1;
+    if (n > 0 and n <= table->bitmaps.size())
+        pushResource(table->bitmaps[n - 1].get());
+    else
+        pushNil(cranked);
+    return 1;
 }
 
-static void playdate_graphics_imagetable_newindex_lua(Cranked *cranked, LuaVal table, LuaVal key, LuaVal value) {
-    // Todo
+static void playdate_graphics_imagetable_newindex_lua(Cranked *cranked, BitmapTable table, int n, Bitmap image) {
+    if (n > 0 and n <= table->bitmaps.size())
+        table->bitmaps[n - 1] = image;
 }
 
-static LuaRet playdate_graphics_tilemap_new_lua(Cranked *cranked) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_tilemap_new_lua(Cranked *cranked) {
+    return pushResource(cranked->heap.construct<LCDTileMap_32>(*cranked));
 }
 
-static void playdate_graphics_tilemap_gc_lua(Cranked *cranked, LuaVal tilemap) {
-    // Todo
+static void playdate_graphics_tilemap_gc_lua(Cranked *cranked, TileMap tilemap) {
+    tilemap->dereference();
 }
 
-static void playdate_graphics_tilemap_setImageTable_lua(Cranked *cranked, LuaVal tilemap, LuaVal table) {
-    // Todo
+static void playdate_graphics_tilemap_setImageTable_lua(Cranked *cranked, TileMap tilemap, BitmapTable table) {
+    tilemap->table = table;
 }
 
-static void playdate_graphics_tilemap_setTiles_lua(Cranked *cranked, LuaVal tilemap, LuaVal data, int width) {
-    // Todo
+static void playdate_graphics_tilemap_setTiles_lua(Cranked *cranked, TileMap tilemap, LuaVal data, int width) {
+    tilemap->width = width;
+    tilemap->tiles.clear();
+    for (int i = 1;; i++) {
+        auto index = data.getElement(i);
+        if (index.val.isNil())
+            break;
+        tilemap->tiles.push_back(index.val.asInt());
+    }
+    int height = (int)ceil((float)tilemap->tiles.size() / (float)width);
+    tilemap->tiles.resize(width * height); // Round up last row if needed
 }
 
-static LuaRet playdate_graphics_tilemap_getTiles_lua(Cranked *cranked, LuaVal tilemap) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_tilemap_getTiles_lua(Cranked *cranked, TileMap tilemap) {
+    auto table = pushTable(cranked);
+    for (int i = 0; i < tilemap->tiles.size(); i++)
+        table.setIntElement(i + 1, tilemap->tiles[i]);
+    return table;
 }
 
-static LuaRet playdate_graphics_tilemap_draw_lua(Cranked *cranked, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
-    // Todo
-    return 0;
+static void playdate_graphics_tilemap_draw_lua(Cranked *cranked, TileMap tilemap, int x, int y, LuaVal sourceRect) {
+    optional<IntRect> rect;
+    if (sourceRect.isTable())
+        rect = sourceRect.asIntRect();
+    else if (sourceRect.isNumeric())
+        rect = IntRect{ sourceRect.asInt(), (sourceRect + 1).asInt(), (sourceRect + 2).asInt(), (sourceRect + 3).asInt() };
+    cranked->graphics.drawTileMap(tilemap, x, y, false, rect);
 }
 
-static LuaRet playdate_graphics_tilemap_drawIgnoringOffset_lua(Cranked *cranked, LuaVal tilemap, int x, int y, LuaVal sourceRect) {
-    // Todo
-    return 0;
+static void playdate_graphics_tilemap_drawIgnoringOffset_lua(Cranked *cranked, TileMap tilemap, int x, int y, LuaVal sourceRect) {
+    optional<IntRect> rect;
+    if (sourceRect.isTable())
+        rect = sourceRect.asIntRect();
+    else if (sourceRect.isNumeric())
+        rect = IntRect{ sourceRect.asInt(), (sourceRect + 1).asInt(), (sourceRect + 2).asInt(), (sourceRect + 3).asInt() };
+    cranked->graphics.drawTileMap(tilemap, x, y, true, rect);
 }
 
-static void playdate_graphics_tilemap_setTileAtPosition_lua(Cranked *cranked, LuaVal tilemap, int x, int y, int index) {
-    // Todo
+static void playdate_graphics_tilemap_setTileAtPosition_lua(Cranked *cranked, TileMap tilemap, int x, int y, int index) {
+    int i = (y - 1) * tilemap->width + x - 1;
+    if (i < tilemap->tiles.size())
+        tilemap->tiles[i] = index;
 }
 
-static LuaRet playdate_graphics_tilemap_getTileAtPosition_lua(Cranked *cranked, LuaVal tilemap, int x, int y, int index) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_tilemap_getTileAtPosition_lua(Cranked *cranked, TileMap tilemap, int x, int y) {
+    int i = (y - 1) * tilemap->width + x - 1;
+    return i < tilemap->tiles.size() ? pushInt(cranked, tilemap->tiles[i]) : pushNil(cranked);
 }
 
-static void playdate_graphics_tilemap_setSize_lua(Cranked *cranked, LuaVal tilemap, int width, int height) {
-    // Todo
+static void playdate_graphics_tilemap_setSize_lua(Cranked *cranked, TileMap tilemap, int width, int height) {
+    tilemap->tiles.resize(width * height);
 }
 
-static LuaRet playdate_graphics_tilemap_getSize_lua(Cranked *cranked, LuaVal tilemap) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_tilemap_getSize_lua(Cranked *cranked, TileMap tilemap) {
+    pushInt(cranked, tilemap->width);
+    pushInt(cranked, tilemap->getHeight());
+    return returnVecValues(cranked, IntVec2 { tilemap->width, tilemap->getHeight() });
 }
 
-static LuaRet playdate_graphics_tilemap_getPixelSize_lua(Cranked *cranked, LuaVal tilemap) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_tilemap_getPixelSize_lua(Cranked *cranked, TileMap tilemap) {
+    auto [width, height] = tilemap->table->getBitmapSize();
+    return returnVecValues(cranked, IntVec2 { width * tilemap->width, height * tilemap->getHeight() });
 }
 
-static LuaRet playdate_graphics_tilemap_getTileSize_lua(Cranked *cranked, LuaVal tilemap) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_tilemap_getTileSize_lua(Cranked *cranked, TileMap tilemap) {
+    return returnVecValues(cranked, tilemap->table->getBitmapSize());
 }
 
-static LuaRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranked, LuaVal tilemap, LuaVal emptyIDs) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranked, TileMap tilemap, LuaVal emptyIDs) {
+    unordered_set<int> empty;
+    for (int i = 1;; i++) {
+        auto index = emptyIDs.getElement(i);
+        if (index.val.isNil())
+            break;
+        empty.emplace(index.val.asInt());
+    }
+    auto table = pushTable(cranked);
+    auto cellSize = tilemap->table->getBitmapSize();
+    auto [ cellWidth, cellHeight ] = cellSize;
+    for (int y = 0; y < tilemap->getHeight(); y++) {
+        for (int x = 0; x < tilemap->width; x++) {
+            if (empty.contains(tilemap->tiles[y * tilemap->width + x]))
+                continue;
+            LuaValGuard rect(pushRect(cranked, IntRect{ { cellWidth * x, cellHeight * y }, cellSize }));
+            table.setElement(y * tilemap->width * x + 1, rect.val);
+        }
+    }
+    return table;
 }
 
 static void playdate_graphics_setFont_lua(Cranked *cranked, Font font, PDFontVariant variant) {
@@ -1251,11 +1308,16 @@ static void playdate_graphics_setFont_lua(Cranked *cranked, Font font, PDFontVar
 }
 
 static LuaValRet playdate_graphics_getFont_lua(Cranked *cranked, PDFontVariant variant) {
-    return pushFont(cranked->graphics.getCurrentDisplayContext().getFont(variant).get());
+    return pushResource(cranked->graphics.getCurrentDisplayContext().getFont(variant).get());
 }
 
 static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFamily) {
-    // Todo
+    for (int i = 0; i < 3; i++) {
+        auto font = fontFamily.getElement(i);
+        if (font.val.isNil())
+            continue;
+        cranked->graphics.getCurrentDisplayContext().getFont((PDFontVariant)i) = font.val.asUserdataObject<Font>();
+    }
 }
 
 static void playdate_graphics_setFontTracking_lua(Cranked *cranked, int pixels) {
@@ -1266,9 +1328,8 @@ static int playdate_graphics_getFontTracking_lua(Cranked *cranked) {
     return cranked->graphics.getCurrentDisplayContext().textTracking;
 }
 
-static LuaRet playdate_graphics_getSystemFont_lua(Cranked *cranked, PDFontVariant variant) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_getSystemFont_lua(Cranked *cranked, PDFontVariant variant) {
+    return pushResource(cranked->graphics.getSystemFont(variant));
 }
 
 static void playdate_graphics_drawText_lua(Cranked *cranked, const char *text, int x, int y, int leadingAdjustment) {
@@ -1292,23 +1353,30 @@ static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *st
 
 static LuaValRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
     try {
-        return pushFont(cranked->graphics.getFont(path));
+        return pushResource(cranked->graphics.getFont(path));
     } catch (exception &) {
         return pushNil(cranked);
     }
 }
 
-static LuaRet playdate_graphics_font_newFamily_lua(Cranked *cranked, LuaVal fontPaths) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_font_newFamily_lua(Cranked *cranked, LuaVal fontPaths) {
+    auto table = pushTable(cranked);
+    for (int i = 0; i < 3; i++) {
+        auto path = fontPaths.getElement(i);
+        if (!path.val.isString())
+            continue;
+        try {
+            LuaValGuard font(pushResource(cranked->graphics.getFont(path.val.asString())));
+            table.setElement(i, font.val);
+        } catch (exception &) {}
+    }
+    return table;
 }
 
 static LuaRet playdate_graphics_font_drawText_lua(Cranked *cranked, Font font, const char *text, int x, int y, int loadingAdjustment) {
     // Todo: Support leading, encodings, return size
-    cranked->graphics.drawText(text, (int)strlen(text), PDStringEncoding::ASCII, x, y);
-    pushInt(cranked, 0);
-    pushInt(cranked, 0);
-    return 2;
+    cranked->graphics.drawText(text, (int)strlen(text), PDStringEncoding::ASCII, x, y, font);
+    return returnVecValues(cranked, IntVec2{ 0, 0 });
 }
 
 static int playdate_graphics_font_getHeight_lua(Cranked *cranked, Font font) {
@@ -1342,130 +1410,167 @@ static LuaValRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, Font font
     try {
         auto &page = font->pages.at(0);
         auto &glyph = *page->glyphs.at(c);
-        return pushImage(glyph.bitmap.get());
+        return pushResource(glyph.bitmap.get());
     } catch (out_of_range &ignored) { // Todo: Prevent exceptions?
         return pushNil(cranked);
     }
 }
 
-static LuaValRet playdate_graphics_sprite_new_lua(Cranked *context) {
-    return pushSprite(context->graphics.createSprite());
+static Sprite playdate_graphics_sprite_new_lua(Cranked *context, LuaVal imageOrTilemap) {
+    auto sprite = context->graphics.createSprite();
+    if (imageOrTilemap.isTable()) { // Todo: Helper checks for correct argument?
+        if (LuaValGuard metaTable(imageOrTilemap.getMetaTable()); not metaTable.val.isNil()) {
+            if (auto str = metaTable.val.getStringField("__name")) {
+                if (string name = str; name == "playdate.graphics.tilemap")
+                    sprite->tileMap = imageOrTilemap.asUserdataObject<TileMap>();
+                else if (name == "playdate.graphics.image")
+                    sprite->image = imageOrTilemap.asUserdataObject<Bitmap>();
+            }
+        }
+    }
+    return sprite;
 }
 
 static void playdate_graphics_sprite_gc_lua(Cranked *cranked, Sprite sprite) {
     sprite->dereference();
 }
 
-static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_sprite_index_lua(Cranked *cranked, LuaVal obj, LuaVal key) {
+    if (cranked->luaEngine.indexMetatable())
+        return 1;
+
+    // Index object
+    auto context = cranked->getLuaContext();
+    lua_pushvalue(context, key);
+    if (lua_rawget(context, obj))
+        return 1;
+    lua_pop(context, 1);
+
+    if (key.isString()) {
+        auto sprite = obj.asUserdataObject<Sprite>();
+        string name(key.asString());
+        if (name == "x")
+            pushFloat(cranked, sprite->getPosition().x);
+        else if (name == "y")
+            pushFloat(cranked, sprite->getPosition().y);
+        else
+            pushNil(cranked);
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
-static LuaRet playdate_graphics_sprite_update_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static void playdate_graphics_sprite_update_lua(Cranked *cranked, Sprite sprite) {
+    if (sprite)
+        sprite->update();
+    else
+        cranked->graphics.updateSprites();
 }
 
 static void playdate_graphics_sprite_setImage_lua(Cranked *cranked, Sprite sprite, Bitmap image, GraphicsFlip flip, float scale, LuaVal yScale) {
-    // Todo
+    sprite->setImage(image, flip, scale, yScale.isNumeric() ? yScale.asFloat() : scale);
 }
 
-static LuaRet playdate_graphics_sprite_getImage_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_getImage_lua(Cranked *cranked, Sprite sprite) {
+    return pushResource(sprite->image.get());
 }
 
 static void playdate_graphics_sprite_add_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
+    cranked->graphics.addSpriteToDrawList(sprite);
 }
 
 static void playdate_graphics_sprite_remove_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
+    cranked->graphics.removeSpriteFromDrawList(sprite);
 }
 
 static LuaRet playdate_graphics_sprite_getPosition_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, sprite->getPosition());
 }
 
 static void playdate_graphics_sprite_setCenter_lua(Cranked *cranked, Sprite sprite, float x, float y) {
-    // Todo
+    sprite->center = { x, y };
 }
 
 static LuaRet playdate_graphics_sprite_getCenter_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, sprite->center);
 }
 
-static LuaRet playdate_graphics_sprite_getCenterPoint_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_getCenterPoint_lua(Cranked *cranked, Sprite sprite) {
+    return pushPoint(cranked, Vec2{ sprite->center.x, sprite->center.y });
 }
+
 static LuaRet playdate_graphics_sprite_getSize_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, sprite->bounds.size);
 }
 
 static void playdate_graphics_sprite_setScale_lua(Cranked *cranked, Sprite sprite, float scale, LuaVal yScale) {
-    // Todo
+    sprite->scale = { scale, yScale.isNumeric() ? yScale.asFloat() : scale };
 }
 
 static LuaRet playdate_graphics_sprite_getScale_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, sprite->scale);
 }
 
 static void playdate_graphics_sprite_setRotation_lua(Cranked *cranked, Sprite sprite, float angle, LuaVal scale, LuaVal yScale) {
-    // Todo
+
+    float xScale = scale.isNumeric() ? scale.asFloat() : 1;
+    sprite->scale = { xScale, yScale.isNumeric() ? yScale.asFloat() : xScale };
+    sprite->rotation = angle;
 }
 
-static LuaRet playdate_graphics_sprite_getRotation_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static float playdate_graphics_sprite_getRotation_lua(Cranked *cranked, Sprite sprite) {
+    return sprite->rotation;
 }
 
-static LuaRet playdate_graphics_sprite_copy_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_copy_lua(Cranked *cranked, Sprite sprite) {
+    return pushResource(sprite->copy());
 }
 
-static void playdate_graphics_sprite_setImageFlip_lua(Cranked *cranked, Sprite sprite, LuaVal flip, LuaVal flipCollideRect) {
-    // Todo
+static void playdate_graphics_sprite_setImageFlip_lua(Cranked *cranked, Sprite sprite, GraphicsFlip flip, bool flipCollideRect) {
+    sprite->flip = flip;
+    sprite->collideRectFlip = flipCollideRect ? flip : GraphicsFlip::Unflipped;
 }
 
 static void playdate_graphics_sprite_setBounds_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
+    if (arg1.isTable())
+        sprite->setBounds(arg1.asRect());
+    else
+        sprite->setBounds({ arg1.asFloat(), arg2.asFloat(), arg3.asFloat(), arg4.asFloat() });
 }
 
 static LuaRet playdate_graphics_sprite_getBounds_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnRectValues(cranked, sprite->bounds);
 }
 
-static LuaRet playdate_graphics_sprite_getBoundsRect_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_getBoundsRect_lua(Cranked *cranked, Sprite sprite) {
+    return pushRect(cranked, sprite->bounds);
 }
 
 static bool playdate_graphics_sprite_isOpaque_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return false;
+    return sprite->opaque;
 }
 
-static void playdate_graphics_sprite_setTilemap_lua(Cranked *cranked, Sprite sprite, LuaVal tilemap) {
-    // Todo
+static void playdate_graphics_sprite_setTilemap_lua(Cranked *cranked, Sprite sprite, TileMap tilemap) {
+    sprite->tileMap = tilemap;
 }
 
 static void playdate_graphics_sprite_setClipRect_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
+    if (arg1.isTable())
+        sprite->clipRect = arg1.asIntRect();
+    else
+        sprite->clipRect = { arg1.asInt(), arg2.asInt(), arg3.asInt(), arg4.asInt() };
 }
 
 static void playdate_graphics_sprite_setClipRectsInRange_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4, LuaVal arg5, LuaVal arg6) {
-    // Todo
+    if (arg4.isNil())
+        cranked->graphics.setSpriteClipRectsInRage(arg1.asIntRect(), arg2.asInt(), arg3.asInt());
+    else
+        cranked->graphics.setSpriteClipRectsInRage(intRectFromArgs(arg1), arg5.asInt(), arg6.asInt());
 }
 
-static void playdate_graphics_sprite_setStencilImage_lua(Cranked *cranked, Sprite sprite, LuaVal stencil, bool tile) {
-    // Todo
+static void playdate_graphics_sprite_setStencilImage_lua(Cranked *cranked, Sprite sprite, Bitmap stencil, bool tile) {
+    sprite->stencil = stencil;
+    sprite->stencilTiled = tile;
 }
 
 static void playdate_graphics_sprite_setStencilPattern_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2) {
@@ -1473,8 +1578,7 @@ static void playdate_graphics_sprite_setStencilPattern_lua(Cranked *cranked, Spr
 }
 
 static bool playdate_graphics_sprite_getAlwaysRedraw_lua(Cranked *cranked) {
-    // Todo
-    return false;
+    return cranked->graphics.alwaysRedrawSprites;
 }
 
 void playdate_sprite_addDirtyRect_lua(Cranked *cranked, Sprite sprite, int x, int y, int width, int height) {
@@ -1482,283 +1586,568 @@ void playdate_sprite_addDirtyRect_lua(Cranked *cranked, Sprite sprite, int x, in
 }
 
 static void playdate_graphics_sprite_setRedrawsOnImageChange_lua(Cranked *cranked, Sprite sprite, bool flag) {
-    // Todo
+    sprite->dontRedrawOnImageChange = !flag;
 }
 
-static LuaRet playdate_graphics_sprite_getAllSprites_lua(Cranked *cranked) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_getAllSprites_lua(Cranked *cranked) {
+    auto table = pushTable(cranked);
+    int i = 1;
+    for (auto &sprite : cranked->graphics.spriteDrawList) {
+        LuaValGuard ref(cranked->luaEngine.pushResource(sprite.get()));
+        table.setElement(i++, ref.val);
+    }
+    return table;
 }
 
 static void playdate_graphics_sprite_removeSprites_lua(Cranked *cranked, LuaVal spriteArray) {
-    // Todo
+    for (int i = 1;; i++) {
+        auto value = spriteArray.getElement(i);
+        if (value.val.isNil())
+            break;
+        cranked->graphics.removeSpriteFromDrawList(value.val.asUserdataObject<Sprite>());
+    }
 }
 
-static void playdate_graphics_sprite_setCollideRect_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
+static void playdate_graphics_sprite_setCollideRect_lua(Cranked *cranked, Sprite sprite, LuaVal arg1) {
+    sprite->setCollisionRect(arg1.isTable() ? arg1.asRect() : rectFromArgs(arg1));
 }
 
-static LuaRet playdate_graphics_sprite_getCollideRect_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_getCollideRect_lua(Cranked *cranked, Sprite sprite) {
+    return pushRect(cranked, sprite->collideRect);
 }
 
 static LuaRet playdate_graphics_sprite_getCollideBounds_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return returnRectValues(cranked, sprite->collideRect);
 }
 
-static LuaRet playdate_graphics_sprite_overlappingSprites_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_overlappingSprites_lua(Cranked *cranked, Sprite sprite) {
+    auto overlapping = cranked->bump.getOverlappingSprites(sprite);
+    auto table = pushTable(cranked);
+    for (int i = 0; i < overlapping.size(); i++) {
+        LuaValGuard ref(pushResource(overlapping[i]));
+        table.setElement(i + 1, ref.val);
+    }
+    return table;
 }
 
-static LuaRet playdate_graphics_sprite_allOverlappingSprites_lua(Cranked *cranked) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_sprite_allOverlappingSprites_lua(Cranked *cranked) {
+    auto overlapping = cranked->bump.getAllOverlappingSprites();
+    auto table = pushTable(cranked);
+    for (int i = 0; i < overlapping.size(); i++) {
+        LuaValGuard ref(pushResource(overlapping[i]));
+        table.setElement(i + 1, ref.val);
+    }
+    return table;
 }
 
 static bool playdate_graphics_sprite_alphaCollision_lua(Cranked *cranked, Sprite sprite, Sprite anotherSprite) {
-    // Todo
-    return false;
+    if (not sprite->image or not anotherSprite->image)
+        return false;
+    auto spritePos = sprite->getPosition().as<int32>();
+    auto otherPos = anotherSprite->getPosition().as<int32>();
+    return Graphics::checkBitmapMaskCollision(sprite->image.get(), spritePos.x, spritePos.y, GraphicsFlip::Unflipped, anotherSprite->image.get(), otherPos.x, otherPos.y, GraphicsFlip::Unflipped, sprite->bounds.as<int32>());
 }
 
 static void playdate_graphics_sprite_setGroups_lua(Cranked *cranked, Sprite sprite, LuaVal groups) {
-    // Todo
+    int mask = 0;
+    iterateArray(groups, [&](LuaVal group) {
+        mask |= 1 << group.asInt() - 1;
+        return false;
+    });
+    sprite->groupMask = mask;
 }
 
 static void playdate_graphics_sprite_setCollidesWithGroups_lua(Cranked *cranked, Sprite sprite, LuaVal groups) {
-    // Todo
+    int mask = 0;
+    iterateArray(groups, [&](LuaVal group) {
+        mask |= 1 << group.asInt() - 1;
+        return false;
+    });
+    sprite->collidesWithGroupMask = mask;
 }
 
 static void playdate_graphics_sprite_setGroupMask_lua(Cranked *cranked, Sprite sprite, uint32 mask) {
-    // Todo
+    sprite->groupMask = mask;
 }
 
 static uint32 playdate_graphics_sprite_getGroupMask_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return sprite->groupMask;
 }
 
 static void playdate_graphics_sprite_setCollidesWithGroupsMask_lua(Cranked *cranked, Sprite sprite, uint32 mask) {
-    // Todo
+    sprite->collidesWithGroupMask = mask;
 }
 
 static uint32 playdate_graphics_sprite_getCollidesWithGroupsMask_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
-    return 0;
+    return sprite->collidesWithGroupMask;
 }
 
 static void playdate_graphics_sprite_resetGroupMask_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
+    sprite->groupMask = 0;
 }
 
 static void playdate_graphics_sprite_resetCollidesWithGroupsMask_lua(Cranked *cranked, Sprite sprite) {
-    // Todo
+    sprite->collidesWithGroupMask = 0;
 }
 
-static LuaRet playdate_graphics_sprite_moveWithCollisions_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2) {
-    // Todo
-    return 0;
+static LuaRet moveOrCheckCollisions(LuaVal spriteVal, LuaVal arg1, LuaVal arg2, bool sim) {
+    auto sprite = spriteVal.asUserdataObject<Sprite>();
+    auto cranked = &sprite->cranked;
+    auto context = cranked->getLuaContext();
+    Vec2 goal = arg2.isNil() ? arg1.asVec() : Vec2{ arg1.asFloat(), arg2.asFloat() };
+    auto response = spriteVal.getField("collisionResponse");
+    bool hasResponseFunc = response.val.isFunction();
+    auto responseType = hasResponseFunc ? Bump::ResponseType{} : response.val.asCollisionResponse();
+    auto [actual, collisions] = cranked->bump.move(sprite, goal, sim, [&](Sprite a, Sprite b){
+        if (hasResponseFunc) {
+            lua_pushvalue(context, response.val);
+            pushResource(a); // Todo: Do the actual sprite objects need to be used? Probably... That would require storing weak references to Lua object tables from Sprite
+            pushResource(b);
+            lua_call(context, 2, 1); // Todo: Protected?
+            LuaValGuard value(LuaVal(context, lua_gettop(context)));
+            if (!value.val.isNil())
+                return value.val.asCollisionResponse();
+        }
+        return responseType;
+    });
+
+    pushFloat(cranked, actual.x);
+    pushFloat(cranked, actual.y);
+    auto collisionsArray = pushTable(cranked);
+    for (int i = 0; i < collisions.size(); i++) {
+        auto &entry = collisions[i];
+        LuaValGuard collision(pushTable(cranked));
+        setResourceField(collision.val, "sprite", entry.sprite); // Todo: Probably also needs to be actual object...
+        setResourceField(collision.val, "other", entry.other);
+        collision.val.setIntField("type", (int)entry.type);
+        collision.val.setBoolField("overlaps", entry.overlaps);
+        collision.val.setFloatField("ti", entry.ti);
+        setVecField(collision.val, "move", entry.move);
+        setVecField(collision.val, "normal", entry.normal);
+        setPointField(collision.val, "touch", entry.touch);
+        setRectField(collision.val, "spriteRect", entry.entityRect);
+        setRectField(collision.val, "otherRect", entry.otherRect);
+        if (entry.type == Bump::ResponseType::Bounce)
+            setPointField(collision.val, "bounce", entry.bounce);
+        if (entry.type == Bump::ResponseType::Slide)
+            setPointField(collision.val, "slide", entry.slide);
+        collisionsArray.setElement(i + 1, collision.val);
+    }
+    pushInt(cranked, (int)collisions.size());
+    return 4;
 }
 
-static LuaRet playdate_graphics_sprite_checkCollisions_lua(Cranked *cranked, Sprite sprite, LuaVal arg1, LuaVal arg2) {
-    // Todo
-    return 0;
+static LuaRet playdate_graphics_sprite_moveWithCollisions_lua(Cranked *cranked, LuaVal sprite, LuaVal arg1, LuaVal arg2) {
+    return moveOrCheckCollisions(sprite, arg1, arg2, false);
+}
+
+static LuaRet playdate_graphics_sprite_checkCollisions_lua(Cranked *cranked, LuaVal sprite, LuaVal arg1, LuaVal arg2) {
+    return moveOrCheckCollisions(sprite, arg1, arg2, true);
+}
+
+static LuaRet returnSpriteList(Cranked *cranked, const vector<Sprite> &sprites) {
+    auto table = pushTable(cranked);
+    int i = 1;
+    for (auto sprite : sprites)
+        setResourceElement(table, i++, sprite);
+    return 1;
 }
 
 static LuaRet playdate_graphics_sprite_querySpritesAtPoint_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2) {
-    // Todo
-    return 0;
+    auto point = arg2.isNil() ? arg1.asVec() : Vec2{ arg1.asFloat(), arg2.asFloat() };
+    return returnSpriteList(cranked, cranked->bump.queryPoint(point));
 }
 
 static LuaRet playdate_graphics_sprite_querySpritesInRect_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
-    return 0;
+    auto rect = arg2.isNil() ? arg1.asRect() : Rect{ arg1.asFloat(), arg2.asFloat(), arg3.asFloat(), arg4.asFloat() };
+    return returnSpriteList(cranked, cranked->bump.queryRect(rect));
 }
 
 static LuaRet playdate_graphics_sprite_querySpritesAlongLine_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
-    return 0;
+    auto segment = arg2.isNil() ? arg1.asLineSeg() : LineSeg{ arg1.asFloat(), arg2.asFloat(), arg3.asFloat(), arg4.asFloat() };
+    return returnSpriteList(cranked, cranked->bump.querySegment(segment));
 }
 
 static LuaRet playdate_graphics_sprite_querySpriteInfoAlongLine_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2, LuaVal arg3, LuaVal arg4) {
-    // Todo
-    return 0;
+    auto segment = arg2.isNil() ? arg1.asLineSeg() : LineSeg{ arg1.asFloat(), arg2.asFloat(), arg3.asFloat(), arg4.asFloat() };
+    auto segmentInfo = cranked->bump.querySegmentInfo(segment);
+    auto table = pushTable(cranked);
+    pushInt(cranked, (int)segmentInfo.size());
+    int i = 1;
+    for (auto &info : segmentInfo) {
+        LuaValGuard infoTable(pushTable(cranked));
+        table.setElement(i++, infoTable.val);
+        setResourceField(infoTable.val, "sprite", info.sprite);
+        setPointField(infoTable.val, "entryPoint", info.seg.start);
+        setPointField(infoTable.val, "exitPoint", info.seg.end);
+        infoTable.val.setFloatField("ti1", info.ti1);
+        infoTable.val.setFloatField("ti2", info.ti2);
+    }
+    return 2;
 }
 
-static LuaRet playdate_graphics_video_new_lua(Cranked *cranked, const char *path) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_video_new_lua(Cranked *cranked, const char *path) {
+    try {
+        return cranked->graphics.getVideoPlayer(path);
+    } catch (exception &) {
+        return pushNil(cranked);
+    }
 }
 
-static void playdate_graphics_video_gc_lua(Cranked *cranked, LuaVal video) {
-    // Todo
+static void playdate_graphics_video_gc_lua(Cranked *cranked, VideoPlayer video) {
+    video->dereference();
 }
 
 static LuaRet playdate_graphics_video_getSize_lua(Cranked *cranked, VideoPlayer video) {
-    // Todo
-    return 0;
+    return returnVecValues(cranked, video->size);
 }
 
 static int playdate_graphics_video_getFrameCount_lua(Cranked *cranked, VideoPlayer video) {
-    // Todo
-    return 0;
+    return (int)video->frames.size();
 }
 
-static int playdate_graphics_video_getFrameRate_lua(Cranked *cranked, VideoPlayer video) {
-    // Todo
-    return 0;
+static float playdate_graphics_video_getFrameRate_lua(Cranked *cranked, VideoPlayer video) {
+    return video->frameRate;
 }
 
-static void playdate_graphics_video_setContext_lua(Cranked *cranked, VideoPlayer video, LuaVal image) {
-    // Todo
+static void playdate_graphics_video_setContext_lua(Cranked *cranked, VideoPlayer video, Bitmap image) {
+    video->target = image;
 }
 
-static LuaRet playdate_graphics_video_getContext_lua(Cranked *cranked, VideoPlayer video) {
-    // Todo
-    return 0;
+static NodeGraph playdate_pathfinder_graph_new_lua(Cranked *cranked, int nodeCount, LuaVal coordinates) {
+    auto graph = cranked->nativeEngine.createReferencedResource<NodeGraph>();
+    for (int i = 1; i <= nodeCount; i++) {
+        auto node = graph->addNewNode();
+        node->id = i;
+        if (!coordinates.isTable())
+            continue;
+        if (auto coords = coordinates.getElement(i); coords.val.isTable()) {
+            node->x = coords.val.getIntElement(1);
+            node->x = coords.val.getIntElement(2);
+        }
+    }
+    return graph;
 }
 
-static void playdate_graphics_video_useScreenContext_lua(Cranked *cranked, VideoPlayer video) {
-    // Todo
+static void playdate_pathfinder_graph_gc_lua(Cranked *cranked, NodeGraph graph) {
+    graph->dereference();
 }
 
-static void playdate_graphics_video_renderFrame_lua(Cranked *cranked, VideoPlayer video, int number) {
-    // Todo
+static NodeGraph playdate_pathfinder_graph_new2DGrid_lua(Cranked *cranked, int width, int height, bool allowDiagonals, LuaVal includedNodes) {
+    constexpr int cost = 10, diagonalCost = 14;
+    const int count = width * height;
+    vector connected(count, true);
+    vector<GraphNode> nodes(count);
+    if (includedNodes.isTable())
+        for (int i = 0; i < count; i++)
+            connected[i] = includedNodes.getBoolElement(i + 1);
+    auto graph = cranked->heap.construct<PDNodeGraph_32>(*cranked);
+    for (int i = 0; i < count; i++)
+        nodes[i] = graph->addNewNode();
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int i = y * width + y;
+            auto node = nodes[i];
+            node->id = i + 1;
+            node->x = x;
+            node->y = y;
+            const auto handleConnection = [=, &connected, &nodes](int dx, int dy) {
+                int cx = x + dx, cy = y + dy;
+                bool diagonal = dx != 0 and dy != 0;
+                if (cx >= width or cy >= height or (dx == 0 and dy == 0) or (diagonal and not allowDiagonals))
+                    return;
+                int ci = cy * width + cx;
+                if (not connected[ci])
+                    return;
+                auto other = nodes[ci];
+                int weight = diagonal ? diagonalCost : cost;
+                node->addConnection(other, weight);
+                other->addConnection(node, weight);
+            };
+            for (int j = 0; j <= 1; j++)
+                for (int k = 0; k <= 1; k++)
+                    handleConnection(j, k);
+        }
+    }
+    return graph;
 }
 
-static LuaRet playdate_pathfinder_graph_new_lua(Cranked *cranked, LuaVal nodeCount, LuaVal coordinates) {
-    // Todo
-    return 0;
+static GraphNode playdate_pathfinder_graph_addNewNode_lua(Cranked *cranked, NodeGraph graph, int id, int x, int y, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
+    auto node = graph->addNewNode();
+    node->id = id;
+    node->x = x;
+    node->y = y;
+    if (not connectedNodes.isTable() or not weights.isTable())
+        return node;
+    for (int i = 1;; i++) {
+        auto connected = connectedNodes.getElement(i);
+        auto weight = weights.getElement(i);
+        if (connected.val.isNil() or weight.val.isNil())
+            break;
+        auto otherNode = connected.val.asUserdataObject<GraphNode>();
+        auto weightVal = weight.val.asInt();
+        node->addConnection(otherNode, weightVal);
+        if (addReciprocalConnections)
+            otherNode->addConnection(node, weightVal);
+    }
+    return node;
 }
 
-static void playdate_pathfinder_graph_gc_lua(Cranked *cranked, LuaVal graph) {
-    // Todo
+static LuaValRet playdate_pathfinder_graph_addNewNodes_lua(Cranked *cranked, NodeGraph graph, int count) {
+    auto table = pushTable(cranked);
+    for (int i = 1; i <= count; i++)
+        setResourceElement(table, i, graph->addNewNode());
+    return table;
 }
 
-static LuaRet playdate_pathfinder_graph_new2DGrid_lua(Cranked *cranked, LuaVal graph, int width, int height, bool allowDiagonals, LuaVal includedNodes) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_addNode_lua(Cranked *cranked, NodeGraph graph, GraphNode node, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
+    graph->nodes.emplace(node);
+    if (not connectedNodes.isTable() or not weights.isTable())
+        return;
+    for (int i = 1;; i++) {
+        auto connected = connectedNodes.getElement(i);
+        auto weight = weights.getElement(i);
+        if (connected.val.isNil() or weight.val.isNil())
+            break;
+        auto otherNode = connected.val.asUserdataObject<GraphNode>();
+        auto weightVal = weight.val.asInt();
+        node->addConnection(otherNode, weightVal);
+        if (addReciprocalConnections)
+            otherNode->addConnection(node, weightVal);
+    }
 }
 
-static LuaRet playdate_pathfinder_graph_addNewNode_lua(Cranked *cranked, LuaVal graph, int id, LuaVal x, LuaVal y, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_addNodes_lua(Cranked *cranked, NodeGraph graph, LuaVal nodes) {
+    for (int i = 1;; i++) {
+        auto node = nodes.getElement(i);
+        if (node.val.isNil())
+            break;
+        graph->nodes.emplace(node.val.asUserdataObject<GraphNode>());
+    }
 }
 
-static LuaRet playdate_pathfinder_graph_addNewNodes_lua(Cranked *cranked, LuaVal graph, int count) {
-    // Todo
-    return 0;
+static LuaValRet playdate_pathfinder_graph_allNodes_lua(Cranked *cranked, NodeGraph graph) {
+    auto table = pushTable(cranked);
+    int i = 1;
+    for (auto &node : graph->nodes)
+        setResourceElement(table, i++, node.get());
+    return table;
 }
 
-static void playdate_pathfinder_graph_addNode_lua(Cranked *cranked, LuaVal graph, LuaVal node, LuaVal connectedNodes, LuaVal weights, bool addReciprocalConnections) {
-    // Todo
+static void playdate_pathfinder_graph_removeNode_lua(Cranked *cranked, NodeGraph graph, GraphNode node) {
+    node->removeAllConnections();
+    eraseByEquivalentKey(graph->nodes, node);
 }
 
-static void playdate_pathfinder_graph_addNodes_lua(Cranked *cranked, LuaVal graph, LuaVal nodes) {
-    // Todo
+static LuaRet playdate_pathfinder_graph_removeNodeWithXY_lua(Cranked *cranked, NodeGraph graph, int x, int y) {
+    if (auto node = graph->findByXY(x, y)) {
+        node->removeAllConnections();
+        pushResource(node);
+        eraseByEquivalentKey(graph->nodes, node);
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
-static LuaRet playdate_pathfinder_graph_allNodes_lua(Cranked *cranked, LuaVal graph) {
-    // Todo
-    return 0;
+static LuaRet playdate_pathfinder_graph_removeNodeWithID_lua(Cranked *cranked, NodeGraph graph, LuaVal id) {
+    if (auto node = graph->findById(id)) {
+        node->removeAllConnections();
+        pushResource(node);
+        eraseByEquivalentKey(graph->nodes, node);
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
-static void playdate_pathfinder_graph_removeNode_lua(Cranked *cranked, LuaVal graph, LuaVal node) {
-    // Todo
+static LuaRet playdate_pathfinder_graph_nodeWithID_lua(Cranked *cranked, NodeGraph graph, LuaVal id) {
+    if (auto node = graph->findById(id))
+        pushResource(node);
+    else
+        pushNil(cranked);
+    return 1;
 }
 
-static LuaRet playdate_pathfinder_graph_removeNodeWithXY_lua(Cranked *cranked, LuaVal graph, int x, int y) {
-    // Todo
-    return 0;
+static LuaRet playdate_pathfinder_graph_nodeWithXY_lua(Cranked *cranked, NodeGraph graph, int x, int y) {
+    if (auto node = graph->findByXY(x, y))
+        pushResource(node);
+    else
+        pushNil(cranked);
+    return 1;
 }
 
-static LuaRet playdate_pathfinder_graph_removeNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_addConnections_lua(Cranked *cranked, NodeGraph graph, LuaVal connections) {
+    iterateTable(connections, [graph](LuaVal nodeIdVal, LuaVal value) {
+        int nodeId = nodeIdVal.asInt();
+        auto node = graph->findById(nodeId);
+        if (not node or not value.isTable())
+            return false;
+        for (int i = 1;; i += 2) {
+            auto idVal = value.getElement(i);
+            auto weightVal = value.getElement(i + 1);
+            if (idVal.val.isNil() or weightVal.val.isNil())
+                break;
+            int id = idVal.val.asInt();
+            int weight = weightVal.val.asInt();
+            if (auto other = graph->findById(id))
+                node->addConnection(other, weight);
+        }
+        return false;
+    });
 }
 
-static LuaRet playdate_pathfinder_graph_nodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_addConnectionToNodeWithID_lua(Cranked *cranked, NodeGraph graph, int fromId, int toId, int weight, bool addReciprocalConnections) {
+    auto to = graph->findById(toId);
+    auto from = graph->findById(fromId);
+    if (not to or not from)
+        return;
+    from->addConnection(to, weight);
+    if (addReciprocalConnections)
+        to->addConnection(from, weight);
 }
 
-static LuaRet playdate_pathfinder_graph_nodeWithXY_lua(Cranked *cranked, LuaVal graph, int x, int y) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_removeAllConnections_lua(Cranked *cranked, NodeGraph graph) {
+    for (auto &node : graph->nodes)
+        node->removeConnections();
 }
 
-static void playdate_pathfinder_graph_addConnections_lua(Cranked *cranked, LuaVal graph, LuaVal connections) {
-    // Todo
+static void playdate_pathfinder_graph_removeAllConnectionsFromNodeWithID_lua(Cranked *cranked, NodeGraph graph, int id, bool removeIncoming) {
+    if (auto node = graph->findById(id)) {
+        node->removeConnections();
+        if (removeIncoming)
+            node->removeIncomingConnections();
+    }
 }
 
-static void playdate_pathfinder_graph_addConnectionToNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal from, LuaVal to, LuaVal weights, bool addReciprocalConnections) {
-    // Todo
+static LuaRet findPath(NodeGraph graph, GraphNode startNode, GraphNode goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes, bool getIds = false) {
+    // Todo: Support Lua heuristic, how to implement findPathToGoalAdjacentNodes? What are rules for adjacent nodes? Closest with same X or Y in each dir?
+    auto cranked = &startNode->cranked;
+    auto path = graph->pathfind(startNode, goalNode, [&](GraphNode a, GraphNode b) {
+        return abs(a->x - b->x) + abs(a->y - b->y); // Manhatten distance
+    });
+    if (not path.empty()) {
+        auto table = pushTable(cranked);
+        for (int i = 1; i <= path.size(); i++) {
+            if (getIds)
+                table.setIntElement(i, path[i]->id);
+            else
+                setResourceElement(table, i, path[i]);
+        }
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
-static void playdate_pathfinder_graph_removeAllConnections_lua(Cranked *cranked, LuaVal graph) {
-    // Todo
+static LuaRet playdate_pathfinder_graph_findPath_lua(Cranked *cranked, NodeGraph graph, GraphNode startNode, GraphNode goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+    return findPath(graph, startNode, goalNode, heuristic, findPathToGoalAdjacentNodes);
 }
 
-static void playdate_pathfinder_graph_removeAllConnectionsFromNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id, bool removeIncoming) {
-    // Todo
+static LuaRet playdate_pathfinder_graph_findPathWithIDs_lua(Cranked *cranked, NodeGraph graph, int startID, int goalID, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
+    auto startNode = graph->findById(startID);
+    auto goalNode = graph->findById(goalID);
+    if (not startNode or not goalNode) {
+        pushNil(cranked);
+        return 1;
+    }
+    return findPath(graph, startNode, goalNode, heuristic, findPathToGoalAdjacentNodes, true);
 }
 
-static LuaRet playdate_pathfinder_graph_findPath_lua(Cranked *cranked, LuaVal graph, LuaVal startNode, LuaVal goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_graph_setXYForNodeWithID_lua(Cranked *cranked, NodeGraph graph, int id, int x, int y) {
+    if (auto node = graph->findById(id)) {
+        node->x = x;
+        node->y = y;
+    }
 }
 
-static LuaRet playdate_pathfinder_graph_findPathWithIDs_lua(Cranked *cranked, LuaVal graph, LuaVal startID, LuaVal goalID, LuaVal heuristic, bool findPathToGoalAdjacentNodes) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_node_gc_lua(Cranked *cranked, GraphNode node) {
+    node->dereference();
 }
 
-static void playdate_pathfinder_graph_setXYForNodeWithID_lua(Cranked *cranked, LuaVal graph, LuaVal id, int x, int y) {
-    // Todo
+static LuaRet playdate_pathfinder_node_index_lua(Cranked *cranked, GraphNode node, LuaVal key) {
+    if (cranked->luaEngine.indexMetatable())
+        return 1;
+    if (key.isString()) {
+        string name(key.asString());
+        if (name == "id")
+            pushInt(cranked, node->id);
+        else if (name == "x")
+            pushInt(cranked, node->x);
+        else if (name == "y")
+            pushInt(cranked, node->y);
+        else
+            pushNil(cranked);
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
-static void playdate_pathfinder_node_gc_lua(Cranked *cranked, LuaVal self) {
-    // Todo
+static void playdate_pathfinder_node_newindex_lua(Cranked *cranked, GraphNode node, LuaVal key, LuaVal value) {
+    if (!key.isString())
+        return;
+    string name(key.asString());
+    int val = value.asInt();
+    if (name == "id")
+        node->id = val;
+    else if (name == "x")
+        node->x = val;
+    else if (name == "y")
+        node->y = val;
 }
 
-static LuaRet playdate_pathfinder_node_index_lua(Cranked *cranked, LuaVal self, LuaVal key) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_node_addConnection_lua(Cranked *cranked, GraphNode node, GraphNode other, int weight, bool addReciprocalConnection) {
+    node->addConnection(other, weight);
+    if (addReciprocalConnection)
+        other->addConnection(node, weight);
 }
 
-static void playdate_pathfinder_node_newindex_lua(Cranked *cranked, LuaVal self, LuaVal key, LuaVal value) {
-    // Todo
+static void playdate_pathfinder_node_addConnections_lua(Cranked *cranked, GraphNode node, LuaVal others, LuaVal weights, bool addReciprocalConnection) {
+    for (int i = 1;; i++) {
+        auto other = others.getElement(i);
+        auto weight = weights.getElement(i);
+        if (other.val.isNil() or weight.val.isNil())
+            break;
+        auto otherNode = other.val.asUserdataObject<GraphNode>();
+        auto weightVal = weight.val.asInt();
+        node->addConnection(otherNode, weightVal);
+        if (addReciprocalConnection)
+            otherNode->addConnection(node, weightVal);
+    }
 }
 
-static void playdate_pathfinder_node_addConnection_lua(Cranked *cranked, LuaVal self, LuaVal node, LuaVal weight, bool addReciprocalConnection) {
-    // Todo
+static void playdate_pathfinder_node_addConnectionToNodeWithXY_lua(Cranked *cranked, GraphNode node, int x, int y, int weight, bool addReciprocalConnection) {
+    node->assertValidGraph();
+    auto found = node->graph->findByXY(x, y);
+    if (not found)
+        return;
+    node->addConnection(node, weight);
+    if (addReciprocalConnection)
+        found->addConnection(node, weight);
 }
 
-static void playdate_pathfinder_node_addConnections_lua(Cranked *cranked, LuaVal self, LuaVal nodes, LuaVal weights, bool addReciprocalConnection) {
-    // Todo
+static LuaValRet playdate_pathfinder_node_connectedNodes_lua(Cranked *cranked, GraphNode node) {
+    auto table = pushTable(cranked);
+    int i = 1;
+    for (auto pair : node->getConnections()) {
+        LuaValGuard other(pushResource(pair.first));
+        table.setElement(i++, other.val);
+    }
+    return table;
 }
 
-static void playdate_pathfinder_node_addConnectionToNodeWithXY_lua(Cranked *cranked, LuaVal self, int x, int y, LuaVal weight, bool addReciprocalConnection) {
-    // Todo
+static void playdate_pathfinder_node_removeConnection_lua(Cranked *cranked, GraphNode node, GraphNode other, bool removeReciprocal) {
+    node->removeConnection(other);
+    if (removeReciprocal)
+        other->removeConnection(node);
 }
 
-static LuaRet playdate_pathfinder_node_connectedNodes_lua(Cranked *cranked, LuaVal self) {
-    // Todo
-    return 0;
+static void playdate_pathfinder_node_removeAllConnections_lua(Cranked *cranked, GraphNode node, bool removeIncoming) {
+    node->removeConnections();
+    if (removeIncoming)
+        node->removeIncomingConnections();
 }
 
-static void playdate_pathfinder_node_removeConnection_lua(Cranked *cranked, LuaVal self, LuaVal node, bool removeReciprocal) {
-    // Todo
-}
-
-static void playdate_pathfinder_node_removeAllConnections_lua(Cranked *cranked, LuaVal self, bool removeIncoming) {
-    // Todo
-}
-
-static void playdate_pathfinder_node_setXY_lua(Cranked *cranked, LuaVal self, int x, int y) {
-    // Todo
+static void playdate_pathfinder_node_setXY_lua(Cranked *cranked, GraphNode node, int x, int y) {
+    node->x = x;
+    node->y = y;
 }
 
 static int playdate_sound_getSampleRate_lua(Cranked *cranked) {
@@ -1778,7 +2167,7 @@ static void playdate_sound_removeEffect_lua(Cranked *cranked) {
     // Todo
 }
 
-static bool playdate_sound_getHeadphoneState_lua(Cranked *cranked) {
+static bool playdate_sound_getHeadphoneState_lua(Cranked *cranked, LuaVal changeCallback) {
     // Todo
     return false;
 }
@@ -2858,9 +3247,9 @@ void LuaEngine::registerLuaGlobals() {
                 video.setWrappedFunction<playdate_graphics_video_getFrameCount_lua>("getFrameCount");
                 video.setWrappedFunction<playdate_graphics_video_getFrameRate_lua>("getFrameRate");
                 video.setWrappedFunction<playdate_graphics_video_setContext_lua>("setContext");
-                video.setWrappedFunction<playdate_graphics_video_getContext_lua>("getContext");
-                video.setWrappedFunction<playdate_graphics_video_useScreenContext_lua>("useScreenContext");
-                video.setWrappedFunction<playdate_graphics_video_renderFrame_lua>("renderFrame");
+                video.setWrappedFunction<playdate_video_getContext>("getContext");
+                video.setWrappedFunction<playdate_video_useScreenContext>("useScreenContext");
+                video.setWrappedFunction<playdate_video_renderFrame>("renderFrame");
             }
         }
 

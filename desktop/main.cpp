@@ -22,7 +22,7 @@ using namespace cranked;
 typedef variant<string, int, float, bool> setting_type;
 
 enum class Windows {
-    Debug, Registers, HeapMemory, CodeMemory, Disassembly
+    Debug, Registers, HeapMemory, CodeMemory, Disassembly, Buttons, Crank, Accelerometer
 };
 
 struct Userdata {
@@ -74,7 +74,7 @@ int main(int argc, const char *args[]) {
 
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     // Todo: If window starts small, it squishes saved window positions
-    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1000, 1000, windowFlags);
+    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1000, 1400, windowFlags);
     if (!window)
         throw CrankedError("Failed to create SDL window: {}", SDL_GetError());
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -215,6 +215,8 @@ int main(int argc, const char *args[]) {
     bool firstFrame = true;
     bool requestedStart = false;
 
+    int buttonInputs{};
+
     // Todo: Extract the following disaster to separate functions
     auto callback = [&](Cranked &cranked){
         if (audioDevice) {
@@ -233,13 +235,14 @@ int main(int argc, const char *args[]) {
             }
         }
 
-        constexpr int keys[] { SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_B, SDL_SCANCODE_D, SDL_SCANCODE_Z, SDL_SCANCODE_X };
-        cranked.currentInputs = 0;
+        constexpr int keys[] { SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_Z, SDL_SCANCODE_X };
+        cranked.currentInputs = buttonInputs;
         for (int i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
             if (keyboardState[keys[i]])
                 cranked.currentInputs |= (1 << i);
+        buttonInputs = 0;
 
-        io.FontGlobalScale = (float)scale;
+        io.FontGlobalScale = scale;
 
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -255,13 +258,13 @@ int main(int argc, const char *args[]) {
                 // Todo: Clean this up (Different menu? Termination should not be necessary) (Also just doesn't work correctly at preset)
                 if (ImGui::MenuItem(cranked.state == Cranked::State::Stopped ? "Start" : cranked.state == Cranked::State::Stopping ? "Terminate" : "Stop")) {
                     switch (cranked.state) {
-                        case cranked::Cranked::State::Stopped:
+                        case Cranked::State::Stopped:
                             requestedStart = true;
                             break;
-                        case cranked::Cranked::State::Stopping:
+                        case Cranked::State::Stopping:
                             cranked.terminate();
                             break;
-                        case cranked::Cranked::State::Running:
+                        case Cranked::State::Running:
                             cranked.stop();
                             break;
                     }
@@ -278,6 +281,8 @@ int main(int argc, const char *args[]) {
                 ImGui::MenuItem("Show Code Memory", nullptr, &getWindowOpen(Windows::CodeMemory));
                 ImGui::MenuItem("Show Heap Memory", nullptr, &getWindowOpen(Windows::HeapMemory));
                 ImGui::MenuItem("Show Disassembly", nullptr, &getWindowOpen(Windows::Disassembly));
+                ImGui::MenuItem("Show Buttons", nullptr, &getWindowOpen(Windows::Buttons));
+                ImGui::MenuItem("Show Crank", nullptr, &getWindowOpen(Windows::Crank));
                 ImGui::EndMenu();
             } else if (wasScaling) {
                 style.ScaleAllSizes((float)newScale / scale);
@@ -287,7 +292,7 @@ int main(int argc, const char *args[]) {
             ImGui::EndMainMenuBar();
         }
 
-        //ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         // Todo: Capture logToConsole/print and write to a "Log" window
 
@@ -467,6 +472,54 @@ int main(int argc, const char *args[]) {
             }
 #endif
             ImGui::EndChild();
+            ImGui::End();
+        }
+
+        // Todo: Improve aesthetics
+        if (getWindowOpen(Windows::Buttons)) {
+            ImGui::SetNextWindowSize(ImVec2(180 * scale, 60 * scale), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Buttons", &getWindowOpen(Windows::Buttons), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+
+            ImGui::BeginGroup();
+            ImGui::BeginGroup();
+            ImGui::Dummy({ 0, 10 * scale });
+            buttonInputs |= (ImGui::Button("L"), ImGui::IsItemActive() * (int)PDButtons::Left);
+            ImGui::EndGroup();
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            buttonInputs |= (ImGui::Button("U"), ImGui::IsItemActive() * (int)PDButtons::Up);
+            buttonInputs |= (ImGui::Button("D"), ImGui::IsItemActive() * (int)PDButtons::Down);
+            ImGui::EndGroup();
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            ImGui::Dummy({ 0, 10 * scale });
+            buttonInputs |= (ImGui::Button("R"), ImGui::IsItemActive() * (int)PDButtons::Right);
+            ImGui::EndGroup();
+            ImGui::EndGroup();
+
+            ImGui::SameLine();
+            buttonInputs |= (ImGui::Button("A", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::A);
+            ImGui::SameLine();
+            buttonInputs |= (ImGui::Button("B", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::B);
+            ImGui::End();
+        }
+
+        if (getWindowOpen(Windows::Crank)) {
+            float radius = 35 * scale;
+            ImGui::SetNextWindowSize(ImVec2(radius * 2 + 2 * scale, radius * 2 + 2 * scale), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Crank", &getWindowOpen(Windows::Buttons), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+            auto screenPos = ImGui::GetCursorScreenPos();
+            auto contentSize = ImGui::GetContentRegionAvail();
+            auto drawList = ImGui::GetWindowDrawList();
+            ImVec2 center{ radius + 1 * scale + screenPos.x, radius + 1 * scale + screenPos.y };
+            ImGui::InvisibleButton("##", contentSize, ImGuiButtonFlags_MouseButtonLeft);
+            if (ImGui::IsItemActive())
+                cranked.crankAngle = atan2f(io.MousePos.y - center.y, io.MousePos.x - center.x) / numbers::pi_v<float> * 180;
+            auto color = ImGui::GetColorU32(accentColor);
+            drawList->AddCircle(center, radius, color);
+            auto angle = cranked.crankAngle * numbers::pi_v<float> / 180;
+            ImVec2 lineEnd{ center.x + cosf(angle) * radius, center.y + sinf(angle) * radius };
+            drawList->AddLine(center, lineEnd, color);
             ImGui::End();
         }
 

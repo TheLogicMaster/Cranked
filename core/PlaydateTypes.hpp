@@ -122,6 +122,8 @@ namespace cranked {
         Inverted,
     };
 
+    typedef LCDBitmapDrawMode BitmapDrawMode;
+
     enum class GraphicsFlip : int32 {
         Unflipped,
         FlippedX,
@@ -208,6 +210,14 @@ namespace cranked {
         Headset
     };
 
+    struct PDNodeGraph_32;
+    typedef PDNodeGraph_32 *NodeGraph;
+    typedef ResourceRef<PDNodeGraph_32> NodeGraphRef;
+
+    struct PDGraphNode_32;
+    typedef PDGraphNode_32 *GraphNode;
+    typedef ResourceRef<PDGraphNode_32> GraphNodeRef;
+
     struct LCDVideoPlayer_32;
     typedef LCDVideoPlayer_32 *VideoPlayer;
     typedef ResourceRef<LCDVideoPlayer_32> VideoPlayerRef;
@@ -219,6 +229,10 @@ namespace cranked {
     struct LCDBitmapTable_32;
     typedef LCDBitmapTable_32 *BitmapTable;
     typedef ResourceRef<LCDBitmapTable_32> BitmapTableRef;
+
+    struct LCDTileMap_32;
+    typedef LCDTileMap_32 *TileMap;
+    typedef ResourceRef<LCDTileMap_32> TileMapRef;
 
     struct LCDFont_32;
     typedef LCDFont_32 *Font;

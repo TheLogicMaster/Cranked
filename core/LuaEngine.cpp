@@ -85,24 +85,59 @@ void LuaEngine::runUpdateLoop() {
     inLuaUpdate = false;
 }
 
-LuaVal LuaEngine::pushImage(Bitmap image) const {
-    return pushUserdataResource(image, "playdate.graphics.image");
+template<>
+LuaVal LuaEngine::pushResource(NodeGraph resource) const {
+    return pushUserdataResource(resource, "playdate.pathfinder.graph");
 }
 
-LuaVal LuaEngine::pushSprite(Sprite sprite) const {
-    return pushUserdataResource(sprite, "playdate.graphics.sprite");
+template<>
+LuaVal LuaEngine::pushResource(GraphNode resource) const {
+    return pushUserdataResource(resource, "playdate.pathfinder.node");
 }
 
-LuaVal LuaEngine::pushFont(Font font) const {
-    return pushUserdataResource(font, "playdate.graphics.font");
+template<>
+LuaVal LuaEngine::pushResource(Bitmap resource) const {
+    return pushUserdataResource(resource, "playdate.graphics.image");
 }
 
-LuaVal LuaEngine::pushFile(File file) const {
-    return pushUserdataResource(file, "playdate.file.file");
+template<>
+LuaVal LuaEngine::pushResource(BitmapTable resource) const {
+    return pushUserdataResource(resource, "playdate.graphics.imagetable");
 }
 
-LuaVal LuaEngine::pushMenuItem(MenuItem item) const {
-    return pushUserdataResource(item, "playdate.menu.item");
+template<>
+LuaVal LuaEngine::pushResource(TileMap resource) const {
+    return pushUserdataResource(resource, "playdate.graphics.tilemap");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(Sprite resource) const {
+    if (auto value = getResourceValue(resource); not value.isNil())
+        return value;
+    lua_pop(getContext(), 1);
+    auto value = pushUserdataResource(resource, "playdate.graphics.sprite");
+    storeResourceValue(resource, value);
+    return value;
+}
+
+template<>
+LuaVal LuaEngine::pushResource(VideoPlayer resource) const {
+    return pushUserdataResource(resource, "playdate.graphics.video");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(Font resource) const {
+    return pushUserdataResource(resource, "playdate.graphics.font");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(File resource) const {
+    return pushUserdataResource(resource, "playdate.file.file");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(MenuItem resource) const {
+    return pushUserdataResource(resource, "playdate.menu.item");
 }
 
 void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {

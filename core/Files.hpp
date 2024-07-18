@@ -10,8 +10,6 @@ namespace cranked {
     struct SDFile_32 : NativeResource {
         explicit SDFile_32(Cranked &cranked);
 
-        SDFile_32(const SDFile_32 &other) = delete;
-        SDFile_32(SDFile_32 &&other) = delete;
         ~SDFile_32() override;
 
         FILE *file{};
@@ -64,7 +62,7 @@ namespace cranked {
 
         Cranked &cranked;
 
-        unordered_set<FileRef> openFiles{};
+        unordered_resource_set<File> openFiles{};
         fs::path appDataPath = "./appData/";
         cref_t lastError{};
 
