@@ -12,7 +12,7 @@ LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
         : NativeResource(cranked), width(width), height(height), data(vheap_vector(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
-        : NativeResource(cranked), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
+        : NativeResource(other.cranked), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
 
 LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     if (&other == this)
@@ -115,6 +115,12 @@ LCDSolidColor LCDBitmap_32::getPixel(int x, int y) const {
 
 // Todo: Could be more efficient using memset and such (Patterns add complexity)
 void LCDBitmap_32::clear(LCDColor color) {
+    if (color.color == LCDSolidColor::Clear) {
+        if (!mask)
+            mask = cranked.heap.construct<LCDBitmap_32>(cranked, width, height);
+        else
+            mask->clear(color);
+    }
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
             drawPixel(x, y, color);
@@ -194,6 +200,7 @@ LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {
 }
 
 LCDSprite_32::~LCDSprite_32() {
+    cranked.luaEngine.clearResourceValue(this);
     cranked.graphics.allocatedSprites.erase(this);
 }
 
@@ -201,17 +208,44 @@ void LCDSprite_32::updateCollisionWorld() {
     cranked.bump.updateSprite(this);
 }
 
+void LCDSprite_32::updateLuaPosition() {
+    if (!cranked.luaEngine.isLoaded())
+        return;
+    LuaValGuard value(cranked.luaEngine.getResourceValue(this));
+    if (value.val.isNil())
+        return;
+    auto pos = getPosition();
+    value.val.setFloatField("x", pos.x);
+    value.val.setFloatField("y", pos.y);
+}
+
 void LCDSprite_32::draw() {
     if (!visible or !inDrawList)
         return;
     Vec2 drawPos = bounds.pos;
     // Todo: Support tilemap
+    Rect dirtyRect = { -bounds.pos, { DISPLAY_WIDTH, DISPLAY_HEIGHT } }; // Todo
     if (image) {
         // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
         cranked.graphics.drawBitmap(image.get(), (int)drawPos.x, (int)drawPos.y, flip, ignoresDrawOffset);
     } else if (drawFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::struct4f_t, ArgType::struct4f_t>
-                (drawFunction, this, fromRect(Rect{ drawPos, bounds.size }), PDRect_32{ 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT }); // Todo: Dirty rect
+                (drawFunction, this, fromRect(Rect{ drawPos, bounds.size }), fromRect(dirtyRect)); // Todo: Correct args?
+    else if (LuaValGuard value{ cranked.luaEngine.getResourceValue(this) }; value.val.isTable()) {
+        if (auto callback = value.val.getFieldRaw("draw"); callback.isFunction()) {
+            cranked.luaEngine.pushResource(this);
+            cranked.luaEngine.pushFloat(dirtyRect.pos.x);
+            cranked.luaEngine.pushFloat(dirtyRect.pos.y);
+            cranked.luaEngine.pushFloat(dirtyRect.size.x);
+            cranked.luaEngine.pushFloat(dirtyRect.size.y);
+            if (int result = lua_pcall(cranked.getLuaContext(), 5, 0, 0); result != LUA_OK) {
+                string errStr = lua_isstring(cranked.getLuaContext(), -1) ? lua_tostring(cranked.getLuaContext(), -1) : "";
+                lua_pop(cranked.getLuaContext(), 1);
+                throw CrankedError("Exception in Sprite draw: {}, ({})", cranked.luaEngine.getLuaError(result), errStr);
+            }
+        } else
+            lua_pop(cranked.getLuaContext(), 1);
+    }
 }
 
 void LCDSprite_32::update() {
@@ -219,6 +253,28 @@ void LCDSprite_32::update() {
         return;
     if (updateFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t>(updateFunction, this);
+    else if (LuaValGuard value{ cranked.luaEngine.getResourceValue(this) }; value.val.isTable()) {
+        if (auto callback = value.val.getFieldRaw("update"); callback.isFunction()) {
+            bool isUpdateFunc; // Guard against playdate.graphics.sprite.update being found and causing C stack overflow
+            {
+                if (!cranked.luaEngine.getQualifiedLuaGlobal("playdate.graphics.sprite.update"))
+                    throw CrankedError("Missing Sprite table");
+                LuaValGuard updateFunc { LuaVal(cranked.getLuaContext()) };
+                isUpdateFunc = lua_compare(cranked.getLuaContext(), callback, updateFunc.val, LUA_OPEQ);
+            }
+            if (isUpdateFunc) {
+                lua_pop(cranked.getLuaContext(), 1);
+                return;
+            }
+            cranked.luaEngine.pushResource(this);
+            if (int result = lua_pcall(cranked.getLuaContext(), 1, 0, 0); result != LUA_OK) {
+                string errStr = lua_isstring(cranked.getLuaContext(), -1) ? lua_tostring(cranked.getLuaContext(), -1) : "";
+                lua_pop(cranked.getLuaContext(), 1);
+                throw CrankedError("Exception in Sprite update: {}, ({})", cranked.luaEngine.getLuaError(result), errStr);
+            }
+        } else
+            lua_pop(cranked.getLuaContext(), 1);
+    }
 }
 
 Sprite LCDSprite_32::copy() {
@@ -627,7 +683,7 @@ Bitmap Graphics::invertedBitmap(Bitmap bitmap) {
     auto inverted = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
     for (int i = 0; i < (int)bitmap->data.size(); i++)
         inverted->data[i] = ~bitmap->data[i]; // Affects row padding bits, which doesn't matter
-    inverted->mask = heap.construct<LCDBitmap_32>(*bitmap->mask);
+    inverted->mask = bitmap->mask ? heap.construct<LCDBitmap_32>(*bitmap->mask) : nullptr;
     return inverted;
 }
 

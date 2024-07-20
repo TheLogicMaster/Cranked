@@ -146,6 +146,16 @@ namespace cranked {
         return split;
     }
 
+    inline string stringToLower(string str) {
+        transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return tolower(c); });
+        return str;
+    }
+
+    inline string stringToUpper(string str) {
+        transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return toupper(c); });
+        return str;
+    }
+
     class Version {
     public:
         Version() : version(0) {}

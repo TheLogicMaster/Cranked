@@ -104,7 +104,7 @@ namespace cranked {
 
         void unload();
 
-        vector<uint8> readRomFile(const string &name, const string &extension = "");
+        vector<uint8> readRomFile(string name, const string &extension = "", const vector<string> &replacedExtensions = {});
 
         File *findRomFile(const string &name);
 
@@ -171,7 +171,7 @@ namespace cranked {
         }
 
         Image getImage(const string &name) {
-            auto data = readRomFile(name, ".pdi");
+            auto data = readRomFile(name, ".pdi", { ".gif", ".png" });
             return readImage(data.data(), data.size());
         }
 
@@ -181,17 +181,17 @@ namespace cranked {
         }
 
         StringTable getStringTable(const string &name) {
-            auto data = readRomFile(name, ".pds");
+            auto data = readRomFile(name, ".pds", { ".strings" });
             return readStringTable(data.data(), data.size());
         }
 
         Font getFont(const string &name) {
-            auto data = readRomFile(name, ".pft");
+            auto data = readRomFile(name, ".pft", { ".fnt" });
             return readFont(data.data(), data.size());
         }
 
         Audio getAudio(const string &name) {
-            auto data = readRomFile(name, ".pda");
+            auto data = readRomFile(name, ".pda", { ".wav", ".aiff" });
             return readAudio(data.data(), data.size());
         }
 

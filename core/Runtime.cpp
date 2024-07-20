@@ -421,6 +421,7 @@ int32 cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8 *f
     return size;
 }
 
+// Todo: Should log to logger rather than stdout
 // Todo: Args are passed as emulated sizes, which will cause issues when `int` size is different, and such
 // Todo: Probably needs conversion when calling vararg functions
 void cranked::playdate_sys_logToConsole([[maybe_unused]] Cranked *cranked, uint8 *fmt, ...) {
@@ -436,6 +437,7 @@ void cranked::playdate_sys_error(Cranked *cranked, uint8 *fmt, ...) {
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
     va_end(args);
+    printf("\n");// Doesn't depend on Lua setNewlinePrinted flag
     cranked->stop();
 }
 
@@ -1033,7 +1035,6 @@ int32 cranked::playdate_lua_getArgType(Cranked *cranked, int32 pos, cref_t *outC
             *outClass = 0;
         return 0;
     }
-    int type = lua_type(context, pos);
     if (outClass) {
         if (lua_getmetatable(context, pos)) {
             lua_pushstring(context, "__name");
@@ -1043,13 +1044,20 @@ int32 cranked::playdate_lua_getArgType(Cranked *cranked, int32 pos, cref_t *outC
         } else
             *outClass = 0;
     }
+    int type = lua_type(context, pos);
+    if (type == LUA_TNUMBER)
+        return lua_isinteger(context, pos) ? (int)LuaType::Int : (int)LuaType::Float;
+    if (type == LUA_TUSERDATA or type == LUA_TLIGHTUSERDATA)
+        return (int)LuaType::Object;
+    if (type == LUA_TTHREAD)
+        return (int)LuaType::Thread;
     return type;
 }
 
 int32 cranked::playdate_lua_argIsNil(Cranked *cranked, int32 pos) {
     if (!cranked->getLuaContext())
         return false;
-    return lua_isnil(cranked->getLuaContext(), pos);
+    return lua_isnoneornil(cranked->getLuaContext(), pos);
 }
 
 // Todo: Do the getArg functions convert the argument if the type is different? Or should these be making copies first?
@@ -1617,6 +1625,7 @@ Sprite cranked::playdate_sprite_newSprite(Cranked *cranked) {
 }
 
 void cranked::playdate_sprite_freeSprite(Cranked *cranked, Sprite sprite) {
+    cranked->graphics.removeSpriteFromDrawList(sprite); // Just in case, allow deletion
     sprite->dereference();
 }
 
@@ -1652,7 +1661,7 @@ void cranked::playdate_sprite_setBounds(Cranked *cranked, Sprite sprite, PDRect_
 }
 
 PDRect_32 cranked::playdate_sprite_getBounds(Cranked *cranked, Sprite sprite) {
-    return fromRect(sprite->bounds);
+    return fromRect(sprite->getBounds());
 }
 
 void cranked::playdate_sprite_moveTo(Cranked *cranked, Sprite sprite, float x, float y) {
@@ -1672,7 +1681,7 @@ Bitmap cranked::playdate_sprite_getImage(Cranked *cranked, Sprite sprite) {
 }
 
 void cranked::playdate_sprite_setSize(Cranked *cranked, Sprite s, float width, float height) {
-    s->bounds.size = Vec2(width, height);
+    s->setSize({ width, height });
 }
 
 void cranked::playdate_sprite_setZIndex(Cranked *cranked, Sprite sprite, int16 zIndex) {
@@ -1728,7 +1737,7 @@ void cranked::playdate_sprite_setCollisionsEnabled(Cranked *cranked, Sprite spri
 }
 
 int32 cranked::playdate_sprite_collisionsEnabled(Cranked *cranked, Sprite sprite) {
-    return sprite->collisionsEnabled;
+    return sprite->areCollisionsEnabled();
 }
 
 void cranked::playdate_sprite_setVisible(Cranked *cranked, Sprite sprite, int32 flag) {
@@ -1912,14 +1921,14 @@ void cranked::playdate_sprite_setStencilImage(Cranked *cranked, Sprite sprite, B
 }
 
 void cranked::playdate_sprite_setCenter(Cranked *cranked, Sprite s, float x, float y) {
-    s->center = {x, y};
+    s->setCenter({ x, y });
 }
 
 void cranked::playdate_sprite_getCenter(Cranked *cranked, Sprite s, float *x, float *y) {
     if (x)
-        *x = s->center.x;
+        *x = s->getCenter().x;
     if (y)
-        *y = s->center.y;
+        *y = s->getCenter().y;
 }
 
 void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource c, float lvol, float rvol) {

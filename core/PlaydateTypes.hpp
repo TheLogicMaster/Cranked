@@ -97,6 +97,18 @@ namespace cranked {
         ReadDataFallback = Read | ReadData, // Read data then fallback to ROM
     };
 
+    enum class LuaType : int32 {
+        Nil,
+        Bool,
+        Int,
+        Float,
+        String,
+        Table,
+        Function,
+        Thread,
+        Object
+    };
+
     enum class DitherType : int32 {
         None,
         DiagonalLine,

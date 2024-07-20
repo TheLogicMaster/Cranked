@@ -71,7 +71,10 @@ namespace cranked {
         BitmapRef mask;
     };
 
+    // Todo: Protect position/bounds and update Lua x/y when moved
     struct LCDSprite_32 : NativeResource {
+        friend Graphics;
+
         explicit LCDSprite_32(Cranked &cranked);
 
         ~LCDSprite_32() override;
@@ -87,6 +90,10 @@ namespace cranked {
             updateCollisionWorld();
         }
 
+        [[nodiscard]] bool areCollisionsEnabled() const {
+            return collisionsEnabled;
+        }
+
         /// Sets the collision rect relative to top-left corner of bounds
         void setCollisionRect(Rect rect) {
             collideRect = rect;
@@ -99,17 +106,43 @@ namespace cranked {
             if (image)
                 bounds.size = { (float)image->width, (float)image->height };
             updateCollisionWorld();
+            updateLuaPosition();
+        }
+
+        [[nodiscard]] Rect getBounds() const {
+            return bounds;
         }
 
         /// Sets the position based on the specified center
         void setPosition(Vec2 pos) {
             bounds.pos = pos - getCenterOffset();
             updateCollisionWorld();
+            updateLuaPosition();
         }
 
         /// Gets the position based on the specified center
         [[nodiscard]] Vec2 getPosition() const {
             return bounds.pos + getCenterOffset();
+        }
+
+        void setCenter(Vec2 newCenter) {
+            Vec2 pos = getPosition();
+            center = newCenter;
+            setPosition(pos);
+        }
+
+        [[nodiscard]] Vec2 getCenter() const {
+            return center;
+        }
+
+        void setSize(Vec2 size) {
+            Vec2 pos = getPosition();
+            bounds.size = size;
+            setPosition(pos);
+        }
+
+        [[nodiscard]] Vec2 getSize() const {
+            return bounds.size;
         }
 
         /// Sets the image and adjusts the bounds to maintain the same position
@@ -122,10 +155,8 @@ namespace cranked {
             image = bitmap;
             flip = bitmapFlip;
             scale = { xScale, yScale };
-            Vec2 pos = getPosition();
             if (bitmap)
-                bounds.size = { (float)bitmap->width, (float)bitmap->height };
-            setPosition(pos);
+                setSize({ (float)bitmap->width, (float)bitmap->height });
         }
 
         /// Returns the offset from the world space top-left corner to the sprite's considered position
@@ -138,6 +169,8 @@ namespace cranked {
             return getCenterOffset() - collideRect.pos;
         }
 
+        void updateLuaPosition();
+
         void setImage(Bitmap bitmap) {
             image = bitmap;
             collideRectFlip = GraphicsFlip::Unflipped;
@@ -149,16 +182,13 @@ namespace cranked {
 
         Sprite copy();
 
-        Rect bounds{};
         BitmapRef image{};
         TileMapRef tileMap{}; // Todo: Behavior compared to image (Replaces image?)
-        Vec2 center{ 0.5f, 0.5f };
         bool visible = true;
         bool updatesEnabled = true;
         bool dontRedrawOnImageChange{};
         bool ignoresDrawOffset{};
         bool opaque{};
-        bool collisionsEnabled = true;
         Rect collideRect{};
         GraphicsFlip collideRectFlip{}; // Todo
         uint32 groupMask{}; // Only used by Lua
@@ -178,6 +208,11 @@ namespace cranked {
         cref_t userdata{};
         bool dirty = true;
         vector<LCDRect_32> dirtyRects;
+
+    private:
+        bool collisionsEnabled = true;
+        Rect bounds{};
+        Vec2 center{ 0.5f, 0.5f };
         bool inDrawList; // Only set from Graphics
     };
 

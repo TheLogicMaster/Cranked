@@ -72,7 +72,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - [x] Life
 - [ ] Exposure
 - [ ] bach.mid
-- [ ] Array
+- [x] Array
 - [ ] 3D Library (Works until memory bug occurs)
 - [ ] Sprite Collision Masks
 - [ ] Pathfinder
@@ -86,7 +86,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - [ ] Controller Test
 - [ ] Asheteroids
 - [ ] Accelerometer Test
-- [ ] 2020
+- [x] 2020
 - Single File Examples
   - [ ] Animator
   - [ ] Arcs

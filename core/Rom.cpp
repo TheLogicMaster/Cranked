@@ -148,12 +148,19 @@ void Rom::unload() {
     loaded = false;
 }
 
-vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
-    auto filepath = !extension.empty() and not name.ends_with(extension) ? name + extension : name;
-    if (filepath.starts_with("/System/")) {
+vector<uint8> Rom::readRomFile(string name, const string &extension, const vector<string> &replacedExtensions) {
+    for (auto &replaced : replacedExtensions) {
+        if (name.ends_with(replaced)) {
+            name = name.substr(0, name.size() - replaced.size());
+            break;
+        }
+    }
+    if (!extension.empty() and not name.ends_with(extension))
+        name += extension;
+    if (name.starts_with("/System/")) {
         auto file = findSystemFile(name.substr(8));
         if (!file)
-            throw CrankedError("No such file: " + filepath);
+            throw CrankedError("No such file: " + name);
         return file->data;
     }
     for (auto &file : pdzFiles)
@@ -161,7 +168,7 @@ vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
             return file.data;
     vector<uint8> data;
     if (zip) {
-        auto entry = zip->getEntry(filepath);
+        auto entry = zip->getEntry(name);
         if (entry.isNull())
             throw CrankedError("No such file: " + name);
         data.resize(entry.getSize());
@@ -169,7 +176,7 @@ vector<uint8> Rom::readRomFile(const string &name, const string &extension) {
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(fs::path(path) / filepath);
+        data = readFileData(fs::path(path) / name);
     return data;
 }
 

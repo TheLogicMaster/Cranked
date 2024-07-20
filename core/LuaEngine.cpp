@@ -77,41 +77,41 @@ void LuaEngine::runUpdateLoop() {
     if (result == LUA_OK)
         lua_resetthread(luaUpdateThread);
     else if (result != LUA_YIELD) {
-        string error(getLuaError(result));
+        string errStr = lua_isstring(luaUpdateThread, -1) ? lua_tostring(luaUpdateThread, -1) : ""; // Todo: When does this not push an error?
         inLuaUpdate = false;
         lua_resetthread(luaUpdateThread);
-        throw CrankedError("Failed to run Lua update loop: {}", error);
+        throw CrankedError("Failed to run Lua update loop: {} ({})", getLuaError(result), errStr);
     }
     inLuaUpdate = false;
 }
 
 template<>
-LuaVal LuaEngine::pushResource(NodeGraph resource) const {
+LuaVal LuaEngine::pushResource(NodeGraph resource) {
     return pushUserdataResource(resource, "playdate.pathfinder.graph");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(GraphNode resource) const {
+LuaVal LuaEngine::pushResource(GraphNode resource) {
     return pushUserdataResource(resource, "playdate.pathfinder.node");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(Bitmap resource) const {
+LuaVal LuaEngine::pushResource(Bitmap resource) {
     return pushUserdataResource(resource, "playdate.graphics.image");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(BitmapTable resource) const {
+LuaVal LuaEngine::pushResource(BitmapTable resource) {
     return pushUserdataResource(resource, "playdate.graphics.imagetable");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(TileMap resource) const {
+LuaVal LuaEngine::pushResource(TileMap resource) {
     return pushUserdataResource(resource, "playdate.graphics.tilemap");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(Sprite resource) const {
+LuaVal LuaEngine::pushResource(Sprite resource) {
     if (auto value = getResourceValue(resource); not value.isNil())
         return value;
     lua_pop(getContext(), 1);
@@ -121,22 +121,22 @@ LuaVal LuaEngine::pushResource(Sprite resource) const {
 }
 
 template<>
-LuaVal LuaEngine::pushResource(VideoPlayer resource) const {
+LuaVal LuaEngine::pushResource(VideoPlayer resource) {
     return pushUserdataResource(resource, "playdate.graphics.video");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(Font resource) const {
+LuaVal LuaEngine::pushResource(Font resource) {
     return pushUserdataResource(resource, "playdate.graphics.font");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(File resource) const {
+LuaVal LuaEngine::pushResource(File resource) {
     return pushUserdataResource(resource, "playdate.file.file");
 }
 
 template<>
-LuaVal LuaEngine::pushResource(MenuItem resource) const {
+LuaVal LuaEngine::pushResource(MenuItem resource) {
     return pushUserdataResource(resource, "playdate.menu.item");
 }
 

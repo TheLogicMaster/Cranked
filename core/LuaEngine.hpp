@@ -40,11 +40,11 @@ namespace cranked {
         }
 
         [[nodiscard]] bool isNil() const {
-            return lua_isnil(context, index);
+            return lua_isnoneornil(context, index);
         }
 
         [[nodiscard]] bool isString() const {
-            return lua_isstring(context, index);
+            return lua_type(context, index) == LUA_TSTRING;
         }
 
         [[nodiscard]] bool isInt() const {
@@ -52,11 +52,11 @@ namespace cranked {
         }
 
         [[nodiscard]] bool isFloat() const {
-            return lua_isnumber(context, index);
+            return !isInt() and lua_type(context, index) == LUA_TNUMBER;
         }
 
         [[nodiscard]] bool isNumeric() const {
-            return isFloat() or isInt();
+            return lua_type(context, index) == LUA_TNUMBER;
         }
 
         [[nodiscard]] bool isBool() const {
@@ -166,7 +166,7 @@ namespace cranked {
             if (isInt())
                 return (GraphicsFlip)asInt();
             if (isString()) {
-                auto str = string(asString());
+                auto str = stringToLower(asString());
                 if (str == "flipX")
                     return GraphicsFlip::FlippedX;
                 if (str == "flipY")
@@ -181,7 +181,7 @@ namespace cranked {
             if (isInt())
                 return (PDFontVariant)asInt();
             if (isString()) {
-                auto str = string(asString());
+                auto str = stringToLower(asString());
                 if (str == "normal")
                     return PDFontVariant::Normal;
                 if (str == "bold")
@@ -196,7 +196,7 @@ namespace cranked {
             if (isInt())
                 return (PDLanguage)asInt();
             if (isString()) {
-                auto str = string(asString());
+                auto str = stringToLower(asString());
                 if (str == "en")
                     return PDLanguage::English;
                 if (str == "jp")
@@ -209,7 +209,7 @@ namespace cranked {
             if (isInt())
                 return (PDButtons)asInt();
             if (isString()) {
-                auto str = string(asString());
+                auto str = stringToLower(asString());
                 if (str == "left")
                     return PDButtons::Left;
                 if (str == "right")
@@ -230,7 +230,7 @@ namespace cranked {
             if (isInt())
                 return (Bump::ResponseType)asInt();
             if (isString()) {
-                auto str = string(asString());
+                auto str = stringToLower(asString());
                 if (str == "slide")
                     return Bump::ResponseType::Slide;
                 if (str == "freeze")
@@ -430,12 +430,13 @@ namespace cranked {
                 pop();
         }
 
-        void pop() const {
+        void pop() {
             if (popped)
                 throw CrankedError("Double LuaVal pop");
             if (lua_gettop(val.context) != val.index)
                 throw CrankedError("Unbalanced LuaVal pop");
             lua_pop(val.context, 1);
+            popped = true;
         }
 
         LuaVal val;
@@ -466,7 +467,7 @@ namespace cranked {
             return inLuaUpdate ? luaUpdateThread : luaInterpreter;
         }
 
-        bool isLoaded() {
+        [[nodiscard]] bool isLoaded() const {
             return luaInterpreter != nullptr;
         }
 
@@ -509,14 +510,16 @@ namespace cranked {
             return object;
         }
 
-        LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) const {
+        LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) {
+            if (!resource)
+                return pushNil();
             auto object = pushUserdataObject(resource, metatable);
             resource->reference();
             return object;
         }
 
         template<is_resource_ptr R>
-        LuaVal pushResource(R resource) const;
+        LuaVal pushResource(R resource);
 
         LuaVal pushNil () {
             lua_pushnil(getContext());
@@ -538,7 +541,7 @@ namespace cranked {
             return LuaVal{getContext()};
         }
 
-        LuaVal pushFloat(float value) const {
+        LuaVal pushFloat(float value) {
             lua_pushnumber(getContext(), value);
             return LuaVal{getContext()};
         }
@@ -597,13 +600,13 @@ namespace cranked {
         }
 
         template<is_resource_ptr R>
-        void setResourceElement(LuaVal val, int n, R resource) const {
+        void setResourceElement(LuaVal val, int n, R resource) {
             pushResource(resource);
             lua_seti(val.context, val.index, n);
         }
 
         template<is_resource_ptr R>
-        void setResourceField(LuaVal val, const char *name, R resource) const {
+        void setResourceField(LuaVal val, const char *name, R resource) {
             pushResource(resource);
             lua_setfield(val.context, val.index, name);
         }
@@ -645,13 +648,13 @@ namespace cranked {
         }
 
         [[nodiscard]] bool indexMetatable() const {
-            auto context = getContext();
-            if (!context)
+            if (!isLoaded())
                 return false;
+            auto context = getContext();
             if (!lua_getmetatable(context, 1))
                 return false;
             lua_pushvalue(context, 2);
-            if (!lua_rawget(context, 1)) {
+            if (!lua_rawget(context, -2)) {
                 lua_pop(context, 2);
                 return false;
             }
@@ -683,7 +686,7 @@ namespace cranked {
             lua_pop(luaContext, 2);
         }
 
-        bool getQualifiedLuaGlobal(const char *name, bool createMissing = false) const {
+        bool getQualifiedLuaGlobal(const char *name, bool createMissing = false) const { // Todo: Return LuaVal?
             auto nameStr = string(name);
             size_t pos;
             auto luaContext = getContext();
@@ -741,7 +744,7 @@ namespace cranked {
         }
 
         void invokeLuaCallback(const string &name) const {
-            if (!getContext())
+            if (!isLoaded())
                 return;
             auto start = lua_gettop(getContext());
             lua_getglobal(getContext(), "playdate");
@@ -752,7 +755,7 @@ namespace cranked {
         }
 
         bool invokeLuaInputCallback(const string &name, const vector<float> &args = {}) {
-            if (!getContext())
+            if (!isLoaded())
                 return false;
             auto start = lua_gettop(getContext());
             lua_getglobal(getContext(), "cranked");
@@ -791,6 +794,8 @@ namespace cranked {
         }
 
         void clearResourceValue(void *ptr) const {
+            if (!isLoaded())
+                return;
             if (!getQualifiedLuaGlobal("cranked.resources"))
                 throw CrankedError("Preserved table missing");
             auto context = getContext();
@@ -804,7 +809,7 @@ namespace cranked {
          * Preserves a given Lua value in a reference counted global table
          */
         void preserveLuaValue(int index) const {
-            if (!getContext())
+            if (!isLoaded())
                 return;
             if (!getQualifiedLuaGlobal("cranked.preserved"))
                 throw CrankedError("Preserved table missing");
@@ -819,7 +824,7 @@ namespace cranked {
         }
 
         void releaseLuaValue(int index) const {
-            if (!getContext())
+            if (!isLoaded())
                 return;
             if (!getQualifiedLuaGlobal("cranked.preserved"))
                 throw CrankedError("Preserved table missing");

@@ -59,8 +59,8 @@ namespace cranked {
     }
 
     template<is_resource_ptr R>
-    LuaVal pushResource(R resource) {
-        return resource->cranked.luaEngine.pushResource(resource);
+    LuaVal pushResource(Cranked *cranked, R resource) {
+        return cranked->luaEngine.pushResource(resource);
     }
 
     inline LuaVal pushTime(Cranked *cranked, const chrono::system_clock::time_point &time) {
@@ -129,9 +129,6 @@ namespace cranked {
 
         template<numeric_type T>
         LuaValRet(Vector2<T> vector) : LuaValRet(pushPoint(vector)) {} // NOLINT(*-explicit-constructor)
-
-        template<is_resource_ptr R>
-        LuaValRet(R resource) : LuaValRet(pushResource(resource)) {} // NOLINT(*-explicit-constructor)
     };
 
     template<typename T, int I>
@@ -155,6 +152,8 @@ namespace cranked {
         else if constexpr (is_same_v<T, uint8 *> or is_same_v<T, const char *>)
             return (T)lua_tostring(context, I);
         else if constexpr (is_pointer_v<T> and is_class_v<remove_pointer_t<T>>) { // Treat all class pointers as unwrapped userdata objects
+            if (lua_isnoneornil(context, I))
+                return (T) nullptr;
             lua_getfield(context, I, "userdata");
             auto value = lua_touserdata(context, -1);
             lua_pop(context, 1);
@@ -176,7 +175,7 @@ namespace cranked {
         else if constexpr (is_type_listed<T, const char *, uint8 *>)
             lua_pushstring(context, val);
         else if constexpr (is_resource_ptr<T>)
-            pushResource(val);
+            pushResource(Cranked::fromLuaContext(context), val);
         else if constexpr (is_same_v<T, Vec2>)
             pushVec(Cranked::fromLuaContext(context), val);
         else if constexpr (is_type_listed<T, IntRect, Rect>)

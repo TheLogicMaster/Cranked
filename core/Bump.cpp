@@ -270,7 +270,7 @@ tuple<Vec2, vector<Bump::Collision>> Bump::move(Sprite sprite, Vec2 goal, bool s
             }
         }
 
-        sprite->bounds.pos = actual - sprite->collideRect.pos;
+        sprite->setPosition(actual + sprite->getCollisionRectToCenterOffset());
     }
 
     return { actual + sprite->getCollisionRectToCenterOffset(), collisions };

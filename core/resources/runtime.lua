@@ -34,6 +34,7 @@ function cranked.dispatchInputEvent(name, change, acceleratedChange)
         local handler = handlerTable.handler
         local masks = handlerTable.masks
         if handler[name] then
+            handled = true
             handler[name](change, acceleratedChange) -- Extra args are nil anyway when unused
             if masks then
                 return true
@@ -41,6 +42,20 @@ function cranked.dispatchInputEvent(name, change, acceleratedChange)
         end
     end
     return handled
+end
+
+-- Quick and dirty tostring for tables from https://stackoverflow.com/a/27028488
+function cranked.stringify(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then k = '"'..k..'"' end
+                s = s .. '['..k..'] = ' .. cranked.stringify(v) .. ','
+            end
+        return s .. '} '
+    else
+        return tostring(o)
+    end
 end
 
 -- Overwrite default print functionality with ability to control newlines
@@ -510,7 +525,7 @@ function playdate.geometry.vector2D:__newindex(key, value)
     elseif key == 'y' then
         self.dy = value + .0
     else
-        self[key] = value
+        rawset(self, key, value)
     end
 end
 

@@ -66,7 +66,7 @@ namespace cranked {
 
         /// Call to update the world with the specified sprite after changing sprite collision state externally
         void updateSprite(Sprite sprite) {
-            bool enabled = sprite->collisionsEnabled and sprite->collideRect;
+            bool enabled = sprite->areCollisionsEnabled() and sprite->collideRect;
             for (auto &row : cells)
                 for (auto &cell : row.second)
                     eraseByEquivalentKey(cell.second.sprites, sprite);
