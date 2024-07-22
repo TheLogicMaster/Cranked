@@ -42,13 +42,13 @@ LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) 
     return *this;
 }
 
-[[nodiscard]] IntVec2 LCDBitmapTable_32::getBitmapSize() const {
-    if (!bitmaps.empty() and bitmaps[0])
-        return { bitmaps[0]->width, bitmaps[0]->height };
+LCDTileMap_32::LCDTileMap_32(Cranked &cranked) : NativeResource(cranked) {}
+
+[[nodiscard]] IntVec2 LCDTileMap_32::getCellSize() const {
+    if (table and !table->bitmaps.empty() and table->bitmaps[0])
+        return { table->bitmaps[0]->width, table->bitmaps[0]->height };
     return {};
 }
-
-LCDTileMap_32::LCDTileMap_32(Cranked &cranked) : NativeResource(cranked) {}
 
 // Todo: These pixel functions should be used less and live in the header
 
@@ -217,6 +217,8 @@ void LCDSprite_32::updateLuaPosition() {
     auto pos = getPosition();
     value.val.setFloatField("x", pos.x);
     value.val.setFloatField("y", pos.y);
+    value.val.setFloatField("width", bounds.size.x);
+    value.val.setFloatField("height", bounds.size.y);
 }
 
 void LCDSprite_32::draw() {
@@ -225,9 +227,15 @@ void LCDSprite_32::draw() {
     Vec2 drawPos = bounds.pos;
     // Todo: Support tilemap
     Rect dirtyRect = { -bounds.pos, { DISPLAY_WIDTH, DISPLAY_HEIGHT } }; // Todo
+
+    auto &context = cranked.graphics.getCurrentDisplayContext();
+    auto drawOffset = context.drawOffset;
+    ScopeExitHelper cleanupDrawOffset{ [=, &context]{ context.drawOffset = drawOffset; } };
+    context.drawOffset = drawPos.as<int32>();
+
     if (image) {
         // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
-        cranked.graphics.drawBitmap(image.get(), (int)drawPos.x, (int)drawPos.y, flip, ignoresDrawOffset);
+        cranked.graphics.drawBitmap(image.get(), 0, 0, flip, ignoresDrawOffset);
     } else if (drawFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::struct4f_t, ArgType::struct4f_t>
                 (drawFunction, this, fromRect(Rect{ drawPos, bounds.size }), fromRect(dirtyRect)); // Todo: Correct args?
@@ -310,9 +318,11 @@ Sprite LCDSprite_32::copy() {
     return other;
 }
 
+DisplayContext::DisplayContext(Bitmap bitmap, FontFamily fonts) : bitmap(bitmap), fonts(std::move(fonts)) {}
+
 DisplayContext &Graphics::pushContext(Bitmap target) {
-    // Todo: Should this copy the existing context?
-    return displayContextStack.emplace_back(target ? target : frameBuffer.get());
+    // Todo: Should this copy the existing context? Do fonts always default to system fonts?
+    return displayContextStack.emplace_back(getCurrentDisplayContext());
 }
 
 void Graphics::popContext() {
@@ -453,12 +463,12 @@ void Graphics::drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int heigh
 
 void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, Font font) {
     ZoneScoped;
-    // Todo: Support encodings
+    // Todo: Support encodings, font families
     // Todo: Kerning
     const char *string = (const char *) text;
     auto &context = getCurrentDisplayContext();
     if (!font)
-        font = (context.font ? context.font : getSystemFont()).get();
+        font = (context.getFont(PDFontVariant::Normal) ? context.getFont(PDFontVariant::Normal) : getSystemFont()).get();
     for (int i = 0; i < len; i++) {
         char character = string[i];
         int pageIndex = 0; // Todo: Temp ascii
@@ -526,6 +536,7 @@ void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
 }
 
 void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, LCDColor color, bool filled) {
+    // Todo: The angle checks need normalization
     int xc = rectX + width / 2;
     int yc = rectY + height / 2;
     int rx = width / 2;
@@ -700,7 +711,23 @@ Bitmap Graphics::vcrPauseFilteredBitmap(Bitmap bitmap) {
 }
 
 void Graphics::drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset, optional<IntRect> sourceRect) {
-    // Todo
+    if (not tilemap->table)
+        return;
+    auto cellSize = tilemap->getCellSize();
+    for (int i = 0; i < tilemap->getHeight(); i++) {
+        int drawY = y + cellSize.y * i;
+        for (int j = 0; j < tilemap->width; j++) {
+            int index = tilemap->tiles[i * tilemap->width + j];
+            if (index < 0 or index >= tilemap->table->bitmaps.size())
+                continue;
+            drawBitmap(tilemap->table->bitmaps[index].get(), x + cellSize.x * j, drawY, GraphicsFlip::Unflipped, ignoreOffset); // Todo: Support sourceRect
+        }
+    }
+}
+
+IntVec2 Graphics::measureText(const char *text, const FontFamily &fonts, int leadingAdjustment) {
+    auto font = fonts.regular.get() ? fonts.regular.get() : getSystemFont(PDFontVariant::Normal); // Todo: Support families properly
+    return { (int)strlen(text) * font->glyphWidth, font->glyphWidth }; // Todo: Measure properly
 }
 
 bool Graphics::checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect) {
@@ -746,6 +773,8 @@ void Graphics::drawSprites() {
 }
 
 void Graphics::addSpriteToDrawList(Sprite sprite) {
+    if (containsEquivalentValue(spriteDrawList, sprite))
+        return;
     spriteDrawList.emplace_back(sprite);
     cranked.bump.updateSprite(sprite);
     sprite->inDrawList = true;
@@ -834,22 +863,21 @@ Font Graphics::getFont(const uint8 *data, bool wide) {
 }
 
 Font Graphics::getSystemFont(PDFontVariant variant) {
-    return systemFonts[(int)variant].get();
+    return systemFonts.getFont(variant).get();
 }
 
 void Graphics::init() {
     frameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     previousFrameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
-    frameBufferContext = DisplayContext(frameBuffer.get());
     for (int i = 0; i < 3; i++)
-        systemFonts[i] = getFont(systemFontSources[i]);
+        systemFonts.getFont((PDFontVariant) i) = getFont(systemFontSources[i]);
+    frameBufferContext = DisplayContext(frameBuffer.get(), systemFonts);
 }
 
 void Graphics::reset() {
     frameBuffer.reset();
     previousFrameBuffer.reset();
-    for (auto &font : systemFonts)
-        font.reset();
+    systemFonts.reset();
 
     for (auto &context : displayContextStack)
         context.reset();

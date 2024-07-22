@@ -139,7 +139,7 @@ int Files::stat(const string &path, FileStat_32 &stat) {
     }
     if (romFile) {
         stat.isdir = false;
-        stat.size = (uint32) romFile->data.size();
+        stat.size = romFile->size;
         setTime(romFile->modTime);
         return 0;
     }
@@ -215,6 +215,7 @@ int Files::close(File file) {
     }
     if (file->file)
         fclose(file->file);
+    file->file = nullptr;
     eraseByEquivalentKey(openFiles, file);
     cranked.heap.destruct(file);
     return 0;

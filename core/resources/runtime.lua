@@ -45,12 +45,19 @@ function cranked.dispatchInputEvent(name, change, acceleratedChange)
 end
 
 -- Quick and dirty tostring for tables from https://stackoverflow.com/a/27028488
-function cranked.stringify(o)
+function cranked.stringify(o, depth)
+    if depth == nil then
+        depth = 0
+    elseif depth > 10 then
+        return '<Max Depth>'
+    else
+        depth += 1
+    end
     if type(o) == 'table' then
         local s = '{ '
         for k, v in pairs(o) do
             if type(k) ~= 'number' then k = '"'..k..'"' end
-                s = s .. '['..k..'] = ' .. cranked.stringify(v) .. ','
+                s = s .. '['..k..'] = ' .. cranked.stringify(v, depth + 1) .. ','
             end
         return s .. '} '
     else
@@ -363,7 +370,7 @@ function playdate.geometry.point:__add(v)
 end
 
 function playdate.geometry.point:__sub(p)
-    return geometry.vector.new(self.x - p.x, self.y - p.y)
+    return geometry.vector2D.new(self.x - p.x, self.y - p.y)
 end
 
 function playdate.geometry.point:__mul(t)
@@ -1163,87 +1170,4 @@ end
 
 function playdate.geometry.distanceToPoint(x1, y1, x2, y2)
     return math.sqrt((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
-end
-
--- Unpack object args for official library functions that expect userdata rather than table objects
-local drawCircleInRect = playdate.graphics.drawCircleInRect
-local fillCircleInRect = playdate.graphics.fillCircleInRect
-local drawCircleAtPoint = playdate.graphics.drawCircleAtPoint
-local fillCircleAtPoint = playdate.graphics.fillCircleAtPoint
-local drawArc = playdate.graphics.drawArc
-local drawTextInRect = playdate.graphics.drawTextInRect
-local drawLocalizedTextInRect = playdate.graphics.drawLocalizedTextInRect
-local addEmptyCollisionSprite = spritelib.addEmptyCollisionSprite
-local drawInRect = playdate.graphics.nineSlice.drawInRect
-
-function playdate.graphics.drawCircleInRect(x, ...)
-    if type(x) == 'table' then
-        drawCircleInRect(x.x, x.y, x.width, x.height)
-    else
-        drawCircleInRect(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.fillCircleInRect(x, ...)
-    if type(x) == 'table' then
-        fillCircleInRect(x.x, x.y, x.width, x.height)
-    else
-        fillCircleInRect(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.drawCircleAtPoint(x, ...)
-    if type(x) == 'table' then
-        drawCircleAtPoint(x.x, x.y, select(1, ...))
-    else
-        drawCircleAtPoint(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.fillCircleAtPoint(x, ...)
-    if type(x) == 'table' then
-        fillCircleAtPoint(x.x, x.y, select(1, ...))
-    else
-        fillCircleAtPoint(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.drawArc(x, ...)
-    if type(x) == 'table' then
-        drawArc(x.x, x.y, x.radius, x.startAngle, x.endAngle, select(1, ...))
-    else
-        drawArc(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.drawTextInRect(str, x, ...)
-    if type(x) == 'table' then
-        drawTextInRect(str, x.x, x.y, x.width, x.height, select(1, ...))
-    else
-        drawTextInRect(str, x, select(1, ...))
-    end
-end
-
-function playdate.graphics.drawLocalizedTextInRect(text, x, ...)
-    if type(x) == 'table' then
-        drawLocalizedTextInRect(text, x.x, x.y, x.width, x.height, select(1, ...))
-    else
-        drawLocalizedTextInRect(text, x, select(1, ...))
-    end
-end
-
-function spritelib.addEmptyCollisionSprite(x, ...)
-    if type(x) == 'table' then
-        addEmptyCollisionSprite(x.x, x.y, x.width, x.height, select(1, ...))
-    else
-        addEmptyCollisionSprite(x, select(1, ...))
-    end
-end
-
-function playdate.graphics.nineSlice:drawInRect(x, ...)
-    if type(x) == 'table' then
-        drawInRect(self, x.x, x.y, x.width, x.height)
-    else
-        drawInRect(self, x, select(1, ...))
-    end
 end

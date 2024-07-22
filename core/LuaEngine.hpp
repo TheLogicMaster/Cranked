@@ -1,8 +1,7 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "Rom.hpp"
-#include "Geometry.hpp"
+#include "Graphics.hpp"
 #include "Bump.hpp"
 
 namespace cranked {
@@ -92,6 +91,8 @@ namespace cranked {
         }
 
         [[nodiscard]] int asInt() const {
+            if (!isInt())
+                return (int)lua_tonumber(context, index);
             return lua_tointeger(context, index);
         }
 
@@ -142,12 +143,20 @@ namespace cranked {
             return {getFloatField("dx"), getFloatField("dy")};
         }
 
-        [[nodiscard]] IntVec2 asPoint() const {
-            return {getIntField("x"), getIntField("y")};
+        [[nodiscard]] Vec2 asPoint() const {
+            return {getFloatField("x"), getFloatField("y")};
         }
 
         [[nodiscard]] IntVec2 asIntPoint() const {
             return {getIntField("x"), getIntField("y")};
+        }
+
+        [[nodiscard]] FontFamily asFontFamily() {
+            return {
+                getUserdataObjectElement<Font>((int)PDFontVariant::Normal),
+                getUserdataObjectElement<Font>((int)PDFontVariant::Bold),
+                getUserdataObjectElement<Font>((int)PDFontVariant::Italic)
+            };
         }
 
         [[nodiscard]] chrono::system_clock::time_point asTime() const {
@@ -263,6 +272,11 @@ namespace cranked {
             lua_seti(context, index, n);
         }
 
+        void setNilElement(int n) const {
+            lua_pushnil(context);
+            lua_seti(context, index, n);
+        }
+
         void setLightUserdataElement(int n, void *value) const {
             lua_pushlightuserdata(context, value);
             lua_seti(context, index, n);
@@ -338,6 +352,11 @@ namespace cranked {
 
         void setLightUserdataField(const char *name, void *value) const {
             lua_pushlightuserdata(context, value);
+            lua_setfield(context, index, name);
+        }
+
+        void setNilField(const char *name) const {
+            lua_pushnil(context);
             lua_setfield(context, index, name);
         }
 

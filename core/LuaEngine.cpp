@@ -1,5 +1,6 @@
 #include "LuaEngine.hpp"
 #include "Cranked.hpp"
+#include "gen/LuaPatchesSource.hpp"
 
 using namespace cranked;
 
@@ -25,6 +26,12 @@ void LuaEngine::init() {
     registerLuaGlobals();
     tracy::LuaRegister(luaInterpreter);
 
+    // Load argv like simulator (Not modifyable)
+    auto argv = pushTable();
+    for (int i = 0; i < cranked.config.argv.size(); i++)
+        argv.setStringElement(i + 1, cranked.config.argv[i].c_str());
+    setQualifiedLuaGlobal("playdate.argv");
+
     lua_settop(luaInterpreter, 0);
     lua_sethook(luaInterpreter, luaHook, LUA_MASKCOUNT, 10000); // Todo: Tune count param to a few milliseconds or so
 
@@ -35,7 +42,8 @@ void LuaEngine::init() {
     if (cranked.nativeEngine.isLoaded())
         cranked.nativeEngine.invokeEventCallback(PDSystemEvent::InitLua, 2);
 
-    constexpr const char *PRELOADED_SOURCES[] { "sprites.lua", "nineslice.lua", "graphics.lua" }; // Preload so that functions that treat objects as `userdata` can be shimmed
+    // Todo: Propertly normalize imported names
+    constexpr const char *PRELOADED_SOURCES[] { "CoreLibs/animator", "CoreLibs/nineslice", "CoreLibs/graphics", "CoreLibs/sprites" }; // Preload so that functions that treat objects as `userdata` can be shimmed
     Rom::File *lastLuaFile{}; // Assuming main Lua file is always last
     for (auto &file : cranked.rom->pdzFiles)
         if (file.type == Rom::FileType::LUAC) {
@@ -49,6 +57,10 @@ void LuaEngine::init() {
                 }
             lastLuaFile = &file;
         }
+
+    if (luaL_dostring(getContext(), LUA_PATCHES_SOURCE))
+        throw CrankedError("Failed to load Patches: {}", lua_tostring(getContext(), -1));
+
     if (!lastLuaFile)
         throw CrankedError("Failed to find main Lua file");
     luaL_loadbuffer(luaInterpreter, (char *) lastLuaFile->data.data(), lastLuaFile->data.size(), lastLuaFile->name.c_str());
@@ -138,6 +150,21 @@ LuaVal LuaEngine::pushResource(File resource) {
 template<>
 LuaVal LuaEngine::pushResource(MenuItem resource) {
     return pushUserdataResource(resource, "playdate.menu.item");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(SamplePlayer resource) {
+    return pushUserdataResource(resource, "playdate.sound.sampleplayer");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(FilePlayer resource) {
+    return pushUserdataResource(resource, "playdate.sound.fileplayer");
+}
+
+template<>
+LuaVal LuaEngine::pushResource(Synth resource) {
+    return pushUserdataResource(resource, "playdate.sound.synth");
 }
 
 void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {

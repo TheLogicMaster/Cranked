@@ -45,6 +45,7 @@ void Cranked::reset() {
 
     debugger.reset();
     graphics.reset();
+    audio.reset();
     menu.reset();
     files.reset();
     bump.reset();
@@ -74,6 +75,7 @@ void Cranked::update() {
 
         pressedInputs = currentInputs & ~previousInputs;
         releasedInputs = ~currentInputs & previousInputs;
+        previousInputs = currentInputs;
 
         if (pressedInputs & int(PDButtons::A))
             buttonDownTimeA = chrono::system_clock::now();
@@ -162,12 +164,11 @@ void Cranked::update() {
         }
 
         previousCrankDocked = crankDocked;
-        previousInputs = currentInputs;
     }
 
     updateInternals();
 
-    currentMillis += duration_cast<chrono::milliseconds>((chrono::system_clock::now() - currentMillisStart)).count(); // Todo: Does this increase while locked/in-menu?
+    currentMillis += duration_cast<chrono::milliseconds>(chrono::system_clock::now() - currentMillisStart).count(); // Todo: Does this increase while locked/in-menu?
 
     FrameMark; // Todo: This isn't ideal since a single update call can span multiple frames at present
 }

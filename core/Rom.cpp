@@ -392,6 +392,7 @@ Rom::StringTable Rom::readStringTable(const uint8 *data, size_t dataSize) {
         offsets[i + 1] = readUint32LE(stringData);
         stringData += 4;
     }
+    stringData += 4;
     StringTable table;
     for (int i = 0; i < stringCount; i++) {
         auto start = stringData + offsets[i];
@@ -523,9 +524,9 @@ Rom::ImageTable Rom::readImageTable(const uint8 *data, size_t dataSize) {
     vector<uint8> decompressedData;
     if (compressed) {
         auto size = readUint32LE(&data[0x10]);
-//        auto firstImageWidth = (int) readUint32LE(&data[0x14]); // Redundant
-//        auto firstImageHeight = (int) readUint32LE(&data[0x18]); // Redundant
-//        auto cellCount = readUint32LE(&data[0x1C]); // Redundant
+        // auto firstImageWidth = (int) readUint32LE(&data[0x14]); // Redundant
+        // auto firstImageHeight = (int) readUint32LE(&data[0x18]); // Redundant
+        // auto cellCount = readUint32LE(&data[0x1C]); // Redundant
         decompressedData = decompressData(&data[0x20], dataSize - 0x20, size);
         tableData = decompressedData.data();
     } else
@@ -538,7 +539,8 @@ Rom::ImageTable Rom::readImageTable(const uint8 *data, size_t dataSize) {
         offsets[i + 1] = readUint32LE(tableData);
         tableData += 4;
     }
-    Rom::ImageTable table;
+    tableData += 4;
+    ImageTable table;
     table.cellsPerRow = cellsPerRow;
     for (int i = 0; i < cellCount; i++)
         table.cells.emplace_back(readImageCell(tableData + offsets[i]));

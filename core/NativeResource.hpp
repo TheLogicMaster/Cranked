@@ -108,9 +108,9 @@ namespace cranked {
             return *this;
         }
 
-        bool operator==(ResourceRef const &other) const = default;
+        bool operator==(const ResourceRef &other) const = default;
 
-        bool operator==(T *other) const {
+        bool operator==(const T *other) const {
             return resource == other;
         }
 

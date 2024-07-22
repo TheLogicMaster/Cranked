@@ -7,7 +7,8 @@ PDGraphNode_32::PDGraphNode_32(NodeGraph graph) : NativeResource(graph->cranked)
 }
 
 PDGraphNode_32::~PDGraphNode_32() {
-    graph->allocatedNodes.erase(this);
+    if (graph)
+        graph->allocatedNodes.erase(this);
     for (auto node : references)
         node->connections.erase(this);
 }
@@ -64,6 +65,9 @@ GraphNode PDNodeGraph_32::addNewNode() {
             cameFrom[next] = current;
         }
     }
+
+    if (!cameFrom[goal])
+        return {};
 
     vector<GraphNode> path;
     for (auto node = goal; node != start; node = cameFrom[node]) {

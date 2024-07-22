@@ -97,7 +97,7 @@ void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32 endCapSt
 }
 
 void cranked::playdate_graphics_setFont(Cranked *cranked, Font font) {
-    cranked->graphics.getCurrentDisplayContext().font = font;
+    cranked->graphics.getCurrentDisplayContext().getFont(PDFontVariant::Normal) = font;
 }
 
 void cranked::playdate_graphics_setTextTracking(Cranked *cranked, int32 tracking) {

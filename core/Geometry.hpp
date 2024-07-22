@@ -128,19 +128,19 @@ namespace cranked {
         [[nodiscard]] Rectangle intersection(const Rectangle<S> &other) const {
             using A = decltype(T() + S());
             Rectangle<A> rect{};
-            if (other.pos.x < pos.x) {
+            if (other.pos.x > pos.x) {
                 rect.pos.x = (A)other.pos.x;
-                rect.size.x = max((A)0.0f, min((A)other.size.x, (A)size.x - ((A)pos.x - (A)other.pos.x)));
+                rect.size.x = max((A)0, min((A)other.size.x, (A)size.x - ((A)pos.x - (A)other.pos.x)));
             } else {
                 rect.pos.x = (A)pos.x;
-                rect.size.x = max((A)0.0f, min((A)size.x, (A)other.size.x - ((A)other.pos.x - (A)pos.x)));
+                rect.size.x = max((A)0, min((A)size.x, (A)other.size.x - ((A)other.pos.x - (A)pos.x)));
             }
-            if (other.pos.y < pos.y) {
+            if (other.pos.y > pos.y) {
                 rect.pos.y = (A)other.pos.y;
-                rect.size.y = max((A)0.0f, min((A)other.size.y, (A)size.y - ((A)pos.y - (A)other.pos.y)));
+                rect.size.y = max((A)0, min((A)other.size.y, (A)size.y - ((A)pos.y - (A)other.pos.y)));
             } else {
                 rect.pos.y = (A)pos.y;
-                rect.size.y = max((A)0.0f, min((A)size.y, (A)other.size.y - ((A)other.pos.y - (A)pos.y)));
+                rect.size.y = max((A)0, min((A)size.y, (A)other.size.y - ((A)other.pos.y - (A)pos.y)));
             }
             return rect;
         }

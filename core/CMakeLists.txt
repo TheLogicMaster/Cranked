@@ -90,3 +90,4 @@ embed_resource("Asheville-Sans-14-Bold.pft" "AshevilleSans14Bold.hpp" "ASHEVILLE
 embed_resource("Asheville-Sans-14-Light-Oblique.pft" "AshevilleSans14LightOblique.hpp" "ASHEVILLE_SANS_14_LIGHT_OBLIQUE" "" "Rom.cpp")
 embed_resource("Asheville-Sans-24-Light.pft" "AshevilleSans24Light.hpp" "ASHEVILLE_SANS_24_LIGHT" "" "Rom.cpp")
 embed_resource("runtime.lua" "LuaRuntimeSource.hpp" "LUA_RUNTIME_SOURCE" "-t" "LuaRuntime.cpp")
+embed_resource("patches.lua" "LuaPatchesSource.hpp" "LUA_PATCHES_SOURCE" "-t" "LuaEngine.cpp")

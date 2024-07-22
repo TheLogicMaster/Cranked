@@ -213,15 +213,13 @@ namespace cranked {
         bool collisionsEnabled = true;
         Rect bounds{};
         Vec2 center{ 0.5f, 0.5f };
-        bool inDrawList; // Only set from Graphics
+        bool inDrawList{}; // Only set from Graphics
     };
 
     struct LCDBitmapTable_32 : NativeResource {
         LCDBitmapTable_32(Cranked &cranked, int cellsPerRow);
 
         LCDBitmapTable_32 &operator=(const LCDBitmapTable_32 &other);
-
-        [[nodiscard]] IntVec2 getBitmapSize() const;
 
         int cellsPerRow{};
         vector<BitmapRef> bitmaps;
@@ -233,6 +231,8 @@ namespace cranked {
         [[nodiscard]] int getHeight() const {
             return (int)tiles.size() / width;
         }
+
+        [[nodiscard]] IntVec2 getCellSize() const;
 
         BitmapTableRef table;
         int width{};
@@ -263,27 +263,41 @@ namespace cranked {
         unordered_map<int, FontPageRef> pages;
     };
 
+    struct FontFamily {
+        FontRef &getFont(PDFontVariant variant) {
+            switch (variant) {
+                case PDFontVariant::Bold:
+                    return bold;
+                case PDFontVariant::Italic:
+                    return italic;
+                default:
+                    return regular;
+            }
+        }
+
+        void reset() {
+            regular.reset();
+            bold.reset();
+            italic.reset();
+        }
+
+        FontRef regular{};
+        FontRef bold{};
+        FontRef italic{};
+    };
+
     struct DisplayContext {
-        explicit DisplayContext(Bitmap bitmap) : bitmap(bitmap) {}
+        explicit DisplayContext(Bitmap bitmap, FontFamily fonts = {});
 
         void reset() {
             bitmap.reset();
             stencilImage.reset();
             focusedImage.reset();
-            font.reset();
-            boldFont.reset();
-            italicFont.reset();
+            fonts.reset();
         }
 
         FontRef &getFont(PDFontVariant variant) {
-            switch (variant) {
-                case PDFontVariant::Bold:
-                    return boldFont;
-                case PDFontVariant::Italic:
-                    return italicFont;
-                default:
-                    return font;
-            }
+            return fonts.getFont(variant);
         }
 
         BitmapRef bitmap;
@@ -303,9 +317,7 @@ namespace cranked {
         DitherType ditherPattern{};
         float ditherAlpha{};
         LCDBitmapDrawMode bitmapDrawMode{};
-        FontRef font{};
-        FontRef boldFont{};
-        FontRef italicFont{};
+        FontFamily fonts;
         LCDPolygonFillRule polygonFillRule{};
         int textTracking{};
         int textLeading{};
@@ -390,6 +402,8 @@ namespace cranked {
 
         void drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
 
+        IntVec2 measureText(const char *text, const FontFamily &fonts, int leadingAdjustment = 0);
+
         static bool checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect);
 
         void updateSprites();
@@ -446,8 +460,8 @@ namespace cranked {
 
         Cranked &cranked;
         HeapAllocator &heap;
-        Rom::Font systemFontSources[3]{};
-        FontRef systemFonts[3]{};
+        Rom::Font systemFontSources[3]{}; // Todo: Convert to a FontFamily structure in PlaydateTypes
+        FontFamily systemFonts;
         uint32 displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
         bool displayBufferNativeEndian = false;
         uint32 displayBufferOnColor = 0xB0AEA7FF;

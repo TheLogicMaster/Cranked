@@ -307,6 +307,7 @@ namespace cranked {
 
         void init();
 
+        // Todo: Change to take in pointer type as template param
         template<class T, typename ...Args> requires derived_from<T, SoundSource_32>
         T *allocateSource(Args ...args) {
             T *source = heap.construct<T>(cranked, args...);

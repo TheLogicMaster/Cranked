@@ -122,6 +122,7 @@ namespace cranked {
         InternalUpdateCallback updateCallback;
         void *userdata;
         int debugPort;
+        vector<string> argv;
     };
 
     inline vector<string> splitString(string str, const string &delimiter) {
@@ -316,8 +317,13 @@ namespace cranked {
     }
 
     template<typename T, typename V>
+        bool containsEquivalentValue(vector<T> &vec, const V &value) {
+        return find_if(vec.begin(), vec.end(), [&](const T &t) { return t == value; }) != vec.end();
+    }
+
+    template<typename T, typename V>
     bool eraseByEquivalentValue(vector<T> &vec, const V &value) {
-        if (auto it = find_if(vec.begin(), vec.end(), [&](T &t) { return t == value; }); it != vec.end()) {
+        if (auto it = find_if(vec.begin(), vec.end(), [&](const T &t) { return t == value; }); it != vec.end()) {
             vec.erase(it);
             return true;
         }
@@ -401,6 +407,18 @@ namespace cranked {
     private:
         array<T, N> buffer{};
         int index{}; // Index where to place next
+    };
+
+    class ScopeExitHelper {
+    public:
+        explicit ScopeExitHelper(const function<void()> &func) : func(func) {}
+
+        ~ScopeExitHelper() {
+            func();
+        }
+
+    private:
+        const function<void()> func;
     };
 
     struct string_hash

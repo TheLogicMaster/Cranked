@@ -1,20 +1,26 @@
 # Cranked
-
-## About
-Seeing the lack of an open source Playdate emulator, this seemed like a good opportunity to be the first to reverse engineer and 
-reimplement the platform. Most of the file formats had already been reverse engineered, but little in the way of actually loading
-and running games (See [Sources](#sources) for reference materials). 
-Much of the functionality is missing, such as sprites, audio, and graphical effects, and very little is tested thoroughly, but 
-the groundwork is laid and Lua or native programs can be run. See `Runtime.cpp` and `LuaRuntime.cpp` for implemented API functions
-and todo items. Expect many crashes.
+*Cranked* is a work in progress unofficial Playdate Console emulator. This project aims to provide an open source way of running
+Playdate console games on a variety of platforms. They Playdate SDK does include a Simulator program for use in development of 
+Playdate games, but it is unable to play game compiled for an actual Playdate console and requires a binary to be compiled for 
+the native system the simulator runs on. In addition, the official Simulator is only available for the major desktop platform. 
+*Cranked* runs actual Playdate games by means of emulating the Arm processor that powers the console. For now, functionality 
+is mostly limited to compatible SDK demo programs, but a majority of the Playdate API is implemented at some level (Audio aside). 
 
 ## Screenshots
-### Basic Graphics
-![Basic Graphics](media/Shapes.png)
+### Flippy Fish
+![Flippy Fish](media/Flippy_Fish.png)
+### Hammer Down
+![Hammer Down](media/Hammer_Down.png)
 ### Sprite Collisions
 ![Sprite Collisions](media/Sprite_Collisions.png)
 ### Native Debugging
 ![Native Debugging](media/Debugging.png)
+
+## About
+This project was started as an excuse to reverse engineer the platform and implement the first working emulator
+for said platform. See [Sources](#sources) for other projects which have done much of the initial research into the Playdate
+file formats and other interfaces. Development has mostly been done by implementing the API as described by the official
+documentation then filling in the gaps and testing by comparing program execution with the official simulator. 
 
 ## Building
 Libraries are all embedded as submodules except for SDL2, which is required for building desktop targets.
@@ -32,6 +38,7 @@ This should have built the Libretro core and the standalone executable.
 Loading either .pdx directories or .pdx.zip archives is supported (Only .pdx.zip for Libretro core). Run the standalone
 executable with the ROM path as the only command-line argument or load the Libretro core like any other. Most programs will
 likely crash at the moment and there is little in the way of useful debug output, so debugging from an IDE is best for now.
+There is currently no support for running encrypted ROMs from the Catalog.
 
 ## Todo
 - Finish Sprites (Collision occasionally phases a sprite off-screen in Sprite Collision example)
@@ -48,7 +55,7 @@ likely crash at the moment and there is little in the way of useful debug output
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
 - Java library with native libs for Android app consumption
 - Scoreboard support
-- Investigate Catalog app (Web API already documented)
+- Investigate Catalog app (Web API already documented elsewhere)
 - Ability to act as simulator
 - See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
 - System UI/software from SDK (Create replacement assets, *Darker Grotesque* should be able to be adopted in place of *Roobert* system font)
@@ -62,9 +69,10 @@ likely crash at the moment and there is little in the way of useful debug output
 - Fix git submodules to not get in detached head state
 - Can't currently build in release due to false uninitialized variable errors in Capstone
 - Native Cranked API for profiling and such, maybe exposed at a fixed address or at the end of the main PD API struct
+- LuaRuntime being based on tables rather than userdata is likely to cause incompatibility (Already requires patches.lua), and should probably use full userdata from C++
+- Better exception handling and stack traces, potentially with disassembled Asm and Lua for context, especially more Lua context, maybe even decompilation
 
 ## Example Compatibility
-(Not all tested yet)
 - [x] Hello World
 - [x] Sprite Collisions
 - [x] Sprite Game
@@ -75,49 +83,48 @@ likely crash at the moment and there is little in the way of useful debug output
 - [x] Array
 - [ ] 3D Library (Works until memory bug occurs)
 - [ ] Sprite Collision Masks
-- [ ] Pathfinder
+- [x] Pathfinder (Minor issue with font measuring and family switching for no-path text)
 - [ ] Mode 7 Driver
 - [ ] MIDI Player
-- [ ] Level 1-1
-- [ ] Hammer Down
-- [ ] Game Template
-- [ ] Flippy Fish
+- [ ] Level 1-1 (Basic level loading seems to mostly work, but with tons of graphical issues and no floor, also no audio)
+- [x] Hammer Down (No audio)
+- [x] Game Template
+- [x] Flippy Fish (Display inversion on game over is missing)
 - [ ] Drum Machine
-- [ ] Controller Test
-- [ ] Asheteroids
-- [ ] Accelerometer Test
+- [x] Controller Test
+- [ ] Asheteroids (Requires pattern drawing, Nil access error)
+- [x] Accelerometer Test
 - [x] 2020
 - Single File Examples
-  - [ ] Animator
-  - [ ] Arcs
+  - [ ] Animator (Animation of crank-star is messed up at polygon close region, font measuring is wrong, ellipse drawing needs angle normalization)
+  - [ ] Arcs (Ellipse drawing needs work)
   - [ ] Audio
-  - [ ] Balls
+  - [ ] Balls (Kinda works until crash)
   - [ ] Blur Dither
   - [ ] Collisions
-  - [ ] Crank
-  - [ ] Draw Mode
-  - [ ] Draw Sampled
+  - [x] Crank
+  - [x] Draw Mode
+  - [ ] Draw Sampled (Mode 7 not implemented)
   - [ ] Draw Sampled 2
   - [ ] Fade Fast
-  - [ ] File
-  - [ ] Grid View
-  - [ ] Icosohedron
-  - [ ] Image Sample
-  - [ ] Pachinko
-  - [ ] Perlin Distribution
-  - [ ] Perlin
-  - [ ] Perlin 1
-  - [ ] Perlin 2
-  - [ ] Perlin 3
-  - [ ] Perlin 4
-  - [ ] Perlin Fild
+  - [ ] File (Output does not match)
+  - [ ] Grid View (Completely broken)
+  - [ ] Icosohedron (Does not work at all)
+  - [ ] Image Sample (Requires pattern support, does not package ball asset for some reason)
+  - [x] Pachinko
+  - [x] Perlin Distribution
+  - [x] Perlin 1
+  - [x] Perlin 2
+  - [ ] Perlin 3 (Requires patterns)
+  - [ ] Perlin 4 (Crashes with OOM)
+  - [x] Perlin Field
   - [ ] Snd Test
   - [ ] Sprite Scaling
-  - [ ] Stencil
+  - [ ] Stencil (Mostly works, missing graphical features like line width and patterns)
   - [ ] Synth
-  - [ ] Tile Map Test
+  - [x] Tile Map Test
   - [ ] Wave Table
-  - [ ] Zorder
+  - [x] Zorder
 
 ## Internals
 - Unicorn to provide Arm CPU emulation
@@ -169,7 +176,7 @@ git submodule foreach git pull
 ## Sources
 - https://sdk.play.date/inside-playdate
 - https://sdk.play.date/inside-playdate-with-c
-- https://github.com/jaames/playdate-reverse-engineering
+- https://github.com/cranksters/playdate-reverse-engineering
 - https://github.com/scratchminer/pd-emu
 - https://github.com/ARM-software/abi-aa/blob/2982a9f3b512a5bfdc9e3fea5d3b298f9165c36b/aapcs32/aapcs32.rst
 - https://www.lua.org/manual/5.4/

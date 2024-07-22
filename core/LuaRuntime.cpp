@@ -7,6 +7,7 @@ using namespace cranked;
 // Todo: Use new functions (setResourceElement/setResourceField, returnValues, rectFromArgs, intRectFromArgs, LuaValRet without calling pushResource/pushRect/pushVec)
 
 static LuaRet import_lua(Cranked *cranked, const char *name) {
+    // Todo: Properly normailze paths
     if (cranked->luaEngine.loadedLuaFiles.contains(name))
         return 0;
     for (auto &file: cranked->rom->pdzFiles)
@@ -217,30 +218,33 @@ static void playdate_file_seek_lua(Cranked *context, File file, int offset) {
     context->files.seek(file, offset, SEEK_SET);
 }
 
-static LuaRet json_decode_lua(lua_State *context, const char *str) {
+static LuaRet json_decode_lua(Cranked *cranked, const char *str) {
+    auto context = cranked->getLuaContext();
     function<void(const nlohmann::json&)> createTable;
     createTable = [&](const nlohmann::json &json){
+        int arrayIndex = 1;
+        auto table = pushTable(cranked);
         for (auto &entry : json.items()) {
             auto &value = entry.value();
             if (value.is_null())
-                lua_pushnil(context);
+                pushNil(cranked);
             else if (value.is_boolean())
-                lua_pushboolean(context, value.get<bool>());
+                pushBool(cranked, value.get<bool>());
             else if (value.is_number_integer())
-                lua_pushinteger(context, value.get<int>());
+                pushInt(cranked, value.get<int>());
             else if (value.is_number_float())
-                lua_pushnumber(context, value.get<float>());
+                pushFloat(cranked, value.get<float>());
             else if (value.is_string())
-                lua_pushstring(context, value.get<string>().c_str());
+                pushString(cranked, value.get<string>().c_str());
             else
                 createTable(value);
             if (json.is_array())
-                lua_seti(context, -2, stoi(entry.key()));
+                lua_seti(context, table, arrayIndex++);
             else
-                lua_setfield(context, -2, entry.key().c_str());
+                lua_setfield(context, table, entry.key().c_str());
         }
     };
-    createTable(nlohmann::json(str));
+    createTable(nlohmann::json::parse(str));
     return 1;
 }
 
@@ -258,7 +262,7 @@ static LuaRet json_decodeFile_lua(lua_State *context, File file) {
         size += returned;
         buffer.resize(buffer.size() + BUFFER_SEGMENT);
     }
-    return json_decode_lua(context, buffer.data());
+    return json_decode_lua(cranked, buffer.data());
 }
 
 static string jsonEncodeTable(lua_State *context, LuaVal table, bool pretty) {
@@ -395,6 +399,22 @@ static LuaValRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width,
 
 static void playdate_graphics_image_gc_lua(Cranked *cranked, Bitmap image) {
     image->dereference();
+}
+
+static LuaRet playdate_graphics_image_index_lua(Cranked *cranked, Bitmap image, LuaVal key) {
+    if (cranked->luaEngine.indexMetatable())
+        return 1;
+    if (key.isString()) {
+        string str(key.asString());
+        if (str == "width")
+            pushInt(cranked, image->width);
+        else if (str == "height")
+            pushInt(cranked, image->height);
+        else
+            pushNil(cranked);
+    } else
+        pushNil(cranked);
+    return 1;
 }
 
 static LuaRet playdate_graphics_image_load_lua(Cranked *cranked, Bitmap image, const char *path) {
@@ -735,13 +755,13 @@ static vector<int32> getPolygonPoints(Cranked *cranked, LuaVal arg) {
 
 static void playdate_graphics_drawPolygon_lua(Cranked *cranked, LuaVal arg1) {
     auto points = getPolygonPoints(cranked, arg1);
-    cranked->graphics.drawPolygon(points.data(), (int)points.size(), cranked->graphics.getCurrentDisplayContext().drawingColor);
+    cranked->graphics.drawPolygon(points.data(), (int)points.size() / 2, cranked->graphics.getCurrentDisplayContext().drawingColor);
 }
 
 static void playdate_graphics_fillPolygon_lua(Cranked *cranked, LuaVal arg1) {
     auto points = getPolygonPoints(cranked, arg1);
     auto &ctx = cranked->graphics.getCurrentDisplayContext();
-    cranked->graphics.fillPolygon(points.data(), (int)points.size(), ctx.drawingColor, ctx.polygonFillRule);
+    cranked->graphics.fillPolygon(points.data(), (int)points.size() / 2, ctx.drawingColor, ctx.polygonFillRule);
 }
 
 static void playdate_graphics_setPolygonFillRule_lua(Cranked *cranked, LCDPolygonFillRule rule) {
@@ -779,8 +799,7 @@ static void playdate_graphics_setClipRect_lua(Cranked *cranked, LuaVal arg1, int
 }
 
 static LuaRet playdate_graphics_getClipRect_lua(Cranked *cranked) {
-    pushRect(cranked, cranked->graphics.getCurrentDisplayContext().clipRect);
-    return 1;
+    return returnRectValues(cranked, cranked->graphics.getCurrentDisplayContext().clipRect);
 }
 
 static void playdate_graphics_setScreenClipRect_lua(Cranked *cranked, LuaVal arg1, int y, int width, int height) {
@@ -1271,6 +1290,7 @@ static LuaValRet playdate_graphics_tilemap_getTileAtPosition_lua(Cranked *cranke
 
 static void playdate_graphics_tilemap_setSize_lua(Cranked *cranked, TileMap tilemap, int width, int height) {
     tilemap->tiles.resize(width * height);
+    tilemap->width = width;
 }
 
 static LuaRet playdate_graphics_tilemap_getSize_lua(Cranked *cranked, TileMap tilemap) {
@@ -1280,12 +1300,12 @@ static LuaRet playdate_graphics_tilemap_getSize_lua(Cranked *cranked, TileMap ti
 }
 
 static LuaRet playdate_graphics_tilemap_getPixelSize_lua(Cranked *cranked, TileMap tilemap) {
-    auto [width, height] = tilemap->table->getBitmapSize();
+    auto [width, height] = tilemap->getCellSize();
     return returnVecValues(cranked, IntVec2 { width * tilemap->width, height * tilemap->getHeight() });
 }
 
 static LuaRet playdate_graphics_tilemap_getTileSize_lua(Cranked *cranked, TileMap tilemap) {
-    return returnVecValues(cranked, tilemap->table->getBitmapSize());
+    return returnVecValues(cranked, tilemap->getCellSize());
 }
 
 static LuaValRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranked, TileMap tilemap, LuaVal emptyIDs) {
@@ -1297,7 +1317,7 @@ static LuaValRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranke
         empty.emplace(index.val.asInt());
     }
     auto table = pushTable(cranked);
-    auto cellSize = tilemap->table->getBitmapSize();
+    auto cellSize = tilemap->getCellSize();
     auto [ cellWidth, cellHeight ] = cellSize;
     for (int y = 0; y < tilemap->getHeight(); y++) {
         for (int x = 0; x < tilemap->width; x++) {
@@ -1354,8 +1374,8 @@ static LuaRet playdate_graphics_getLocalizedText_lua(Cranked *cranked, const cha
 }
 
 static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *str, LuaVal fontFamily, int leadingAdjustment) {
-    // Todo
-    return 0;
+    auto family = fontFamily.isTable() ? fontFamily.asFontFamily() : cranked->graphics.getCurrentDisplayContext().fonts;
+    return returnVecValues(cranked, cranked->graphics.measureText(str, family, leadingAdjustment));
 }
 
 static LuaValRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
@@ -1418,12 +1438,12 @@ static LuaValRet playdate_graphics_font_getGlyph_lua(Cranked *cranked, Font font
         auto &page = font->pages.at(0);
         auto &glyph = *page->glyphs.at(c);
         return pushResource(cranked, glyph.bitmap.get());
-    } catch (out_of_range &ignored) { // Todo: Prevent exceptions?
+    } catch (out_of_range &) { // Todo: Prevent exceptions?
         return pushNil(cranked);
     }
 }
 
-static Sprite playdate_graphics_sprite_new_lua(Cranked *context, LuaVal imageOrTilemap) {
+static LuaValRet playdate_graphics_sprite_new_lua(Cranked *context, LuaVal imageOrTilemap) {
     auto sprite = context->graphics.createSprite();
     if (imageOrTilemap.isTable()) { // Todo: Helper checks for correct argument?
         if (LuaValGuard metaTable(imageOrTilemap.getMetaTable()); not metaTable.val.isNil()) {
@@ -1435,7 +1455,9 @@ static Sprite playdate_graphics_sprite_new_lua(Cranked *context, LuaVal imageOrT
             }
         }
     }
-    return sprite;
+    auto spriteVal = pushResource(context, sprite);
+    sprite->updateLuaPosition();
+    return spriteVal;
 }
 
 static void playdate_graphics_sprite_gc_lua(Cranked *cranked, Sprite sprite) {
@@ -1633,8 +1655,8 @@ static LuaValRet playdate_graphics_sprite_allOverlappingSprites_lua(Cranked *cra
 static bool playdate_graphics_sprite_alphaCollision_lua(Cranked *cranked, Sprite sprite, Sprite anotherSprite) {
     if (not sprite->image or not anotherSprite->image)
         return false;
-    auto spritePos = sprite->getPosition().as<int32>();
-    auto otherPos = anotherSprite->getPosition().as<int32>();
+    auto spritePos = sprite->getBounds().pos.as<int32>();
+    auto otherPos = anotherSprite->getBounds().pos.as<int32>();
     return Graphics::checkBitmapMaskCollision(sprite->image.get(), spritePos.x, spritePos.y, GraphicsFlip::Unflipped, anotherSprite->image.get(), otherPos.x, otherPos.y, GraphicsFlip::Unflipped, sprite->getBounds().as<int32>());
 }
 
@@ -1684,7 +1706,7 @@ static LuaRet moveOrCheckCollisions(LuaVal spriteVal, LuaVal arg1, LuaVal arg2, 
     auto sprite = spriteVal.asUserdataObject<Sprite>();
     auto cranked = &sprite->cranked;
     auto context = cranked->getLuaContext();
-    Vec2 goal = arg2.isNil() ? arg1.asVec() : Vec2{ arg1.asFloat(), arg2.asFloat() };
+    Vec2 goal = arg2.isNil() ? arg1.asPoint() : Vec2{ arg1.asFloat(), arg2.asFloat() };
     auto response = spriteVal.getField("collisionResponse");
     bool hasResponseFunc = response.val.isFunction();
     auto responseType = hasResponseFunc ? Bump::ResponseType{} : response.val.asCollisionResponse();
@@ -1709,7 +1731,7 @@ static LuaRet moveOrCheckCollisions(LuaVal spriteVal, LuaVal arg1, LuaVal arg2, 
     for (int i = 0; i < collisions.size(); i++) {
         auto &entry = collisions[i];
         LuaValGuard collision(pushTable(cranked));
-        setResourceField(collision.val, "sprite", entry.sprite); // Todo: Probably also needs to be actual object...
+        setResourceField(collision.val, "sprite", entry.sprite);
         setResourceField(collision.val, "other", entry.other);
         collision.val.setIntField("type", (int)entry.type);
         collision.val.setBoolField("overlaps", entry.overlaps);
@@ -1832,17 +1854,17 @@ static NodeGraph playdate_pathfinder_graph_new2DGrid_lua(Cranked *cranked, int w
     vector<GraphNode> nodes(count);
     if (includedNodes.isTable())
         for (int i = 0; i < count; i++)
-            connected[i] = includedNodes.getBoolElement(i + 1);
+            connected[i] = includedNodes.getIntElement(i + 1);
     auto graph = cranked->heap.construct<PDNodeGraph_32>(*cranked);
     for (int i = 0; i < count; i++)
         nodes[i] = graph->addNewNode();
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            int i = y * width + y;
+            int i = y * width + x;
             auto node = nodes[i];
             node->id = i + 1;
-            node->x = x;
-            node->y = y;
+            node->x = x + 1;
+            node->y = y + 1;
             const auto handleConnection = [=, &connected, &nodes](int dx, int dy) {
                 int cx = x + dx, cy = y + dy;
                 bool diagonal = dx != 0 and dy != 0;
@@ -2012,17 +2034,21 @@ static void playdate_pathfinder_graph_removeAllConnectionsFromNodeWithID_lua(Cra
 
 static LuaRet findPath(NodeGraph graph, GraphNode startNode, GraphNode goalNode, LuaVal heuristic, bool findPathToGoalAdjacentNodes, bool getIds = false) {
     // Todo: Support Lua heuristic, how to implement findPathToGoalAdjacentNodes? What are rules for adjacent nodes? Closest with same X or Y in each dir?
-    auto cranked = &startNode->cranked;
+    auto cranked = &graph->cranked;
+    if (!startNode or !goalNode) {
+        pushNil(cranked);
+        return 1;
+    }
     auto path = graph->pathfind(startNode, goalNode, [&](GraphNode a, GraphNode b) {
         return abs(a->x - b->x) + abs(a->y - b->y); // Manhatten distance
     });
     if (not path.empty()) {
         auto table = pushTable(cranked);
-        for (int i = 1; i <= path.size(); i++) {
+        for (int i = 0; i < path.size(); i++) {
             if (getIds)
-                table.setIntElement(i, path[i]->id);
+                table.setIntElement(i + 1, path[i]->id);
             else
-                setResourceElement(table, i, path[i]);
+                setResourceElement(table, i + 1, path[i]);
         }
     } else
         pushNil(cranked);
@@ -2110,7 +2136,7 @@ static void playdate_pathfinder_node_addConnectionToNodeWithXY_lua(Cranked *cran
     auto found = node->graph->findByXY(x, y);
     if (not found)
         return;
-    node->addConnection(node, weight);
+    node->addConnection(found, weight);
     if (addReciprocalConnection)
         found->addConnection(node, weight);
 }
@@ -2168,12 +2194,12 @@ static void playdate_sound_resetTime_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_new_lua(Cranked *cranked) {
-    // Todo
+static SamplePlayer playdate_sound_sampleplayer_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateSource<SamplePlayer_32>();
 }
 
-static void playdate_sound_sampleplayer_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_sampleplayer_gc_lua(Cranked *cranked, SamplePlayer plater) {
+    plater->dereference();
 }
 
 static void playdate_sound_sampleplayer_copy_lua(Cranked *cranked) {
@@ -2212,12 +2238,12 @@ static void playdate_sound_sampleplayer_setRateMod_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_new_lua(Cranked *cranked) {
-    // Todo
+static FilePlayer playdate_sound_fileplayer_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateSource<FilePlayer_32>();
 }
 
-static void playdate_sound_fileplayer_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_fileplayer_gc_lua(Cranked *cranked, FilePlayer player) {
+    player->dereference();
 }
 
 static void playdate_sound_fileplayer_load_lua(Cranked *cranked) {
@@ -2312,12 +2338,12 @@ static void playdate_sound_channel_getVolume_lua(Cranked *cranked) {
     // Todo
 }
 
-static void playdate_sound_synth_new_lua(Cranked *cranked) {
-    // Todo
+static Synth playdate_sound_synth_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateSource<PDSynth_32>();
 }
 
-static void playdate_sound_synth_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_synth_gc_lua(Cranked *cranked, Synth synth) {
+    synth->dereference();
 }
 
 static void playdate_sound_synth_copy_lua(Cranked *cranked) {
@@ -3038,7 +3064,6 @@ void LuaEngine::registerLuaGlobals() {
 
             {
                 auto image = LuaApiHelper(getContext(), "image");
-                image.setSelfIndex();
                 image.setString("__name", "playdate.graphics.image");
                 image.setInteger("kDitherTypeNone", (int)DitherType::None);
                 image.setInteger("kDitherTypeDiagonalLine", (int)DitherType::DiagonalLine);
@@ -3052,6 +3077,7 @@ void LuaEngine::registerLuaGlobals() {
                 image.setInteger("kDitherTypeBurkes", (int)DitherType::Burkes);
                 image.setInteger("kDitherTypeAtkinson", (int)DitherType::Atkinson);
                 image.setWrappedFunction<playdate_graphics_image_gc_lua>("__gc");
+                image.setWrappedFunction<playdate_graphics_image_index_lua>("__index");
                 image.setWrappedFunction<playdate_graphics_image_new_lua>("new");
                 image.setWrappedFunction<playdate_graphics_image_load_lua>("load");
                 image.setWrappedFunction<playdate_graphics_image_copy_lua>("copy");
@@ -3142,7 +3168,7 @@ void LuaEngine::registerLuaGlobals() {
             }
 
             { // Official implementation uses a table with a `_spriteud` userdata field, but using a plain userdata type in `userdata` should work fine
-                auto sprite = LuaApiHelper(getContext(), "sprite"); // Can't have __index, since it is overwritten by sprites.lua
+                auto sprite = LuaApiHelper(getContext(), "sprite"); // Can't have __index, since it is overwritten by sprites.lua // Todo: Could actually work fine with the pre-loading mechanism
                 sprite.setString("__name", "playdate.graphics.sprite");
                 sprite.setInteger("kCollisionTypeSlide", (int)Bump::ResponseType::Slide);
                 sprite.setInteger("kCollisionTypeFreeze", (int)Bump::ResponseType::Freeze);

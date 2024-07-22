@@ -47,6 +47,7 @@ int main(int argc, const char *args[]) {
     commandArgOptions.add_options()
         ("d,debug", "GDB enable/port", cxxopts::value<int>())
         ("p,pause", "Start paused", cxxopts::value<bool>())
+        ("arg", "playdate.argv values", cxxopts::value<vector<string>>())
         ("program", "The program to run", cxxopts::value<string>());
     commandArgOptions.parse_positional({"program"});
 
@@ -54,6 +55,7 @@ int main(int argc, const char *args[]) {
     string programPath = result["program"].as<string>();
     int debugPort = result["debug"].as_optional<int>().value_or(0);
     bool startPaused = result["pause"].as_optional<bool>().value_or(false);
+    vector<string> commandLineArgs = result["arg"].as_optional<vector<string>>().value_or(vector<string>{});
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
         throw CrankedError("Failed to init SDL: {}", SDL_GetError());
@@ -74,7 +76,7 @@ int main(int argc, const char *args[]) {
 
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     // Todo: If window starts small, it squishes saved window positions
-    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1000, 1400, windowFlags);
+    SDL_Window* window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1400, 1400, windowFlags);
     if (!window)
         throw CrankedError("Failed to create SDL window: {}", SDL_GetError());
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -112,6 +114,7 @@ int main(int argc, const char *args[]) {
     Cranked cranked;
     Userdata userdata { .cranked = cranked, .window = window };
     cranked.config.userdata = &userdata;
+    cranked.config.argv = commandLineArgs;
     float &scale = userdata.scale;
 
     { // Todo: This would be good to extract to a header and make more generic
@@ -283,6 +286,7 @@ int main(int argc, const char *args[]) {
                 ImGui::MenuItem("Show Disassembly", nullptr, &getWindowOpen(Windows::Disassembly));
                 ImGui::MenuItem("Show Buttons", nullptr, &getWindowOpen(Windows::Buttons));
                 ImGui::MenuItem("Show Crank", nullptr, &getWindowOpen(Windows::Crank));
+                ImGui::MenuItem("Show Accelerometer", nullptr, &getWindowOpen(Windows::Accelerometer));
                 ImGui::EndMenu();
             } else if (wasScaling) {
                 style.ScaleAllSizes((float)newScale / scale);
@@ -498,27 +502,54 @@ int main(int argc, const char *args[]) {
             ImGui::EndGroup();
 
             ImGui::SameLine();
-            buttonInputs |= (ImGui::Button("A", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::A);
-            ImGui::SameLine();
             buttonInputs |= (ImGui::Button("B", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::B);
+            ImGui::SameLine();
+            buttonInputs |= (ImGui::Button("A", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::A);
             ImGui::End();
         }
 
         if (getWindowOpen(Windows::Crank)) {
             float radius = 35 * scale;
-            ImGui::SetNextWindowSize(ImVec2(radius * 2 + 2 * scale, radius * 2 + 2 * scale), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(radius * 2 + style.WindowPadding.x * 2, radius * 2 + style.WindowPadding.y * 2), ImGuiCond_FirstUseEver);
             ImGui::Begin("Crank", &getWindowOpen(Windows::Buttons), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
             auto screenPos = ImGui::GetCursorScreenPos();
             auto contentSize = ImGui::GetContentRegionAvail();
             auto drawList = ImGui::GetWindowDrawList();
-            ImVec2 center{ radius + 1 * scale + screenPos.x, radius + 1 * scale + screenPos.y };
+            ImVec2 center{ radius + screenPos.x, radius + screenPos.y };
             ImGui::InvisibleButton("##", contentSize, ImGuiButtonFlags_MouseButtonLeft);
-            if (ImGui::IsItemActive())
-                cranked.crankAngle = atan2f(io.MousePos.y - center.y, io.MousePos.x - center.x) / numbers::pi_v<float> * 180;
+            if (ImGui::IsItemActive()) {
+                cranked.crankAngle = atan2f(io.MousePos.y - center.y, io.MousePos.x - center.x) / numbers::pi_v<float> * 180 + 90;
+                if (cranked.crankAngle < 0)
+                    cranked.crankAngle += 360;
+            }
             auto color = ImGui::GetColorU32(accentColor);
             drawList->AddCircle(center, radius, color);
-            auto angle = cranked.crankAngle * numbers::pi_v<float> / 180;
+            auto angle = (cranked.crankAngle - 90) * numbers::pi_v<float> / 180;
             ImVec2 lineEnd{ center.x + cosf(angle) * radius, center.y + sinf(angle) * radius };
+            drawList->AddLine(center, lineEnd, color);
+            ImGui::End();
+        }
+
+        if (getWindowOpen(Windows::Accelerometer)) {
+            float radius = 35 * scale;
+            ImGui::SetNextWindowSize(ImVec2(radius * 2 + style.WindowPadding.x * 2, radius * 2 + style.WindowPadding.y * 2), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Accelerometer", &getWindowOpen(Windows::Accelerometer), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+            auto screenPos = ImGui::GetCursorScreenPos();
+            auto contentSize = ImGui::GetContentRegionAvail();
+            auto drawList = ImGui::GetWindowDrawList();
+            ImVec2 center{ radius + screenPos.x, radius + screenPos.y };
+            ImGui::InvisibleButton("##", contentSize, ImGuiButtonFlags_MouseButtonLeft);
+            if (ImGui::IsItemActive()) {
+                float x = (io.MousePos.x - center.x) / radius, y = (io.MousePos.y - center.y) / radius;
+                float angle = atan2f(y, x);
+                float percent = min(1.0f, sqrtf(x * x + y * y));
+                cranked.accelerometerX = percent * cosf(angle);
+                cranked.accelerometerY = percent * sinf(angle);
+                cranked.accelerometerZ = 1 - percent;
+            }
+            auto color = ImGui::GetColorU32(accentColor);
+            drawList->AddCircle(center, radius, color);
+            ImVec2 lineEnd{ center.x + cranked.accelerometerX * radius, center.y + cranked.accelerometerY * radius };
             drawList->AddLine(center, lineEnd, color);
             ImGui::End();
         }
