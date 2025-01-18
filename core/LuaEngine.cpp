@@ -97,78 +97,8 @@ void LuaEngine::runUpdateLoop() {
     inLuaUpdate = false;
 }
 
-template<>
-LuaVal LuaEngine::pushResource(NodeGraph resource) {
-    return pushUserdataResource(resource, "playdate.pathfinder.graph");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(GraphNode resource) {
-    return pushUserdataResource(resource, "playdate.pathfinder.node");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(Bitmap resource) {
-    return pushUserdataResource(resource, "playdate.graphics.image");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(BitmapTable resource) {
-    return pushUserdataResource(resource, "playdate.graphics.imagetable");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(TileMap resource) {
-    return pushUserdataResource(resource, "playdate.graphics.tilemap");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(Sprite resource) {
-    if (auto value = getResourceValue(resource); not value.isNil())
-        return value;
-    lua_pop(getContext(), 1);
-    auto value = pushUserdataResource(resource, "playdate.graphics.sprite");
-    storeResourceValue(resource, value);
-    return value;
-}
-
-template<>
-LuaVal LuaEngine::pushResource(VideoPlayer resource) {
-    return pushUserdataResource(resource, "playdate.graphics.video");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(Font resource) {
-    return pushUserdataResource(resource, "playdate.graphics.font");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(File resource) {
-    return pushUserdataResource(resource, "playdate.file.file");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(MenuItem resource) {
-    return pushUserdataResource(resource, "playdate.menu.item");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(SamplePlayer resource) {
-    return pushUserdataResource(resource, "playdate.sound.sampleplayer");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(FilePlayer resource) {
-    return pushUserdataResource(resource, "playdate.sound.fileplayer");
-}
-
-template<>
-LuaVal LuaEngine::pushResource(Synth resource) {
-    return pushUserdataResource(resource, "playdate.sound.synth");
-}
-
 void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {
-    static const auto luaHeapProfileName = "Lua Heap";
+    [[maybe_unused]] static const auto luaHeapProfileName = "Lua Heap";
     auto cranked = (Cranked *) userData;
     TracySecureFreeN(ptr, luaHeapProfileName);
     if (nsize == 0) {

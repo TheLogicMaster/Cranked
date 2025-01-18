@@ -3,7 +3,6 @@
 #include "gen/PlaydateAPI.hpp"
 #include "HeapAllocator.hpp"
 #include "Debugger.hpp"
-#include "NativeResource.hpp"
 
 // Todo: Dynarmic implementation
 
@@ -79,8 +78,7 @@ namespace cranked {
             else {
                 if (throws)
                     throw CrankedError("Invalid native address");
-                else
-                    return (T *) (intptr_t) nullptr;
+                return (T *) (intptr_t) nullptr;
             }
             return (T *) (address + offset);
         }
@@ -104,8 +102,7 @@ namespace cranked {
             else {
                 if (throws)
                     throw CrankedError("Invalid native address");
-                else
-                    return 0;
+                return 0;
             }
             return address + offset;
         }
@@ -171,8 +168,7 @@ namespace cranked {
         }
 
         /**
-         * All passed args have to match the expected size exactly, so explicitly cast `int` literals to `int32`, for example
-         * The emulated CPU context must be preserved by the caller if already running emulated code (For Lua emulated native C functions and such)
+         * All passed args have to match the expected size exactly, so explicitly cast `int` literals to `int32`, for example // Todo: Argument type assertions/conversions
          */
         template<typename R, ArgType N, ArgType... A, typename... P>
         R invokeEmulatedFunction(uint32 address, [[maybe_unused]] P... params) {

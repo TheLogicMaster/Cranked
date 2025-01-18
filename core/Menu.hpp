@@ -1,7 +1,6 @@
 #pragma once
 
 #include "PlaydateTypes.hpp"
-#include "NativeResource.hpp"
 #include "HeapAllocator.hpp"
 
 namespace cranked {

@@ -515,6 +515,40 @@ namespace cranked {
             }
         }
 
+        static const char *getLuaClass(ResourceType type) {
+            switch (type) {
+                case ResourceType::Sprite: return "playdate.graphics.sprite";
+                case ResourceType::Bitmap: return "playdate.graphics.image";
+                case ResourceType::BitmapTable: return "playdate.graphics.imagetable";
+                case ResourceType::Font: return "playdate.graphics.font";
+                case ResourceType::TileMap: return "playdate.graphics.tilemap";
+                case ResourceType::VideoPlayer: return "playdate.graphics.video";
+                case ResourceType::Channel: return "playdate.sound.channel";
+                case ResourceType::FilePlayer: return "playdate.sound.fileplayer";
+                case ResourceType::SamplePlayer: return "playdate.sound.sampleplayer";
+                case ResourceType::AudioSample: return "playdate.sound.sample";
+                case ResourceType::Synth: return "playdate.sound.synth";
+                case ResourceType::Instrument: return "playdate.sound.instrument";
+                case ResourceType::Track: return "playdate.sound.track";
+                case ResourceType::Sequence: return "playdate.sound.sequence";
+                case ResourceType::ControlSignal: return "playdate.sound.controlsignal";
+                case ResourceType::LFO: return "playdate.sound.lfo";
+                case ResourceType::Envelope: return "playdate.sound.envelope";
+                case ResourceType::TwoPoleFilter: return "playdate.sound.twopolefilter";
+                case ResourceType::OnePoleFilter: return "playdate.sound.onepolefilter";
+                case ResourceType::BitCrusher: return "playdate.sound.bitcrusher";
+                case ResourceType::RingModulator: return "playdate.sound.ringmod";
+                case ResourceType::Overdrive: return "playdate.sound.overdrive";
+                case ResourceType::DelayLine: return "playdate.sound.delayline";
+                case ResourceType::DelayLineTap: return "playdate.sound.delaylinetap";
+                case ResourceType::File: return "playdate.file.file";
+                case ResourceType::MenuItem: return "playdate.menu.item";
+                case ResourceType::NodeGraph: return "playdate.pathfinder.graph";
+                case ResourceType::GraphNode: return "playdate.pathfinder.node";
+                default: return nullptr;
+            }
+        }
+
         LuaVal pushTable() const {
             lua_newtable(getContext());
             return LuaVal{getContext()};
@@ -529,16 +563,17 @@ namespace cranked {
             return object;
         }
 
-        LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) {
+        LuaVal pushResource(NativeResource *resource) {
             if (!resource)
                 return pushNil();
-            auto object = pushUserdataObject(resource, metatable);
+            if (auto value = getResourceValue(resource); not value.isNil())
+                return value;
+            lua_pop(getContext(), 1);
+            auto value = pushUserdataObject(resource->address, getLuaClass(resource->type));
             resource->reference();
-            return object;
+            storeResourceValue(resource, value);
+            return value;
         }
-
-        template<is_resource_ptr R>
-        LuaVal pushResource(R resource);
 
         LuaVal pushNil () {
             lua_pushnil(getContext());

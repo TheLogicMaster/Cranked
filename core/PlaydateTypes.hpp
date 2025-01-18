@@ -1,9 +1,8 @@
 #pragma once
 
-#include "NativeResource.hpp"
+#include "Utils.hpp"
 
 namespace cranked {
-
     typedef uint32 cref_t;
     typedef float MIDINote;
 
@@ -32,7 +31,7 @@ namespace cranked {
     struct NativeFunctionMetadata {
         const char *name;
         void *func;
-        const std::vector<ArgType> argTypes;
+        const vector<ArgType> argTypes;
         const ArgType returnType;
     };
 
@@ -106,7 +105,7 @@ namespace cranked {
         Table,
         Function,
         Thread,
-        Object
+        Object,
     };
 
     enum class DitherType : int32 {
@@ -219,7 +218,50 @@ namespace cranked {
     enum class MicSource : int32 {
         Autodetect,
         Internal,
-        Headset
+        Headset,
+    };
+
+    /// Purely for emulator use, so order is only concerned with categorical grouping, then typical relevance within a category
+    enum class ResourceType {
+        // Graphics
+        Sprite,
+        Bitmap,
+        BitmapTable,
+        Font,
+        FontPage,
+        FontGlyph,
+        TileMap,
+        VideoPlayer,
+
+        // Audio
+        Channel,
+        FilePlayer,
+        SamplePlayer,
+        AudioSample,
+        Synth,
+        Instrument,
+        Track,
+        Sequence,
+        ControlSignal,
+        LFO,
+        Envelope,
+        TwoPoleFilter,
+        OnePoleFilter,
+        BitCrusher,
+        RingModulator,
+        Overdrive,
+        DelayLine,
+        DelayLineTap,
+        ChannelSignal,
+        CustomSource,
+        CustomSignal,
+        CustomEffect,
+
+        // Misc
+        File,
+        MenuItem,
+        NodeGraph,
+        GraphNode,
     };
 
     struct PDNodeGraph_32;
@@ -361,5 +403,21 @@ namespace cranked {
     struct SoundChannel_32;
     typedef SoundChannel_32 *SoundChannel;
     typedef ResourceRef<SoundChannel_32> SoundChannelRef;
+
+    struct SoundChannelSignal_32;
+    typedef SoundChannelSignal_32 *SoundChannelSignal;
+    typedef ResourceRef<SoundChannelSignal_32> SoundChannelSignalRef;
+
+    struct CustomSoundSource_32;
+    typedef CustomSoundSource_32 *CustomSoundSource;
+    typedef ResourceRef<CustomSoundSource_32> CustomSoundSourceRef;
+
+    struct CustomSoundEffect_32;
+    typedef CustomSoundEffect_32 *CustomSoundEffect;
+    typedef ResourceRef<CustomSoundEffect_32> CustomSoundEffectRef;
+
+    struct CustomSoundSignal_32;
+    typedef CustomSoundSignal_32 *CustomSoundSignal;
+    typedef ResourceRef<CustomSoundSignal_32> CustomSoundSignalRef;
 
 }

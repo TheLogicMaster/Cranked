@@ -6,13 +6,13 @@ using namespace cranked;
 Graphics::Graphics(Cranked &cranked)
         : cranked(cranked), heap(cranked.heap), systemFontSources(Rom::readSystemFont("Asheville-Sans-14-Light.pft"), Rom::readSystemFont("Asheville-Sans-14-Bold.pft"), Rom::readSystemFont("Asheville-Sans-14-Light-Oblique.pft")) {}
 
-LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked), frameRate(frameRate), size(size) {}
+LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked, ResourceType::VideoPlayer, this), frameRate(frameRate), size(size) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked), width(width), height(height), data(vheap_vector(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
+        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
-        : NativeResource(other.cranked), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
+        : NativeResource(other.cranked, ResourceType::Bitmap, this), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
 
 LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     if (&other == this)
@@ -25,14 +25,14 @@ LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
 }
 
 LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable)
-        : NativeResource(bitmap->cranked), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable), bitmap(bitmap) {}
+        : NativeResource(bitmap->cranked, ResourceType::FontGlyph, this), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable), bitmap(bitmap) {}
 
-LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked) {}
+LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked, ResourceType::FontPage, this) {}
 
 LCDFont_32::LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight)
-        : NativeResource(cranked), tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight) {}
+        : NativeResource(cranked, ResourceType::Font, this), tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight) {}
 
-LCDBitmapTable_32::LCDBitmapTable_32(Cranked &cranked, int cellsPerRow) : NativeResource(cranked), cellsPerRow(cellsPerRow) {}
+LCDBitmapTable_32::LCDBitmapTable_32(Cranked &cranked, int cellsPerRow) : NativeResource(cranked, ResourceType::BitmapTable, this), cellsPerRow(cellsPerRow) {}
 
 LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) {
     if (&other == this)
@@ -42,7 +42,7 @@ LCDBitmapTable_32& LCDBitmapTable_32::operator=(const LCDBitmapTable_32 &other) 
     return *this;
 }
 
-LCDTileMap_32::LCDTileMap_32(Cranked &cranked) : NativeResource(cranked) {}
+LCDTileMap_32::LCDTileMap_32(Cranked &cranked) : NativeResource(cranked, ResourceType::TileMap, this) {}
 
 [[nodiscard]] IntVec2 LCDTileMap_32::getCellSize() const {
     if (table and !table->bitmaps.empty() and table->bitmaps[0])
@@ -195,7 +195,7 @@ void LCDBitmap_32::drawBitmap(Bitmap image, int x, int y, int w, int h, int sour
     return frame;
 }
 
-LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked) {
+LCDSprite_32::LCDSprite_32(Cranked &cranked) : NativeResource(cranked, ResourceType::Sprite, this) {
     cranked.graphics.allocatedSprites.emplace(this);
 }
 

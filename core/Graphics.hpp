@@ -3,7 +3,6 @@
 #include "gen/PlaydateAPI.hpp"
 #include "Rom.hpp"
 #include "HeapAllocator.hpp"
-#include "NativeResource.hpp"
 #include "Geometry.hpp"
 
 namespace cranked {

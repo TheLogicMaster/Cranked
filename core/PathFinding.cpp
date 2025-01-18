@@ -2,7 +2,7 @@
 
 using namespace cranked;
 
-PDGraphNode_32::PDGraphNode_32(NodeGraph graph) : NativeResource(graph->cranked), graph(graph) {
+PDGraphNode_32::PDGraphNode_32(NodeGraph graph) : NativeResource(graph->cranked, ResourceType::GraphNode, this), graph(graph) {
     graph->allocatedNodes.emplace(this);
 }
 
@@ -13,7 +13,7 @@ PDGraphNode_32::~PDGraphNode_32() {
         node->connections.erase(this);
 }
 
-PDNodeGraph_32::PDNodeGraph_32(Cranked &cranked) : NativeResource(cranked) {}
+PDNodeGraph_32::PDNodeGraph_32(Cranked &cranked) : NativeResource(cranked, ResourceType::NodeGraph, this) {}
 
 PDNodeGraph_32::~PDNodeGraph_32() {
     for (auto node : allocatedNodes)

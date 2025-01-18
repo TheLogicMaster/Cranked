@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gen/PlaydateAPI.hpp"
-#include "NativeResource.hpp"
 
 namespace cranked {
 

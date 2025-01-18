@@ -15,7 +15,6 @@ file(GLOB IMGUI_SOURCES
 add_executable(cranked_desktop
         main.cpp
         ${IMGUI_SOURCES}
-        libs/ImGuiFileDialog/ImGuiFileDialog.cpp
 )
 target_include_directories(cranked_desktop PUBLIC
         libs/imgui

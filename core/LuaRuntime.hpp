@@ -39,10 +39,6 @@ namespace cranked {
         return cranked->luaEngine.pushUserdataObject(value, metatable);
     }
 
-    inline LuaVal pushUserdataResource(NativeResource *resource, const char *metatable) {
-        return resource->cranked.luaEngine.pushUserdataResource(resource, metatable);
-    }
-
     template<numeric_type T>
     LuaVal pushRect(Cranked *cranked, Rectangle<T> rect) {
         return cranked->luaEngine.pushRect(rect);
@@ -58,8 +54,7 @@ namespace cranked {
         return cranked->luaEngine.pushPoint(point);
     }
 
-    template<is_resource_ptr R>
-    LuaVal pushResource(Cranked *cranked, R resource) {
+    inline LuaVal pushResource(Cranked *cranked, NativeResource *resource) {
         return cranked->luaEngine.pushResource(resource);
     }
 
@@ -153,7 +148,7 @@ namespace cranked {
             return Point(LuaVal{context, I}.asPoint());
         else if constexpr (is_same_v<T, uint8 *> or is_same_v<T, const char *>)
             return (T)lua_tostring(context, I);
-        else if constexpr (is_pointer_v<T> and is_class_v<remove_pointer_t<T>>) { // Treat all class pointers as unwrapped userdata objects
+        else if constexpr (is_pointer_v<T>) {
             if (lua_isnoneornil(context, I))
                 return (T) nullptr;
             lua_getfield(context, I, "userdata");

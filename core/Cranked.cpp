@@ -194,7 +194,6 @@ void Cranked::terminate() {
 }
 
 void Cranked::updateInternals() {
-    // Todo: Update audio (When running)
     debugger.update();
     if (config.updateCallback)
         config.updateCallback(*this);

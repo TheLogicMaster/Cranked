@@ -83,7 +83,6 @@ namespace cranked {
 
         struct Audio {
             SoundFormat soundFormat;
-            bool stereo;
             uint32 sampleRate;
             vector<int16> samples; // Not sure if this is even useful, since it needs to support playing raw data, anyway
             vector<uint8> data;

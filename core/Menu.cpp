@@ -4,7 +4,7 @@
 using namespace cranked;
 
 PDMenuItem_32::PDMenuItem_32(Cranked &cranked, Type type)
-        : NativeResource(cranked), type(type), options(cranked.heap.allocator<vheap_string>()), title(cranked.heap.allocator<char>()) {}
+        : NativeResource(cranked, ResourceType::MenuItem, this), type(type), options(cranked.heap.allocator<vheap_string>()), title(cranked.heap.allocator<char>()) {}
 
 Menu::Menu(Cranked &cranked) : cranked(cranked) {}
 

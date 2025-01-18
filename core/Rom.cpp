@@ -410,7 +410,7 @@ Rom::Audio Rom::readAudio(const uint8 *data, size_t dataSize) {
     auto soundFormat = SoundFormat(headerWord & 0xFF);
     bool stereo = soundFormat == SoundFormat::Stereo8bit or soundFormat == SoundFormat::Stereo16bit or soundFormat == SoundFormat::StereoADPCM;
     auto audioDataSize = dataSize - 16;
-    Audio audio {.soundFormat = soundFormat, .stereo = stereo, .sampleRate = sampleRate};
+    Audio audio {.soundFormat = soundFormat, .sampleRate = sampleRate};
     audio.data.resize(audioDataSize);
     memcpy(audio.data.data(), data + 16, audioDataSize);
     if (soundFormat == SoundFormat::Mono8bit or soundFormat == SoundFormat::Stereo8bit) {

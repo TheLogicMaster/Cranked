@@ -53,6 +53,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Test building on Windows/Mac
 - Create a testing framework to compare console output to the official simulator (Graphics, Collisions)
 - Finish font-ends (Libretro core just crashes at the moment, Desktop has no features, Android only loads a test program)
+- Front-end should run in a separate thread
 - Java library with native libs for Android app consumption
 - Scoreboard support
 - Investigate Catalog app (Web API already documented elsewhere)
@@ -69,7 +70,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Fix git submodules to not get in detached head state
 - Can't currently build in release due to false uninitialized variable errors in Capstone
 - Native Cranked API for profiling and such, maybe exposed at a fixed address or at the end of the main PD API struct
-- LuaRuntime being based on tables rather than userdata is likely to cause incompatibility (Already requires patches.lua), and should probably use full userdata from C++
+- LuaRuntime being based on tables rather than userdata is likely to cause incompatibility (Where not tables...) (Already requires patches.lua), and should probably use full userdata from C++
 - Better exception handling and stack traces, potentially with disassembled Asm and Lua for context, especially more Lua context, maybe even decompilation
 
 ## Example Compatibility
@@ -133,6 +134,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Auto-generated 64-bit safe equivalent Playdate API and data structures by parsing the official headers
 - Lua objects represented by tables with userdata field and metatables
 - Reference counting for all native resources (Higher memory usage when using many resources such as with fonts)
+- Inheritance of audio classes is actually done use C++ virtual inheritance, which means that all parent class types addresses need to be mapped to account for class layouts
 
 ## GDB Debugging
 Requires gdb-multiarch and is run from the project directory with `gdb-multiarch -x gdb_setup`.

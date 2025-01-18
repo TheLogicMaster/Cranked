@@ -73,6 +73,8 @@ int main(int argc, const char *args[]) {
     SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(nullptr, false, &audioSpec, nullptr, false);
     if (!audioDevice)
         printf("Failed to initialize audio: %s\n", SDL_GetError());
+    else
+        SDL_PauseAudioDevice(audioDevice, false);
 
     auto windowFlags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     // Todo: If window starts small, it squishes saved window positions
@@ -203,7 +205,7 @@ int main(int argc, const char *args[]) {
     if (!displayTexture)
         throw CrankedError("Failed to create SDL display texture: ", SDL_GetError());
 
-    auto getWindowOpen = [&](Windows window) -> bool & { return userdata.windowStates[window]; };
+    auto getWindowOpen = [&](Windows w) -> bool & { return userdata.windowStates[w]; };
 
     MemoryEditor codeMemoryEditor;
     MemoryEditor heapMemoryEditor;

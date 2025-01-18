@@ -213,7 +213,8 @@ Bitmap cranked::playdate_graphics_rotatedBitmap(Cranked *cranked, Bitmap bitmap,
 }
 
 BitmapTable cranked::playdate_graphics_newBitmapTable(Cranked *cranked, int32 count, int32 width, int32 height) {
-    auto table = cranked->graphics.createBitmapTable(count); // Todo: Do something with size
+    auto table = cranked->graphics.createBitmapTable(count);
+    table->cellsPerRow = count;
     table->reference();
     return table;
 }
@@ -400,7 +401,11 @@ void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable
         *width = table->bitmaps.empty() ? 0 : table->bitmaps[0]->width;
 }
 
-void *cranked::playdate_sys_realloc(Cranked *cranked, void* ptr, uint32 size) {
+void cranked::playdate_graphics_drawTextInRect(Cranked *cranked, void *text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align) {
+    // Todo
+}
+
+void *cranked::playdate_sys_realloc(Cranked *cranked, void *ptr, uint32 size) {
     if (size == 0) {
         cranked->nativeEngine.freeResource(ptr);
         return nullptr;
@@ -416,8 +421,8 @@ int32 cranked::playdate_sys_formatString(Cranked *cranked, cref_t *ret, uint8 *f
     auto buffer = (uint8 *) cranked->heap.allocate(size + 1);
     *ret = cranked->toVirtualAddress(buffer);
     vsprintf((char *) buffer, (const char *) fmt, args2);
-    va_end(args);
     va_end(args2);
+    va_end(args);
     return size;
 }
 
@@ -1931,25 +1936,29 @@ void cranked::playdate_sprite_getCenter(Cranked *cranked, Sprite s, float *x, fl
         *y = s->getCenter().y;
 }
 
-void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource c, float lvol, float rvol) {
-    c->leftVolume = lvol;
-    c->rightVolume = rvol;
+void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource sourceDerived, float lvol, float rvol) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
+    source->leftVolume = lvol;
+    source->rightVolume = rvol;
 }
 
-void cranked::playdate_sound_source_getVolume(Cranked *cranked, SoundSource c, float *outl, float *outr) {
+void cranked::playdate_sound_source_getVolume(Cranked *cranked, SoundSource sourceDerived, float *outl, float *outr) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
     if (outl)
-        *outl = c->leftVolume;
+        *outl = source->leftVolume;
     if (outr)
-        *outr = c->rightVolume;
+        *outr = source->rightVolume;
 }
 
-int32 cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource c) {
-    return c->playing;
+int32 cranked::playdate_sound_source_isPlaying(Cranked *cranked, SoundSource sourceDerived) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
+    return source->playing;
 }
 
-void cranked::playdate_sound_source_setFinishCallback(Cranked *cranked, SoundSource c, cref_t callback, void *userdata) {
-    c->completionCallback = callback;
-    c->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
+void cranked::playdate_sound_source_setFinishCallback(Cranked *cranked, SoundSource sourceDerived, cref_t callback, void *userdata) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
+    source->completionCallback = callback;
+    source->completionCallbackUserdata = Cranked::version < VERSION_2_4_1 ? 0 : cranked->toVirtualAddress(userdata);
 }
 
 FilePlayer cranked::playdate_sound_fileplayer_newPlayer(Cranked *cranked) {
@@ -2000,7 +2009,7 @@ void cranked::playdate_sound_fileplayer_getVolume(Cranked *cranked, FilePlayer p
 }
 
 float cranked::playdate_sound_fileplayer_getLength(Cranked *cranked, FilePlayer player) {
-    return player->file ? framesToSeconds((int) player->file->romData->size()) : 0;
+    return player->file ? soundFramesToSeconds((int) player->file->romData->size()) : 0;
 }
 
 void cranked::playdate_sound_fileplayer_setOffset(Cranked *cranked, FilePlayer player, float offset) {
@@ -2012,8 +2021,8 @@ void cranked::playdate_sound_fileplayer_setRate(Cranked *cranked, FilePlayer pla
 }
 
 void cranked::playdate_sound_fileplayer_setLoopRange(Cranked *cranked, FilePlayer player, float start, float end) {
-    player->loopStart = framesFromSeconds(start);
-    player->loopEnd = framesFromSeconds(end);
+    player->loopStart = soundFramesFromSeconds(start);
+    player->loopEnd = soundFramesFromSeconds(end);
 }
 
 int32 cranked::playdate_sound_fileplayer_didUnderrun(Cranked *cranked, FilePlayer player) {
@@ -2031,7 +2040,7 @@ void cranked::playdate_sound_fileplayer_setLoopCallback(Cranked *cranked, FilePl
 }
 
 float cranked::playdate_sound_fileplayer_getOffset(Cranked *cranked, FilePlayer player) {
-    return framesToSeconds(player->sampleOffset);
+    return soundFramesToSeconds(player->sampleOffset);
 }
 
 float cranked::playdate_sound_fileplayer_getRate(Cranked *cranked, FilePlayer player) {
@@ -2084,7 +2093,7 @@ void cranked::playdate_sound_sample_freeSample(Cranked *cranked, AudioSample sam
 }
 
 float cranked::playdate_sound_sample_getLength(Cranked *cranked, AudioSample sample) {
-    return framesToSeconds((int) sample->data.size());
+    return soundFramesToSeconds((int) sample->data.size());
 }
 
 int32 cranked::playdate_sound_sample_decompress(Cranked *cranked, AudioSample sample) {
@@ -2132,11 +2141,11 @@ void cranked::playdate_sound_sampleplayer_getVolume(Cranked *cranked, SamplePlay
 }
 
 float cranked::playdate_sound_sampleplayer_getLength(Cranked *cranked, SamplePlayer player) {
-    return player->sample ? framesToSeconds((int) player->sample->data.size()) : 0;
+    return player->sample ? soundFramesToSeconds((int) player->sample->data.size()) : 0;
 }
 
 void cranked::playdate_sound_sampleplayer_setOffset(Cranked *cranked, SamplePlayer player, float offset) {
-    player->sampleOffset = framesFromSeconds(offset);
+    player->sampleOffset = soundFramesFromSeconds(offset);
 }
 
 void cranked::playdate_sound_sampleplayer_setRate(Cranked *cranked, SamplePlayer player, float rate) {
@@ -2159,7 +2168,7 @@ void cranked::playdate_sound_sampleplayer_setLoopCallback(Cranked *cranked, Samp
 }
 
 float cranked::playdate_sound_sampleplayer_getOffset(Cranked *cranked, SamplePlayer player) {
-    return framesToSeconds(player->sampleOffset);
+    return soundFramesToSeconds(player->sampleOffset);
 }
 
 float cranked::playdate_sound_sampleplayer_getRate(Cranked *cranked, SamplePlayer player) {
@@ -2171,25 +2180,31 @@ void cranked::playdate_sound_sampleplayer_setPaused(Cranked *cranked, SamplePlay
 }
 
 SynthSignal cranked::playdate_sound_signal_newSignal(Cranked *cranked, cref_t step, cref_t noteOn, cref_t noteOff, cref_t dealloc, void *userdata) {
-    // Todo
-    return nullptr;
+    return cranked->nativeEngine.createReferencedResource<CustomSoundSignal>(step, noteOn, noteOff, dealloc, userdata);
 }
 
-void cranked::playdate_sound_signal_freeSignal(Cranked *cranked, SynthSignal signal) {
-    signal->dereference();
+void cranked::playdate_sound_signal_freeSignal(Cranked *cranked, SynthSignal signalDerived) {
+    if (auto signal = dynamic_cast<SynthSignal>(cranked->audio.signalFromDerived(signalDerived)))
+        signal->dereference();
 }
 
-float cranked::playdate_sound_signal_getValue(Cranked *cranked, SynthSignal signal) {
+float cranked::playdate_sound_signal_getValue(Cranked *cranked, SynthSignal signalDerived) {
     // Todo
     return 0;
 }
 
-void cranked::playdate_sound_signal_setValueScale(Cranked *cranked, SynthSignal signal, float scale) {
-    signal->scale = scale;
+void cranked::playdate_sound_signal_setValueScale(Cranked *cranked, SynthSignal signalDerived, float scale) {
+    if (auto signal = dynamic_cast<SynthSignal>(cranked->audio.signalFromDerived(signalDerived)))
+        signal->scale = scale;
 }
 
-void cranked::playdate_sound_signal_setValueOffset(Cranked *cranked, SynthSignal signal, float offset) {
-    signal->offset = framesFromSeconds(offset);
+void cranked::playdate_sound_signal_setValueOffset(Cranked *cranked, SynthSignal signalDerived, float offset) {
+    if (auto signal = dynamic_cast<SynthSignal>(cranked->audio.signalFromDerived(signalDerived)))
+        signal->offset = offset;
+}
+
+PDSynthSignal_32 *cranked::playdate_sound_signal_newSignalForValue(Cranked *cranked, PDSynthSignalValue_32 *value) {
+    return nullptr; // Todo
 }
 
 uint8 *cranked::playdate_sound_getError(Cranked *cranked) {
@@ -2239,8 +2254,8 @@ void cranked::playdate_sound_lfo_setFunction(Cranked *cranked, SynthLFO lfo, cre
 }
 
 void cranked::playdate_sound_lfo_setDelay(Cranked *cranked, SynthLFO lfo, float holdoff, float ramptime) {
-    lfo->holdOffSamples = framesFromSeconds(holdoff);
-    lfo->rampTimeSamples = framesFromSeconds(ramptime);
+    lfo->holdOffSamples = soundFramesFromSeconds(holdoff);
+    lfo->rampTimeSamples = soundFramesFromSeconds(ramptime);
 }
 
 void cranked::playdate_sound_lfo_setRetrigger(Cranked *cranked, SynthLFO lfo, int32 flag) {
@@ -2332,6 +2347,10 @@ Synth cranked::playdate_sound_synth_copy(Cranked *cranked, Synth synth) {
     return nullptr; // Todo
 }
 
+void cranked::playdate_sound_synth_clearEnvelope(Cranked *cranked, PDSynth_32 *synth) {
+    synth->envelope = nullptr;
+}
+
 void cranked::playdate_sound_synth_setGenerator_deprecated(Cranked *cranked, Synth synth, int32 stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, void *userdata) {
     synth->generatorStereo = stereo;
     synth->generatorRenderFunc = render;
@@ -2369,16 +2388,16 @@ void cranked::playdate_sound_synth_setTranspose(Cranked *cranked, Synth synth, f
     synth->transposeHalfSteps = halfSteps;
 }
 
-void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, Synth synth, SynthSignalValue mod) {
-    synth->frequencyModulator = mod;
+void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, Synth synth, SynthSignalValue modDerived) {
+    synth->frequencyModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getFrequencyModulator(Cranked *cranked, Synth synth) {
     return synth->frequencyModulator.get();
 }
 
-void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, Synth synth, SynthSignalValue mod) {
-    synth->amplitudeModulator = mod;
+void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, Synth synth, SynthSignalValue modDerived) {
+    synth->amplitudeModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getAmplitudeModulator(Cranked *cranked, Synth synth) {
@@ -2395,8 +2414,8 @@ int32 cranked::playdate_sound_synth_setParameter(Cranked *cranked, Synth synth, 
     return 0;
 }
 
-void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, Synth synth, int32 parameter, SynthSignalValue mod) {
-    synth->parameterModulators[parameter] = mod;
+void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, Synth synth, int32 parameter, SynthSignalValue modDerived) {
+    synth->parameterModulators[parameter] = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getParameterModulator(Cranked *cranked, Synth synth, int32 parameter) {
@@ -2715,8 +2734,8 @@ void cranked::playdate_sound_effect_twopolefilter_setFrequency(Cranked *cranked,
     filter->frequency = frequency;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signal) {
-    filter->frequencyModulator = signal;
+void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signalDerived) {
+    filter->frequencyModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getFrequencyModulator(Cranked *cranked, TwoPoleFilter filter) {
@@ -2731,8 +2750,8 @@ void cranked::playdate_sound_effect_twopolefilter_setResonance(Cranked *cranked,
     filter->resonance = resonance;
 }
 
-void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signal) {
-    filter->resonanceModulator = signal;
+void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked *cranked, TwoPoleFilter filter, SynthSignalValue signalDerived) {
+    filter->resonanceModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getResonanceModulator(Cranked *cranked, TwoPoleFilter filter) {
@@ -2751,8 +2770,8 @@ void cranked::playdate_sound_effect_onepolefilter_setParameter(Cranked *cranked,
     filter->cutoffFrequency = parameter;
 }
 
-void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked *cranked, OnePoleFilter filter, SynthSignalValue signal) {
-    filter->cutoffFrequencyModulator = signal;
+void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked *cranked, OnePoleFilter filter, SynthSignalValue signalDerived) {
+    filter->cutoffFrequencyModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_onepolefilter_getParameterModulator(Cranked *cranked, OnePoleFilter filter) {
@@ -2771,8 +2790,8 @@ void cranked::playdate_sound_effect_bitcrusher_setAmount(Cranked *cranked, BitCr
     filter->amount = amount;
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signal) {
-    filter->amountModulator = signal;
+void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signalDerived) {
+    filter->amountModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getAmountModulator(Cranked *cranked, BitCrusher filter) {
@@ -2783,8 +2802,8 @@ void cranked::playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked
     filter->undersampling = undersampling;
 }
 
-void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signal) {
-    filter->undersamplingModulator = signal;
+void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *cranked, BitCrusher filter, SynthSignalValue signalDerived) {
+    filter->undersamplingModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher filter) {
@@ -2803,8 +2822,8 @@ void cranked::playdate_sound_effect_ringmodulator_setFrequency(Cranked *cranked,
     filter->frequency = frequency;
 }
 
-void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked *cranked, RingModulator filter, SynthSignalValue signal) {
-    filter->frequencyModulator = signal;
+void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked *cranked, RingModulator filter, SynthSignalValue signalDerived) {
+    filter->frequencyModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_ringmodulator_getFrequencyModulator(Cranked *cranked, RingModulator filter) {
@@ -2840,8 +2859,8 @@ void cranked::playdate_sound_effect_delayline_setTapDelay(Cranked *cranked, Dela
     t->delayFrames = frames;
 }
 
-void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cranked, DelayLineTap t, SynthSignalValue mod) {
-    t->delayModulator = mod;
+void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cranked, DelayLineTap t, SynthSignalValue modDerived) {
+    t->delayModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_delayline_getTapDelayModulator(Cranked *cranked, DelayLineTap t) {
@@ -2868,8 +2887,8 @@ void cranked::playdate_sound_effect_overdrive_setLimit(Cranked *cranked, Overdri
     o->limit = limit;
 }
 
-void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked, Overdrive o, SynthSignalValue mod) {
-    o->limitModulator = mod;
+void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked, Overdrive o, SynthSignalValue modDerived) {
+    o->limitModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_overdrive_getLimitModulator(Cranked *cranked, Overdrive o) {
@@ -2880,8 +2899,8 @@ void cranked::playdate_sound_effect_overdrive_setOffset(Cranked *cranked, Overdr
     o->offset = offset;
 }
 
-void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranked, Overdrive o, SynthSignalValue mod) {
-    o->offsetModulator = mod;
+void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranked, Overdrive o, SynthSignalValue modDerived) {
+    o->offsetModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_effect_overdrive_getOffsetModulator(Cranked *cranked, Overdrive o) {
@@ -2893,28 +2912,28 @@ SoundEffect cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_t pr
     return nullptr;
 }
 
-void cranked::playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect effect) {
-    effect->dereference();
+void cranked::playdate_sound_effect_freeEffect(Cranked *cranked, SoundEffect effectDerived) {
+    cranked->audio.effectFromDerived(effectDerived)->dereference();
 }
 
-void cranked::playdate_sound_effect_setMix(Cranked *cranked, SoundEffect effect, float level) {
-    effect->mixLevel = level;
+void cranked::playdate_sound_effect_setMix(Cranked *cranked, SoundEffect effectDerived, float level) {
+    cranked->audio.effectFromDerived(effectDerived)->mixLevel = level;
 }
 
-void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffect effect, SynthSignalValue signal) {
-    effect->mixModulator = signal;
+void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffect effectDerived, SynthSignalValue signalDerived) {
+    cranked->audio.effectFromDerived(effectDerived)->mixModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
-SynthSignalValue cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect effect) {
-    return effect->mixModulator.get();
+SynthSignalValue cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect effectDerived) {
+    return cranked->audio.effectFromDerived(effectDerived)->mixModulator.get();
 }
 
-void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect effect, void *userdata) {
-    effect->userdata = cranked->toVirtualAddress(userdata);
+void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect effectDerived, void *userdata) {
+    cranked->audio.effectFromDerived(effectDerived)->userdata = cranked->toVirtualAddress(userdata);
 }
 
-void *cranked::playdate_sound_effect_getUserdata(Cranked *cranked, SoundEffect effect) {
-    return cranked->fromVirtualAddress(effect->userdata);
+void *cranked::playdate_sound_effect_getUserdata(Cranked *cranked, SoundEffect effectDerived) {
+    return cranked->fromVirtualAddress(cranked->audio.effectFromDerived(effectDerived)->userdata);
 }
 
 SoundChannel cranked::playdate_sound_channel_newChannel(Cranked *cranked) {
@@ -2927,14 +2946,17 @@ void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel 
     channel->dereference();
 }
 
-int32 cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel channel, SoundSource source) {
+int32 cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel channel, SoundSource sourceDerived) {
+
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
     if (find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
         return false;
     channel->sources.emplace(source);
     return true;
 }
 
-int32 cranked::playdate_sound_channel_removeSource(Cranked *cranked, SoundChannel channel, SoundSource source) {
+int32 cranked::playdate_sound_channel_removeSource(Cranked *cranked, SoundChannel channel, SoundSource sourceDerived) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
     return eraseByEquivalentKey(channel->sources, source);
 }
 
@@ -2943,12 +2965,12 @@ SoundSource cranked::playdate_sound_channel_addCallbackSource(Cranked *cranked, 
     return nullptr;
 }
 
-void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel channel, SoundEffect effect) {
-    channel->effects.emplace(effect);
+void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
+    channel->effects.emplace(cranked->audio.effectFromDerived(effectDerived));
 }
 
-void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel channel, SoundEffect effect) {
-    eraseByEquivalentKey(channel->effects, effect);
+void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
+    eraseByEquivalentKey(channel->effects, cranked->audio.effectFromDerived(effectDerived));
 }
 
 void cranked::playdate_sound_channel_setVolume(Cranked *cranked, SoundChannel channel, float volume) {
@@ -2959,8 +2981,8 @@ float cranked::playdate_sound_channel_getVolume(Cranked *cranked, SoundChannel c
     return channel->volume;
 }
 
-void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue mod) {
-    channel->volumeModulator = mod;
+void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue modDerived) {
+    channel->volumeModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getVolumeModulator(Cranked *cranked, SoundChannel channel) {
@@ -2971,8 +2993,8 @@ void cranked::playdate_sound_channel_setPan(Cranked *cranked, SoundChannel chann
     channel->pan = pan;
 }
 
-void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue mod) {
-    channel->panModulator = mod;
+void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChannel channel, SynthSignalValue modDerived) {
+    channel->panModulator = cranked->audio.signalFromDerived(modDerived);
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel channel) {
@@ -2980,13 +3002,11 @@ SynthSignalValue cranked::playdate_sound_channel_getPanModulator(Cranked *cranke
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel channel) {
-    // Todo
-    return nullptr;
+    return channel->drySignal.get();
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getWetLevelSignal(Cranked *cranked, SoundChannel channel) {
-    // Todo
-    return nullptr;
+    return channel->wetSignal.get();
 }
 
 uint32 cranked::playdate_sound_getCurrentTime(Cranked *cranked) {
@@ -3005,14 +3025,14 @@ SoundChannel cranked::playdate_sound_getDefaultChannel(Cranked *cranked) {
 int32 cranked::playdate_sound_addChannel(Cranked *cranked, SoundChannel channel) {
     if (channel == cranked->audio.mainChannel)
         return false;
-    auto &activeChannels = cranked->audio.activeChannels;
+    auto &activeChannels = cranked->audio.channels;
     bool success = !activeChannels.contains(channel);
     activeChannels.emplace(channel);
     return success;
 }
 
 int32 cranked::playdate_sound_removeChannel(Cranked *cranked, SoundChannel channel) {
-    auto &activeChannels = cranked->audio.activeChannels;
+    auto &activeChannels = cranked->audio.channels;
     bool success = activeChannels.contains(channel);
     eraseByEquivalentKey(activeChannels, channel);
     return success;
@@ -3036,10 +3056,11 @@ void cranked::playdate_sound_setOutputsActive(Cranked *cranked, int32 headphone,
     cranked->audio.speakerOutputActive = speaker;
 }
 
-int32 cranked::playdate_sound_removeSource(Cranked *cranked, SoundSource source) {
+int32 cranked::playdate_sound_removeSource(Cranked *cranked, SoundSource sourceDerived) {
+    auto source = cranked->audio.sourceFromDerived(sourceDerived);
     if (eraseByEquivalentKey(cranked->audio.mainChannel->sources, source))
         return true;
-    for (auto &channel : cranked->audio.activeChannels)
+    for (auto &channel : cranked->audio.channels)
         if (eraseByEquivalentKey(channel->sources, source))
             return true;
     return false;

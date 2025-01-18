@@ -6,7 +6,7 @@
 
 using namespace cranked;
 
-SDFile_32::SDFile_32(Cranked &cranked) : NativeResource(cranked) {}
+SDFile_32::SDFile_32(Cranked &cranked) : NativeResource(cranked, ResourceType::File, this) {}
 
 SDFile_32::~SDFile_32() {
     if (file)

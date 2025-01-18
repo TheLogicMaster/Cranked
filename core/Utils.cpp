@@ -1,5 +1,6 @@
 #include "Utils.hpp"
 #include "gif-h/gif.h"
+#include "Cranked.hpp"
 
 using namespace cranked;
 
@@ -32,4 +33,30 @@ void cranked::writeGIF(const char *path, const uint8 *data, int width, int heigh
     GifBegin(&g, path, width, height, 0);
     GifWriteFrame(&g, data, width, height, 0);
     GifEnd(&g);
+}
+
+NativeResource::NativeResource(Cranked &cranked, ResourceType type, void *address) : cranked(cranked), type(type), address(address) {
+    if (cref_t virtAddress = cranked.nativeEngine.toVirtualAddress(this, false); virtAddress < HEAP_ADDRESS or virtAddress >= HEAP_ADDRESS + HEAP_SIZE)
+        throw CrankedError("Native resource allocated in non-heap memory");
+    cranked.nativeEngine.nativeResources.emplace(this);
+}
+
+NativeResource::~NativeResource() {
+    disposed = true;
+    cranked.nativeEngine.nativeResources.erase(this);
+}
+
+bool NativeResource::dereference() {
+    if (disposed)
+        throw CrankedError("Attempted to dereference disposed resource");
+    if (refCount <= 0)
+        throw CrankedError("Attempted to dereference unreferenced resource");
+    if (int count = --refCount; not disposing and count <= 0) {
+        disposing = true;
+        cranked.heap.destruct(this); // Seems sketchy deleting `this`, but it's fine
+        if (count != refCount)
+            throw CrankedError("Attempted resource resurrection detected");
+        return true;
+    }
+    return false;
 }

@@ -2172,73 +2172,78 @@ static int playdate_sound_getSampleRate_lua(Cranked *cranked) {
     return 44100;
 }
 
-static LuaRet playdate_sound_playingSources_lua(Cranked *cranked) {
+static LuaValRet playdate_sound_playingSources_lua(Cranked *cranked) {
+    auto table = pushTable(cranked);
     // Todo
-    return 0;
+    return table;
 }
 
-static void playdate_sound_addEffect_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_addEffect_lua(Cranked *cranked, SoundEffect effectDerived) {
+    cranked->audio.mainChannel->effects.emplace(cranked->audio.effectFromDerived(effectDerived));
 }
 
-static void playdate_sound_removeEffect_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_removeEffect_lua(Cranked *cranked, SoundEffect effectDerived) {
+    eraseByEquivalentKey(cranked->audio.mainChannel->effects, cranked->audio.effectFromDerived(effectDerived));
 }
 
 static bool playdate_sound_getHeadphoneState_lua(Cranked *cranked, LuaVal changeCallback) {
+    lua_pushvalue(cranked->getLuaContext(), changeCallback);
+    cranked->luaEngine.setQualifiedLuaGlobal("cranked.headphoneCallback");
+    return cranked->audio.headphonesConnected;
+}
+
+static void playdate_sound_resetTime_lua(Cranked *cranked) {
+    cranked->audio.sampleTime = 0;
+}
+
+static SamplePlayer playdate_sound_sampleplayer_new_lua(Cranked *cranked, LuaVal sample) {
+    return cranked->audio.allocateSource<SamplePlayer_32>();
+}
+
+static void playdate_sound_sampleplayer_gc_lua(Cranked *cranked, SamplePlayer player) {
+    player->dereference();
+}
+
+static SamplePlayer playdate_sound_sampleplayer_copy_lua(Cranked *cranked, SamplePlayer player) {
+    return player->copy();
+}
+
+static void playdate_sound_sampleplayer_play_lua(Cranked *cranked, SamplePlayer player, int repeatCount, LuaVal rate) {
+    // Todo
+}
+
+static bool playdate_sound_sampleplayer_playAt_lua(Cranked *cranked, SamplePlayer player, int when, LuaVal vol, LuaVal rightVol, LuaVal rate) {
     // Todo
     return false;
 }
 
-static void playdate_sound_resetTime_lua(Cranked *cranked) {
+static void playdate_sound_sampleplayer_setVolume_lua(Cranked *cranked, SamplePlayer player, float vol, LuaVal rightVol) {
     // Todo
 }
 
-static SamplePlayer playdate_sound_sampleplayer_new_lua(Cranked *cranked) {
-    return cranked->audio.allocateSource<SamplePlayer_32>();
+static LuaRet playdate_sound_sampleplayer_getVolume_lua(Cranked *cranked, SamplePlayer player) {
+    // Todo
+    return 0;
 }
 
-static void playdate_sound_sampleplayer_gc_lua(Cranked *cranked, SamplePlayer plater) {
-    plater->dereference();
-}
-
-static void playdate_sound_sampleplayer_copy_lua(Cranked *cranked) {
+static void playdate_sound_sampleplayer_setLoopCallback_lua(Cranked *cranked, SamplePlayer player, LuaVal callback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_play_lua(Cranked *cranked) {
+static void playdate_sound_sampleplayer_setFinishCallback_lua(Cranked *cranked, SamplePlayer player, LuaVal callback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_sampleplayer_playAt_lua(Cranked *cranked) {
-    // Todo
+static AudioSample playdate_sound_sampleplayer_getSample_lua(Cranked *cranked, SamplePlayer player) {
+    return player->sample.get();
 }
 
-static void playdate_sound_sampleplayer_setVolume_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_sampleplayer_setRateMod_lua(Cranked *cranked, SamplePlayer player, SynthSignalValue *signalDerived) {
+    player->rateModulator = cranked->audio.signalFromDerived(signalDerived);
 }
 
-static void playdate_sound_sampleplayer_getVolume_lua(Cranked *cranked) {
+static FilePlayer playdate_sound_fileplayer_new_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2) {
     // Todo
-}
-
-static void playdate_sound_sampleplayer_setLoopCallback_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sampleplayer_setFinishCallback_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sampleplayer_getSample_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sampleplayer_setRateMod_lua(Cranked *cranked) {
-    // Todo
-}
-
-static FilePlayer playdate_sound_fileplayer_new_lua(Cranked *cranked) {
     return cranked->audio.allocateSource<FilePlayer_32>();
 }
 
@@ -2246,96 +2251,120 @@ static void playdate_sound_fileplayer_gc_lua(Cranked *cranked, FilePlayer player
     player->dereference();
 }
 
-static void playdate_sound_fileplayer_load_lua(Cranked *cranked) {
+static void playdate_sound_fileplayer_load_lua(Cranked *cranked, FilePlayer player, const char *path) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_play_lua(Cranked *cranked) {
+static void playdate_sound_fileplayer_play_lua(Cranked *cranked, FilePlayer player, int repeatCount) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setFinishCallback_lua(Cranked *cranked) {
+static void playdate_sound_fileplayer_setFinishCallback_lua(Cranked *cranked, FilePlayer player, LuaVal callback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setLoopRange_lua(Cranked *cranked) {
+static void playdate_sound_fileplayer_setLoopRange_lua(Cranked *cranked, FilePlayer player, float start, LuaVal end, LuaVal loopCallback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setLoopCallback_lua(Cranked *cranked) {
+static void playdate_sound_fileplayer_setLoopCallback_lua(Cranked *cranked, FilePlayer player, LuaVal callback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setBufferSize_lua(Cranked *cranked) {
+static bool playdate_sound_fileplayer_setBufferSize_lua(Cranked *cranked, FilePlayer player, float seconds) {
+    // Todo
+    return false;
+}
+
+static void playdate_sound_fileplayer_setRateMod_lua(Cranked *cranked, FilePlayer player, SynthSignalValue *signalDerived) {
+    player->rateModulator = cranked->audio.signalFromDerived(signalDerived);
+}
+
+static void playdate_sound_fileplayer_setVolume_lua(Cranked *cranked, FilePlayer player, float left, LuaVal right, LuaVal fadeSeconds, LuaVal fadeCallback, LuaVal arg) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setRateMod_lua(Cranked *cranked) {
+static LuaRet playdate_sound_fileplayer_getVolume_lua(Cranked *cranked, FilePlayer player) {
+    // Todo
+    return 0;
+}
+
+static LuaRet playdate_sound_sample_new_lua(Cranked *cranked, LuaVal arg1, LuaVal arg2) {
+    // Todo: Support preallocated size for consistency
+    AudioSample sample;
+    if (arg1.isString()) {
+        try {
+            sample = cranked->audio.loadSample(arg1.asString());
+        } catch (exception &ex) {
+            return returnValues(cranked, nullptr, ex.what());
+        }
+    } else
+        sample = cranked->heap.construct<AudioSample_32>(*cranked, 0);
+    return returnValues(cranked, sample);
+}
+
+static void playdate_sound_sample_gc_lua(Cranked *cranked, AudioSample sample) {
+    sample->dereference();
+}
+
+static AudioSample playdate_sound_sample_getSubsample_lua(Cranked *cranked, AudioSample sample, int start, int end) {
+    // Todo
+    return nullptr;
+}
+
+static LuaRet playdate_sound_sample_load_lua(Cranked *cranked, AudioSample sample, const char *path) {
+    try {
+        AudioSampleRef loaded = cranked->audio.loadSample(path);
+        sample->data = loaded->data;
+        sample->soundFormat = loaded->soundFormat;
+        sample->sampleRate = loaded->sampleRate;
+        return returnValues(cranked, true); // Todo: Correct return value?
+    } catch (exception &ex) {
+        return returnValues(cranked, nullptr, ex.what());
+    }
+}
+
+static uint32 playdate_sound_sample_getSampleRate_lua(Cranked *cranked, AudioSample sample) {
+    return sample->sampleRate;
+}
+
+static SoundFormat playdate_sound_sample_getFormat_lua(Cranked *cranked, AudioSample sample) {
+    return sample->soundFormat;
+}
+
+static LuaRet playdate_sound_sample_getLength_lua(Cranked *cranked, AudioSample sample) {
+    int length = (int)sample->data.size();
+    return returnValues(cranked, length, length);
+}
+
+static SamplePlayer playdate_sound_sample_play_lua(Cranked *cranked, AudioSample sample, int repeatCount, LuaVal rate) {
+    auto player = cranked->audio.allocateSource<SamplePlayer_32>();
+    player->sample = sample;
+    playdate_sound_sampleplayer_play_lua(cranked, player, repeatCount, rate);
+    return player;
+}
+
+static SamplePlayer playdate_sound_sample_playAt_lua(Cranked *cranked, AudioSample sample, int when, LuaVal vol, LuaVal rightVol, LuaVal rate) {
+    auto player = cranked->audio.allocateSource<SamplePlayer_32>();
+    player->sample = sample;
+    playdate_sound_sampleplayer_playAt_lua(cranked, player, when, vol, rightVol, rate);
+    return player;
+}
+
+static void playdate_sound_sample_save_lua(Cranked *cranked, AudioSample sample, const char *path) {
     // Todo
 }
 
-static void playdate_sound_fileplayer_setVolume_lua(Cranked *cranked) {
-    // Todo
+static SoundChannel playdate_sound_channel_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateChannel();
 }
 
-static void playdate_sound_fileplayer_getVolume_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_channel_gc_lua(Cranked *cranked, SoundChannel channel) {
+    channel->dereference();
 }
 
-static void playdate_sound_sample_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_getSubsample_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_load_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_getSampleRate_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_getFormat_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_play_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_playAt_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_sample_save_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_channel_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_channel_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_channel_remove_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_channel_setVolume_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_channel_getVolume_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_channel_remove_lua(Cranked *cranked, SoundChannel channel) {
+    eraseByEquivalentKey(cranked->audio.channels, channel);
 }
 
 static Synth playdate_sound_synth_new_lua(Cranked *cranked) {
@@ -2346,375 +2375,299 @@ static void playdate_sound_synth_gc_lua(Cranked *cranked, Synth synth) {
     synth->dereference();
 }
 
-static void playdate_sound_synth_copy_lua(Cranked *cranked) {
+static Synth playdate_sound_synth_copy_lua(Cranked *cranked, Synth synth) {
     // Todo
+    return nullptr;
 }
 
-static void playdate_sound_synth_playNote_lua(Cranked *cranked) {
+static void playdate_sound_synth_playNote_lua(Cranked *cranked, Synth synth, float pitch, LuaVal volume, LuaVal length, LuaVal when) {
     // Todo
 }
 
-static void playdate_sound_synth_playMIDINote_lua(Cranked *cranked) {
+static void playdate_sound_synth_playMIDINote_lua(Cranked *cranked, Synth synth, float note, LuaVal volume, LuaVal length, LuaVal when) {
     // Todo
 }
 
-static void playdate_sound_synth_setADSR_lua(Cranked *cranked) {
+static void playdate_sound_synth_setADSR_lua(Cranked *cranked, Synth synth, float attack, float decay, float sustain, float release) {
     // Todo
 }
 
-static void playdate_sound_synth_setEnvelopeCurvature_lua(Cranked *cranked) {
+static void playdate_sound_synth_setEnvelopeCurvature_lua(Cranked *cranked, Synth synth, float amount) {
     // Todo
 }
 
-static void playdate_sound_synth_getEnvelope_lua(Cranked *cranked) {
+static SynthEnvelope playdate_sound_synth_getEnvelope_lua(Cranked *cranked, Synth synth) {
     // Todo
+    return nullptr;
 }
 
-static void playdate_sound_synth_setFinishCallback_lua(Cranked *cranked) {
+static void playdate_sound_synth_setFinishCallback_lua(Cranked *cranked, Synth synth, LuaVal callback) {
     // Todo
 }
 
-static void playdate_sound_synth_setLegato_lua(Cranked *cranked) {
+static void playdate_sound_synth_setLegato_lua(Cranked *cranked, Synth synth, bool flag) {
     // Todo
 }
 
-static void playdate_sound_synth_setVolume_lua(Cranked *cranked) {
+static void playdate_sound_synth_setVolume_lua(Cranked *cranked, Synth synth, float left, LuaVal right) {
     // Todo
 }
 
-static void playdate_sound_synth_getVolume_lua(Cranked *cranked) {
+static LuaRet playdate_sound_synth_getVolume_lua(Cranked *cranked, Synth synth) {
     // Todo
+    return 0;
 }
 
-static void playdate_sound_synth_setWaveform_lua(Cranked *cranked) {
+static void playdate_sound_synth_setWaveform_lua(Cranked *cranked, Synth synth, LuaVal waveform) {
     // Todo
 }
 
-static void playdate_sound_signal_setOffset_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_signal_setScale_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_lfo_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_lfo_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_lfo_setArpeggio_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_setScale_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_setOffset_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_trigger_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_envelope_setGlobal_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_setMix_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_setMixMod_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_setAmountModulator_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_bitcrusher_setUndersampleModulator_lua(Cranked *cranked) {
-    // Todo
+static SynthLFO playdate_sound_lfo_new_lua(Cranked *cranked, LFOType type) {
+    return cranked->heap.construct<PDSynthLFO_32>(*cranked, type);
 }
 
-static void playdate_sound_effect_ringmodulator_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_ringmodulator_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_ringmodulator_setMix_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_ringmodulator_setMixMod_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_ringmodulator_setFrequencyModulator_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_onepolefilter_new_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_onepolefilter_gc_lua(Cranked *cranked) {
-    // Todo
-}
-
-static void playdate_sound_effect_onepolefilter_setMix_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_lfo_gc_lua(Cranked *cranked, SynthLFO lfo) {
+    lfo->dereference();
 }
 
-static void playdate_sound_effect_onepolefilter_setMixMod_lua(Cranked *cranked) {
+static void playdate_sound_lfo_setArpeggio_lua(Cranked *cranked, int note1, LuaVal arg1) {
     // Todo
 }
 
-static void playdate_sound_effect_onepolefilter_setParameterModulator_lua(Cranked *cranked) {
-    // Todo
+static SynthEnvelope playdate_sound_envelope_new_lua(Cranked *cranked, float attack, float decay, float sustain, float release) {
+    return cranked->heap.construct<PDSynthEnvelope_32>(*cranked, attack, decay, sustain, release);
 }
 
-static void playdate_sound_effect_twopolefilter_new_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_envelope_gc_lua(Cranked *cranked, SynthEnvelope envelope) {
+    envelope->dereference();
 }
 
-static void playdate_sound_effect_twopolefilter_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_envelope_setScale_lua(Cranked *cranked, SynthEnvelope envelope, float scale) {
+    envelope->scale = scale;
 }
 
-static void playdate_sound_effect_twopolefilter_setMix_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_envelope_setOffset_lua(Cranked *cranked, SynthEnvelope envelope, float offset) {
+    envelope->offset = offset;
 }
 
-static void playdate_sound_effect_twopolefilter_setMixMod_lua(Cranked *cranked) {
+static void playdate_sound_envelope_trigger_lua(Cranked *cranked, SynthEnvelope envelope, float velocity, LuaVal length) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setFrequencyModulator_lua(Cranked *cranked) {
+static void playdate_sound_envelope_setGlobal_lua(Cranked *cranked, SynthEnvelope envelope, bool flag) {
     // Todo
 }
 
-static void playdate_sound_effect_twopolefilter_setResonanceModulator_lua(Cranked *cranked) {
-    // Todo
+static BitCrusher playdate_sound_effect_bitcrusher_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<BitCrusher_32>(*cranked);
 }
 
-static void playdate_sound_effect_overdrive_new_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_effect_bitcrusher_gc_lua(Cranked *cranked, BitCrusher bitcrusher) {
+    bitcrusher->dereference();
 }
 
-static void playdate_sound_effect_overdrive_gc_lua(Cranked *cranked) {
-    // Todo
+static RingModulator playdate_sound_effect_ringmodulator_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<RingModulator_32>(*cranked);
 }
 
-static void playdate_sound_effect_overdrive_setMix_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_effect_ringmodulator_gc_lua(Cranked *cranked, RingModulator ringModulator) {
+    ringModulator->dereference();
 }
 
-static void playdate_sound_effect_overdrive_setMixMod_lua(Cranked *cranked) {
-    // Todo
+static OnePoleFilter playdate_sound_effect_onepolefilter_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<OnePoleFilter_32>(*cranked);
 }
 
-static void playdate_sound_effect_overdrive_setLimitModulator_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_effect_onepolefilter_gc_lua(Cranked *cranked, OnePoleFilter filter) {
+    filter->dereference();
 }
 
-static void playdate_sound_effect_overdrive_setOffsetModulator_lua(Cranked *cranked) {
-    // Todo
+static TwoPoleFilter playdate_sound_effect_twopolefilter_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<TwoPoleFilter_32>(*cranked);
 }
 
-static void playdate_sound_delayline_new_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_effect_twopolefilter_gc_lua(Cranked *cranked, TwoPoleFilter filter) {
+    filter->dereference();
 }
 
-static void playdate_sound_delayline_gc_lua(Cranked *cranked) {
-    // Todo
+static Overdrive playdate_sound_effect_overdrive_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<Overdrive_32>(*cranked);
 }
 
-static void playdate_sound_delayline_setMix_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_effect_overdrive_gc_lua(Cranked *cranked, Overdrive overdrive) {
+    overdrive->dereference();
 }
 
-static void playdate_sound_delayline_setMixMod_lua(Cranked *cranked) {
-    // Todo
+static DelayLine playdate_sound_delayline_new_lua(Cranked *cranked, float length) {
+    return cranked->heap.construct<DelayLine_32>(*cranked, length, true); // Todo: Stereo flag?
 }
 
-static void playdate_sound_delayline_addTap_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_delayline_gc_lua(Cranked *cranked, DelayLine delayLine) {
+    delayLine->dereference();
 }
 
-static void playdate_sound_delaylinetap_gc_lua(Cranked *cranked) {
-    // Todo
+static DelayLineTap playdate_sound_delayline_addTap_lua(Cranked *cranked, DelayLine delayLine, int delay) {
+    return cranked->audio.allocateSource<DelayLineTap_32>(delayLine, delay);
 }
 
-static void playdate_sound_delaylinetap_setDelayMod_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_delaylinetap_gc_lua(Cranked *cranked, DelayLineTap tap) {
+    tap->dereference();
 }
 
-static void playdate_sound_delaylinetap_setVolume_lua(Cranked *cranked) {
+static void playdate_sound_delaylinetap_setVolume_lua(Cranked *cranked, DelayLineTap tap) {
     // Todo
 }
 
-static void playdate_sound_delaylinetap_getVolume_lua(Cranked *cranked) {
+static void playdate_sound_delaylinetap_getVolume_lua(Cranked *cranked, DelayLineTap tap) {
     // Todo
 }
 
-static void playdate_sound_sequence_new_lua(Cranked *cranked) {
-    // Todo
+static SoundSequence playdate_sound_sequence_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateSource<SoundSequence_32>();
 }
 
-static void playdate_sound_sequence_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_sequence_gc_lua(Cranked *cranked, SoundSequence sequence) {
+    sequence->dereference();
 }
 
-static void playdate_sound_sequence_play_lua(Cranked *cranked) {
+static void playdate_sound_sequence_play_lua(Cranked *cranked, SoundSequence sequence, LuaVal finishCallback) {
     // Todo
 }
 
-static void playdate_sound_sequence_goToStep_lua(Cranked *cranked) {
+static void playdate_sound_sequence_goToStep_lua(Cranked *cranked, SoundSequence sequence, int step, bool play) {
     // Todo
+    sequence->time = step;
 }
 
-static void playdate_sound_sequence_getCurrentStep_lua(Cranked *cranked) {
-    // Todo
+static int playdate_sound_sequence_getCurrentStep_lua(Cranked *cranked, SoundSequence sequence) {
+    return sequence->time;
 }
 
-static void playdate_sound_sequence_setLoops_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_sequence_setLoops_lua(Cranked *cranked, SoundSequence sequence, int startStep, int endStep, int loopCount) {
+    sequence->loopStart = startStep;
+    sequence->loopEnd = endStep;
+    sequence->loops = loopCount;
 }
 
-static void playdate_sound_sequence_addTrack_lua(Cranked *cranked) {
+static LuaRet playdate_sound_sequence_addTrack_lua(Cranked *cranked, SoundSequence sequence, SequenceTrack track) {
     // Todo
+    return 0;
 }
 
-static void playdate_sound_sequence_setTrackAtIndex_lua(Cranked *cranked) {
+static void playdate_sound_sequence_setTrackAtIndex_lua(Cranked *cranked, SoundSequence sequence, int n, SequenceTrack track) {
     // Todo
 }
 
-static void playdate_sound_sequence_getTrackAtIndex_lua(Cranked *cranked) {
+static SequenceTrack playdate_sound_sequence_getTrackAtIndex_lua(Cranked *cranked, SoundSequence sequence, int n) {
     // Todo
+    return nullptr;
 }
 
-static void playdate_sound_track_new_lua(Cranked *cranked) {
-    // Todo
+static SequenceTrack playdate_sound_track_new_lua(Cranked *cranked) {
+    return cranked->audio.allocateSource<SequenceTrack_32>();
 }
 
-static void playdate_sound_track_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_track_gc_lua(Cranked *cranked, SequenceTrack track) {
+    track->dereference();
 }
 
-static void playdate_sound_track_addNote_lua(Cranked *cranked) {
+static void playdate_sound_track_addNote_lua(Cranked *cranked, SequenceTrack track, LuaVal arg1, LuaVal note, int length, LuaVal velocity) {
     // Todo
 }
 
-static void playdate_sound_track_setNotes_lua(Cranked *cranked) {
+static void playdate_sound_track_setNotes_lua(Cranked *cranked, SequenceTrack track, LuaVal list) {
     // Todo
 }
 
-static void playdate_sound_track_getNotes_lua(Cranked *cranked) {
+static LuaValRet playdate_sound_track_getNotes_lua(Cranked *cranked, SequenceTrack track, int step, LuaVal endStep) {
+    auto table = pushTable(cranked);
     // Todo
+    return table;
 }
 
-static void playdate_sound_track_getNotesActive_lua(Cranked *cranked) {
+static int playdate_sound_track_getNotesActive_lua(Cranked *cranked, SequenceTrack track) {
     // Todo
+    return 0;
 }
 
-static void playdate_sound_track_setInstrument_lua(Cranked *cranked) {
+static void playdate_sound_track_setInstrument_lua(Cranked *cranked, SequenceTrack track, LuaVal inst) {
     // Todo
 }
 
-static void playdate_sound_track_getInstrument_lua(Cranked *cranked) {
+static void playdate_sound_track_getInstrument_lua(Cranked *cranked, SequenceTrack track) {
     // Todo
 }
 
-static void playdate_sound_track_removeNote_lua(Cranked *cranked) {
+static void playdate_sound_track_removeNote_lua(Cranked *cranked, SequenceTrack track, int step, LuaVal note) {
     // Todo
 }
 
-static void playdate_sound_track_addControlSignal_lua(Cranked *cranked) {
+static void playdate_sound_track_addControlSignal_lua(Cranked *cranked, SequenceTrack track, ControlSignal signal) {
     // Todo
 }
 
-static void playdate_sound_track_getControlSignals_lua(Cranked *cranked) {
+static LuaValRet playdate_sound_track_getControlSignals_lua(Cranked *cranked, SequenceTrack track) {
+    auto table = pushTable(cranked);
     // Todo
+    return table;
 }
 
-static void playdate_sound_instrument_new_lua(Cranked *cranked) {
+static SynthInstrument playdate_sound_instrument_new_lua(Cranked *cranked, Synth synth) {
     // Todo
+    return cranked->audio.allocateSource<PDSynthInstrument_32>();
 }
 
-static void playdate_sound_instrument_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_instrument_gc_lua(Cranked *cranked, SynthInstrument instrument) {
+    instrument->dereference();
 }
 
-static void playdate_sound_instrument_addVoice_lua(Cranked *cranked) {
+static void playdate_sound_instrument_addVoice_lua(Cranked *cranked, SynthInstrument instrument, Synth voice, LuaVal note, LuaVal noteEnd, int transpose) {
     // Todo
 }
 
-static void playdate_sound_instrument_playNote_lua(Cranked *cranked) {
+static void playdate_sound_instrument_playNote_lua(Cranked *cranked, SynthInstrument instrument, LuaVal frequency, LuaVal vel, int length, float when) {
     // Todo
 }
 
-static void playdate_sound_instrument_playMIDINote_lua(Cranked *cranked) {
+static void playdate_sound_instrument_playMIDINote_lua(Cranked *cranked, SynthInstrument instrument, LuaVal note, LuaVal vel, int length, float when) {
     // Todo
 }
 
-static void playdate_sound_instrument_noteOff_lua(Cranked *cranked) {
+static void playdate_sound_instrument_noteOff_lua(Cranked *cranked, SynthInstrument instrument, LuaVal note, float when) {
     // Todo
 }
 
-static void playdate_sound_instrument_setVolume_lua(Cranked *cranked) {
+static void playdate_sound_instrument_setVolume_lua(Cranked *cranked, SynthInstrument instrument, LuaVal left, LuaVal right) {
     // Todo
 }
 
-static void playdate_sound_instrument_getVolume_lua(Cranked *cranked) {
+static LuaRet playdate_sound_instrument_getVolume_lua(Cranked *cranked, SynthInstrument instrument) {
     // Todo
+    return 0;
 }
 
-static void playdate_sound_controlsignal_new_lua(Cranked *cranked) {
-    // Todo
+static ControlSignal playdate_sound_controlsignal_new_lua(Cranked *cranked) {
+    return cranked->heap.construct<ControlSignal_32>(*cranked);
 }
 
-static void playdate_sound_controlsignal_gc_lua(Cranked *cranked) {
-    // Todo
+static void playdate_sound_controlsignal_gc_lua(Cranked *cranked, ControlSignal signal) {
+    signal->dereference();
 }
 
-static void playdate_sound_controlsignal_addEvent_lua(Cranked *cranked) {
+static void playdate_sound_controlsignal_addEvent_lua(Cranked *cranked, ControlSignal signal, LuaVal arg1, LuaVal value, bool interpolate) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_clearEvents_lua(Cranked *cranked) {
+static void playdate_sound_controlsignal_clearEvents_lua(Cranked *cranked, ControlSignal signal) {
     // Todo
 }
 
-static void playdate_sound_controlsignal_setControllerType_lua(Cranked *cranked) {
+static int playdate_sound_controlsignal_setControllerType_lua(Cranked *cranked, ControlSignal signal) {
     // Todo
+    return 0;
 }
 
-static void playdate_sound_controlsignal_getControllerType_lua(Cranked *cranked) {
+static void playdate_sound_controlsignal_getControllerType_lua(Cranked *cranked, ControlSignal signal) {
     // Todo
 }
 
@@ -3418,7 +3371,7 @@ void LuaEngine::registerLuaGlobals() {
                 sample.setWrappedFunction<playdate_sound_sample_load_lua>("load");
                 sample.setWrappedFunction<playdate_sound_sample_getSampleRate_lua>("getSampleRate");
                 sample.setWrappedFunction<playdate_sound_sample_getFormat_lua>("getFormat");
-                sample.setWrappedFunction<playdate_sound_sample_getLength>("getLength");
+                sample.setWrappedFunction<playdate_sound_sample_getLength_lua>("getLength");
                 sample.setWrappedFunction<playdate_sound_sample_play_lua>("play");
                 sample.setWrappedFunction<playdate_sound_sample_playAt_lua>("playAt");
                 sample.setWrappedFunction<playdate_sound_sample_save_lua>("save");
@@ -3435,8 +3388,8 @@ void LuaEngine::registerLuaGlobals() {
                 channel.setWrappedFunction<playdate_sound_channel_removeEffect>("removeEffect");
                 channel.setWrappedFunction<playdate_sound_channel_addSource>("addSource");
                 channel.setWrappedFunction<playdate_sound_channel_removeSource>("removeSource");
-                channel.setWrappedFunction<playdate_sound_channel_setVolume_lua>("setVolume");
-                channel.setWrappedFunction<playdate_sound_channel_getVolume_lua>("getVolume");
+                channel.setWrappedFunction<playdate_sound_channel_setVolume>("setVolume");
+                channel.setWrappedFunction<playdate_sound_channel_getVolume>("getVolume");
                 channel.setWrappedFunction<playdate_sound_channel_setPan>("setPan");
                 channel.setWrappedFunction<playdate_sound_channel_setPanModulator>("setPanMod");
                 channel.setWrappedFunction<playdate_sound_channel_setVolumeModulator>("setVolumeMod");
@@ -3476,8 +3429,8 @@ void LuaEngine::registerLuaGlobals() {
                 auto signal = LuaApiHelper(getContext(), "signal");
                 signal.setSelfIndex();
                 signal.setString("__name", "playdate.sound.signal");
-                signal.setWrappedFunction<playdate_sound_signal_setOffset_lua>("setOffset");
-                signal.setWrappedFunction<playdate_sound_signal_setScale_lua>("setScale");
+                signal.setWrappedFunction<playdate_sound_signal_setValueOffset>("setOffset");
+                signal.setWrappedFunction<playdate_sound_signal_setValueScale>("setScale");
             }
 
             {
@@ -3524,12 +3477,12 @@ void LuaEngine::registerLuaGlobals() {
                 bitCrusher.setString("__name", "playdate.sound.bitcrusher");
                 bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_gc_lua>("__gc");
                 bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_new_lua>("new");
-                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setMix_lua>("setMix");
-                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setMixMod_lua>("setMixMod");
+                bitCrusher.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                bitCrusher.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setAmount>("setAmount");
-                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setAmountModulator_lua>("setAmountMod");
+                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setAmountModulator>("setAmountMod");
                 bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setUndersampling>("setUndersampling");
-                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setUndersampleModulator_lua>("setUndersamplingMod");
+                bitCrusher.setWrappedFunction<playdate_sound_effect_bitcrusher_setUndersampleModulator>("setUndersamplingMod");
             }
 
             {
@@ -3538,10 +3491,10 @@ void LuaEngine::registerLuaGlobals() {
                 ringMod.setString("__name", "playdate.sound.ringmod");
                 ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_gc_lua>("__gc");
                 ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_new_lua>("new");
-                ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_setMix_lua>("setMix");
-                ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_setMixMod_lua>("setMixMod");
+                ringMod.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                ringMod.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_setFrequency>("setFrequency");
-                ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_setFrequencyModulator_lua>("setFrequencyMod");
+                ringMod.setWrappedFunction<playdate_sound_effect_ringmodulator_setFrequencyModulator>("setFrequencyMod");
             }
 
             {
@@ -3550,10 +3503,10 @@ void LuaEngine::registerLuaGlobals() {
                 onePoleFilter.setString("__name", "playdate.sound.onepolefilter");
                 onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_gc_lua>("__gc");
                 onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_new_lua>("new");
-                onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_setMix_lua>("setMix");
-                onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_setMixMod_lua>("setMixMod");
+                onePoleFilter.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                onePoleFilter.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_setParameter>("setParameter");
-                onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_setParameterModulator_lua>("setParameterMod");
+                onePoleFilter.setWrappedFunction<playdate_sound_effect_onepolefilter_setParameterModulator>("setParameterMod");
             }
 
             {
@@ -3562,12 +3515,12 @@ void LuaEngine::registerLuaGlobals() {
                 twoPoleFilter.setString("__name", "playdate.sound.twopolefilter");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_gc_lua>("__gc");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_new_lua>("new");
-                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setMix_lua>("setMix");
-                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setMixMod_lua>("setMixMod");
+                twoPoleFilter.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                twoPoleFilter.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setFrequency>("setFrequency");
-                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setFrequencyModulator_lua>("setFrequencyMod");
+                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setFrequencyModulator>("setFrequencyMod");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setResonance>("setResonance");
-                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setResonanceModulator_lua>("setResonanceMod");
+                twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setResonanceModulator>("setResonanceMod");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setGain>("setGain");
                 twoPoleFilter.setWrappedFunction<playdate_sound_effect_twopolefilter_setType>("setType");
             }
@@ -3578,13 +3531,13 @@ void LuaEngine::registerLuaGlobals() {
                 overdrive.setString("__name", "playdate.sound.overdrive");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_gc_lua>("__gc");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_new_lua>("new");
-                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setMix_lua>("setMix");
-                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setMixMod_lua>("setMixMod");
+                overdrive.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                overdrive.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setGain>("setGain");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setLimit>("setLimit");
-                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setLimitModulator_lua>("setLimitMod");
+                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setLimitModulator>("setLimitMod");
                 overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setOffset>("setOffset");
-                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setOffsetModulator_lua>("setOffsetMod");
+                overdrive.setWrappedFunction<playdate_sound_effect_overdrive_setOffsetModulator>("setOffsetMod");
             }
 
             {
@@ -3593,8 +3546,8 @@ void LuaEngine::registerLuaGlobals() {
                 delayLine.setString("__name", "playdate.sound.delayline");
                 delayLine.setWrappedFunction<playdate_sound_delayline_gc_lua>("__gc");
                 delayLine.setWrappedFunction<playdate_sound_delayline_new_lua>("new");
-                delayLine.setWrappedFunction<playdate_sound_delayline_setMix_lua>("setMix");
-                delayLine.setWrappedFunction<playdate_sound_delayline_setMixMod_lua>("setMixMod");
+                delayLine.setWrappedFunction<playdate_sound_effect_setMix>("setMix");
+                delayLine.setWrappedFunction<playdate_sound_effect_setMixModulator>("setMixMod");
                 delayLine.setWrappedFunction<playdate_sound_delayline_addTap_lua>("addTap");
                 delayLine.setWrappedFunction<playdate_sound_effect_delayline_setFeedback>("setFeedback");
             }
@@ -3605,7 +3558,7 @@ void LuaEngine::registerLuaGlobals() {
                 delayLineTap.setString("__name", "playdate.sound.delaylinetap");
                 delayLineTap.setWrappedFunction<playdate_sound_delaylinetap_gc_lua>("__gc");
                 delayLineTap.setWrappedFunction<playdate_sound_effect_delayline_setTapDelay>("setDelay");
-                delayLineTap.setWrappedFunction<playdate_sound_delaylinetap_setDelayMod_lua>("setDelayMod");
+                delayLineTap.setWrappedFunction<playdate_sound_effect_delayline_setTapDelayModulator>("setDelayMod");
                 delayLineTap.setWrappedFunction<playdate_sound_delaylinetap_setVolume_lua>("setVolume");
                 delayLineTap.setWrappedFunction<playdate_sound_delaylinetap_getVolume_lua>("getVolume");
                 delayLineTap.setWrappedFunction<playdate_sound_effect_delayline_setTapChannelsFlipped>("setFlipChannels");

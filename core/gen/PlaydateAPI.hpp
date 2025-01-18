@@ -5,9 +5,9 @@
 #include "../PlaydateTypes.hpp"
 #include "Utils.hpp"
 
-#define PLAYDATE_SDK_VERSION "2.5.0"
+#define PLAYDATE_SDK_VERSION "2.6.2"
 
-constexpr int FUNCTION_TABLE_SIZE = 499;
+constexpr int FUNCTION_TABLE_SIZE = 502;
 
 namespace cranked {
 
@@ -99,6 +99,7 @@ struct playdate_graphics_32 {
 	cref_t setPixel;
 	cref_t getBitmapPixel;
 	cref_t getBitmapTableInfo;
+	cref_t drawTextInRect;
 };
 
 struct PDDateTime_32 {
@@ -464,6 +465,7 @@ struct playdate_sound_signal_32 {
 	cref_t getValue;
 	cref_t setValueScale;
 	cref_t setValueOffset;
+	cref_t newSignalForValue;
 };
 
 struct playdate_sound_lfo_32 {
@@ -528,6 +530,7 @@ struct playdate_sound_synth_32 {
 	cref_t setWavetable;
 	cref_t setGenerator;
 	cref_t copy;
+	cref_t clearEnvelope;
 };
 
 struct playdate_control_signal_32 {
@@ -911,6 +914,7 @@ int32_t playdate_graphics_getTextTracking(Cranked *cranked);
 void playdate_graphics_setPixel(Cranked *cranked, int32_t x, int32_t y, uint32_t c);
 int32_t playdate_graphics_getBitmapPixel(Cranked *cranked, LCDBitmap_32 * bitmap, int32_t x, int32_t y);
 void playdate_graphics_getBitmapTableInfo(Cranked *cranked, LCDBitmapTable_32 * table, int32_t * count, int32_t * width);
+void playdate_graphics_drawTextInRect(Cranked *cranked, void * text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align);
 void playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32_t flag);
 void playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRect);
 void playdate_sprite_drawSprites(Cranked *cranked);
@@ -1074,6 +1078,7 @@ PDSynthEnvelope_32 * playdate_sound_synth_getEnvelope(Cranked *cranked, PDSynth_
 int32_t playdate_sound_synth_setWavetable(Cranked *cranked, PDSynth_32 * synth, AudioSample_32 * sample, int32_t log2size, int32_t columns, int32_t rows);
 void playdate_sound_synth_setGenerator(Cranked *cranked, PDSynth_32 * synth, int32_t stereo, cref_t render, cref_t noteOn, cref_t release, cref_t setparam, cref_t dealloc, cref_t copyUserdata, void * userdata);
 PDSynth_32 * playdate_sound_synth_copy(Cranked *cranked, PDSynth_32 * synth);
+void playdate_sound_synth_clearEnvelope(Cranked *cranked, PDSynth_32 * synth);
 SoundSequence_32 * playdate_sound_sequence_newSequence(Cranked *cranked);
 void playdate_sound_sequence_freeSequence(Cranked *cranked, SoundSequence_32 * sequence);
 int32_t playdate_sound_sequence_loadMIDIFile(Cranked *cranked, SoundSequence_32 * seq, uint8_t * path);
@@ -1229,6 +1234,7 @@ void playdate_sound_signal_freeSignal(Cranked *cranked, PDSynthSignal_32 * signa
 float playdate_sound_signal_getValue(Cranked *cranked, PDSynthSignal_32 * signal);
 void playdate_sound_signal_setValueScale(Cranked *cranked, PDSynthSignal_32 * signal, float scale);
 void playdate_sound_signal_setValueOffset(Cranked *cranked, PDSynthSignal_32 * signal, float offset);
+PDSynthSignal_32 * playdate_sound_signal_newSignalForValue(Cranked *cranked, PDSynthSignalValue_32 * value);
 uint8_t * playdate_sound_getError(Cranked *cranked);
 int32_t playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8_t * name, cref_t * outErr);
 int32_t playdate_lua_registerClass(Cranked *cranked, uint8_t * name, lua_reg_32 * reg, lua_val_32 * vals, int32_t isstatic, cref_t * outErr);
