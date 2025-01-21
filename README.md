@@ -72,6 +72,8 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Native Cranked API for profiling and such, maybe exposed at a fixed address or at the end of the main PD API struct
 - LuaRuntime being based on tables rather than userdata is likely to cause incompatibility (Where not tables...) (Already requires patches.lua), and should probably use full userdata from C++
 - Better exception handling and stack traces, potentially with disassembled Asm and Lua for context, especially more Lua context, maybe even decompilation
+- Lua debugger functionality
+- Support Debug Adaptor Protocol like Simulator
 
 ## Example Compatibility
 - [x] Hello World
@@ -79,11 +81,11 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - [x] Sprite Game
 - [x] Particles
 - [x] Life
-- [ ] Exposure
+- [x] Exposure
 - [ ] bach.mid
 - [x] Array
 - [ ] 3D Library (Works until memory bug occurs)
-- [ ] Sprite Collision Masks
+- [x] Sprite Collision Masks
 - [x] Pathfinder (Minor issue with font measuring and family switching for no-path text)
 - [ ] Mode 7 Driver
 - [ ] MIDI Player
@@ -93,7 +95,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - [x] Flippy Fish (Display inversion on game over is missing)
 - [ ] Drum Machine
 - [x] Controller Test
-- [ ] Asheteroids (Requires pattern drawing, Nil access error)
+- [ ] Asheteroids (Issue with sprites and Bump, huge memory usage for cells)
 - [x] Accelerometer Test
 - [x] 2020
 - Single File Examples
@@ -101,27 +103,27 @@ There is currently no support for running encrypted ROMs from the Catalog.
   - [ ] Arcs (Ellipse drawing needs work)
   - [ ] Audio
   - [ ] Balls (Kinda works until crash)
-  - [ ] Blur Dither
-  - [ ] Collisions
+  - [x] Blur Dither (Text formatting, many graphical differences, un-implemented blur features)
+  - [ ] Collisions (Works with poor performance until crash)
   - [x] Crank
   - [x] Draw Mode
   - [ ] Draw Sampled (Mode 7 not implemented)
   - [ ] Draw Sampled 2
-  - [ ] Fade Fast
+  - [x] Fade Fast (Text formatting)
   - [ ] File (Output does not match)
-  - [ ] Grid View (Completely broken)
-  - [ ] Icosohedron (Does not work at all)
-  - [ ] Image Sample (Requires pattern support, does not package ball asset for some reason)
+  - [x] Grid View (Text formatting, minor graphical issues)
+  - [x] Icosohedron
+  - [x] Image Sample
   - [x] Pachinko
   - [x] Perlin Distribution
   - [x] Perlin 1
   - [x] Perlin 2
-  - [ ] Perlin 3 (Requires patterns)
-  - [ ] Perlin 4 (Crashes with OOM)
+  - [x] Perlin 3
+  - [x] Perlin 4
   - [x] Perlin Field
   - [ ] Snd Test
-  - [ ] Sprite Scaling
-  - [ ] Stencil (Mostly works, missing graphical features like line width and patterns)
+  - [x] Sprite Scaling
+  - [x] Stencil
   - [ ] Synth
   - [x] Tile Map Test
   - [ ] Wave Table

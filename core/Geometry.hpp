@@ -11,6 +11,15 @@ namespace cranked {
             return Vector2<S>((S) x, (S) y);
         }
 
+        [[nodiscard]] Vector2<float> normalized() const {
+            float len = length();
+            return { (float)x / len, (float)y / len };
+        }
+
+        [[nodiscard]] float length() const {
+            return sqrtf((float)x * (float)x + (float)y * (float)y);
+        }
+
         template<numeric_type S>
         [[nodiscard]] auto operator+(const Vector2<S> other) const {
             return Vector2{ x + other.x, y + other.y };
@@ -185,9 +194,65 @@ namespace cranked {
     }
 
     struct Transform {
-        // Todo
+        float m11, m12, tx;
+        float m21, m22, ty;
 
-        float m11, m12, m21, m22, tx, ty;
+        [[nodiscard]] constexpr Transform invert() const {
+            float det = m11 * m22 - m12 * m21;
+            return {
+                m22 / det, -m12 / det, (m12 * ty - m22 * tx) / det,
+                -m21 / det, m11 / det, (m21 * tx - m11 * ty) / det
+            };
+        }
+
+        template<numeric_type S>
+        [[nodiscard]] constexpr Vector2<S> operator*(Vector2<S> point) const {
+            return Vec2{
+                m11 * (float)point.x + m12 * (float)point.y + tx,
+                m21 * (float)point.x + m22 * (float)point.y + ty,
+            }.as<S>();
+        }
+
+        // Todo: Probably want pre-multiplication rather than post
+        [[nodiscard]] constexpr Transform operator*(const Transform &other) const {
+            return {
+                m11 * other.m11 + m12 * other.m21,
+                m11 * other.m12 + m12 * other.m22,
+                m11 * other.tx + m12 * other.ty + tx,
+                m21 * other.m11 + m22 * other.m21,
+                m21 * other.m12 + m22 * other.m22,
+                m21 * other.tx + m22 * other.ty + ty
+            };
+        }
+
+        static constexpr Transform identity() {
+            return {
+                1, 0, 0,
+                0, 1, 0
+            };
+        }
+
+        static constexpr Transform scale(float xScale, float yScale) {
+            return {
+                xScale, 0, 0,
+                0, yScale, 0
+            };
+        }
+
+        static constexpr Transform rotate(float angle) {
+            return {
+                cosf(angle), -sinf(angle), 0,
+                sinf(angle), cosf(angle), 0
+            };
+        }
+
+        template<numeric_type S>
+        static constexpr Transform translate(Vector2<S> vec) {
+            return {
+                1, 0, (float)vec.x,
+                0, 1, (float)vec.y
+            };
+        }
     };
 
 }

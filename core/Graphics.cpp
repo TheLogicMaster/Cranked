@@ -6,10 +6,172 @@ using namespace cranked;
 Graphics::Graphics(Cranked &cranked)
         : cranked(cranked), heap(cranked.heap), systemFontSources(Rom::readSystemFont("Asheville-Sans-14-Light.pft"), Rom::readSystemFont("Asheville-Sans-14-Bold.pft"), Rom::readSystemFont("Asheville-Sans-14-Light-Oblique.pft")) {}
 
+GrayscaleImage::GrayscaleImage(Bitmap bitmap, float alpha) : GrayscaleImage(bitmap->width, bitmap->height) {
+    for (int y = 0; y < bitmap->height; y++) {
+        for (int x = 0; x < bitmap->width; x++) {
+            if (bitmap->getBufferPixel(x, y))
+                data[y][x] = alpha;
+        }
+    }
+}
+
+void GrayscaleImage::copyInto(Bitmap bitmap, float threshold) const {
+    if (width() != bitmap->width or height() != bitmap->height)
+        throw CrankedError("Image size mismatch");
+    for (int y = 0; y < bitmap->height; y++) {
+        for (int x = 0; x < bitmap->width; x++) {
+            bitmap->setBufferPixel(x, y, data[y][x] >= threshold);
+        }
+    }
+}
+
+void GrayscaleImage::diagonalLines(Bitmap bitmap, int xPhase, int yPhase) const {
+    for (int y = 0; y < bitmap->height; y++)
+        for (int x = 0; x < bitmap->width; x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= (float)((x + y + xPhase + yPhase) % 4) / 4.0f); // Todo: Is this correct for phase values?
+}
+
+void GrayscaleImage::verticalLines(Bitmap bitmap, int xPhase) const {
+    // Todo: This works slightly differently than official implementation (Probably rounding)
+    for (int x = 0; x < bitmap->width; x++) {
+        float threshold = (float)((x + xPhase) % 4) / 4.0f;
+        for (int y = 0; y < bitmap->height; y++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= threshold);
+    }
+}
+
+void GrayscaleImage::horizontalLines(Bitmap bitmap, int yPhase) const {
+    // Todo: This works slightly differently than official implementation (Probably rounding)
+    for (int y = 0; y < bitmap->height; y++) {
+        float threshold = (float)((y + yPhase) % 4) / 4.0f;
+        for (int x = 0; x < bitmap->width; x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= threshold);
+    }
+}
+
+void GrayscaleImage::screenDoor(Bitmap bitmap, int xPhase, int yPhase) const {
+    // Todo: This works differently than official implementation
+    for (int y = 0; y < bitmap->height; y++)
+        for (int x = 0; x < bitmap->width; x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= (float)((x + xPhase) % 2 + (y + yPhase) % 2) / 4.0f);
+}
+
+void GrayscaleImage::bayer2x2(Bitmap bitmap, int xPhase, int yPhase) const {
+    constexpr BayerTable<2> table{};
+    for (int y = 0; y < height(); y++)
+        for (int x = 0; x < width(); x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= table.get(x + xPhase, y + yPhase));
+}
+
+void GrayscaleImage::bayer4x4(Bitmap bitmap, int xPhase, int yPhase) const {
+    constexpr BayerTable<4> table{};
+    for (int y = 0; y < height(); y++)
+        for (int x = 0; x < width(); x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= table.get(x + xPhase, y + yPhase));
+}
+
+void GrayscaleImage::bayer8x8(Bitmap bitmap, int xPhase, int yPhase) const {
+    constexpr BayerTable<8> table{};
+    for (int y = 0; y < height(); y++)
+        for (int x = 0; x < width(); x++)
+            bitmap->setBufferPixel(x, y, data[y][x] >= table.get(x + xPhase, y + yPhase));
+}
+
+void GrayscaleImage::floydSteinberg(Bitmap bitmap) {
+    for (int y = 0; y < height(); y++) {
+        for (int x = 0; x < width(); x++) {
+            float old = data[y][x];
+            bool val = old > 0.5f;
+            auto newVal = (float)val;
+            bitmap->setBufferPixel(x, y, val);
+            float error = old - newVal;
+            diffuseError(x + 1, y, error, 7 / 16.0f);
+            diffuseError(x - 1, y + 1, error, 3 / 16.0f);
+            diffuseError(x + 0, y + 1, error, 5 / 16.0f);
+            diffuseError(x + 1, y + 1, error, 1 / 16.0f);
+        }
+    }
+}
+
+void GrayscaleImage::burkes(Bitmap bitmap) {
+    for (int y = 0; y < height(); y++) {
+        for (int x = 0; x < width(); x++) {
+            float old = data[y][x];
+            bool val = old > 0.5f;
+            auto newVal = (float)val;
+            bitmap->setBufferPixel(x, y, val);
+            float error = old - newVal;
+            diffuseError(x + 1, y, error, 8 / 32.0f);
+            diffuseError(x + 2, y, error, 4 / 32.0f);
+            diffuseError(x - 2, y + 1, error, 2 / 32.0f);
+            diffuseError(x - 1, y + 1, error, 4 / 32.0f);
+            diffuseError(x + 0, y + 1, error, 8 / 32.0f);
+            diffuseError(x + 1, y + 1, error, 4 / 32.0f);
+            diffuseError(x + 2, y + 1, error, 2 / 32.0f);
+        }
+    }
+}
+
+void GrayscaleImage::atkinson(Bitmap bitmap) {
+    for (int y = 0; y < height(); y++) {
+        for (int x = 0; x < width(); x++) {
+            float old = data[y][x];
+            bool val = old > 0.5f;
+            auto newVal = (float)val;
+            bitmap->setBufferPixel(x, y, val);
+            float error = old - newVal;
+            diffuseError(x + 1, y, error, 1 / 8.0f);
+            diffuseError(x + 2, y, error, 1 / 8.0f);
+            diffuseError(x - 1, y + 1, error, 1 / 8.0f);
+            diffuseError(x + 0, y + 1, error, 1 / 8.0f);
+            diffuseError(x + 1, y + 1, error, 1 / 8.0f);
+            diffuseError(x + 0, y + 2, error, 1 / 8.0f);
+        }
+    }
+}
+
+void GrayscaleImage::dither(Bitmap bitmap, DitherType type, int xPhase = 0, int yPhase = 0) {
+    switch (type) {
+        case DitherType::DiagonalLine:
+            diagonalLines(bitmap, xPhase, yPhase);
+        break;
+        case DitherType::VerticalLine:
+            verticalLines(bitmap, xPhase);
+        break;
+        case DitherType::HorizontalLine:
+            horizontalLines(bitmap, yPhase);
+        break;
+        case DitherType::Screen:
+            screenDoor(bitmap, xPhase, yPhase);
+        break;
+        case DitherType::Bayer2x2:
+            bayer2x2(bitmap, xPhase, yPhase);
+        break;
+        case DitherType::Bayer4x4:
+            bayer4x4(bitmap, xPhase, yPhase);
+        break;
+        case DitherType::Bayer8x8:
+            bayer8x8(bitmap, xPhase, yPhase);
+        break;
+        case DitherType::FloydSteinberg:
+            floydSteinberg(bitmap);
+        break;
+        case DitherType::Burkes:
+            burkes(bitmap);
+        break;
+        case DitherType::Atkinson:
+            atkinson(bitmap);
+        break;
+        default:
+        case DitherType::None:
+            break;
+    }
+}
+
 LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked, ResourceType::VideoPlayer, this), frameRate(frameRate), size(size) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(width * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
+        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(width * height / 8, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
         : NativeResource(other.cranked, ResourceType::Bitmap, this), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
@@ -78,25 +240,37 @@ void LCDBitmap_32::setBufferPixel(int x, int y, bool color) {
     word |= color << offset;
 }
 
-void LCDBitmap_32::drawPixel(int x, int y, LCDColor color) {
+void LCDBitmap_32::drawPixel(int x, int y, const Color &color) {
     if (x < 0 or x >= width or y < 0 or y >= height)
         return;
     // Todo: Is pattern offset affected by draw offset?
-    auto c = color.color;
-    if (color.pattern >= 4) {
+    const uint8 *pattern{};
+    LCDSolidColor c{};
+    if (holds_alternative<LCDColor>(color)) {
+        if (cref_t val = get<LCDColor>(color).pattern; val >= 4)
+            pattern = (uint8 *)cranked.fromVirtualAddress(val);
+        else
+            c = (LCDSolidColor)val;
+    } else if (holds_alternative<PatternColor>(color)) {
+        pattern = get<PatternColor>(color).pattern.data();
+    } else if (holds_alternative<DitherColor>(color)) {
+        // Todo
+    }
+    if (pattern) {
         auto row = y % 8;
         auto column = x % 8;
-        auto word = cranked.virtualRead<uint8>(color.pattern + row);
-        auto maskWord = cranked.virtualRead<uint8>(color.pattern + row + 8);
-        if (maskWord & (0x80 >> column))
-            c = word & (0x80 >> column) ? LCDSolidColor::White : LCDSolidColor::Black;
+        auto word = pattern[row];
+        auto maskWord = pattern[row + 8];
+        if (maskWord & 0x80 >> column)
+            c = word & 0x80 >> column ? LCDSolidColor::White : LCDSolidColor::Black;
         else
             c = LCDSolidColor::Clear;
     }
 
     // Todo: Is this even right?
-//        if (c == LCDSolidColor::Clear and mask)
-//            mask->setBufferPixel(x, y, false);
+    if (mask)
+        mask->setBufferPixel(x, y, c != LCDSolidColor::Clear);
+
     if (c == LCDSolidColor::Clear)
         return;
 
@@ -114,62 +288,16 @@ LCDSolidColor LCDBitmap_32::getPixel(int x, int y) const {
 }
 
 // Todo: Could be more efficient using memset and such (Patterns add complexity)
-void LCDBitmap_32::clear(LCDColor color) {
-    if (color.color == LCDSolidColor::Clear) {
+void LCDBitmap_32::clear(const Color &color) {
+    if (auto c = get_if<LCDColor>(&color); c->color == LCDSolidColor::Clear) {
         if (!mask)
             mask = cranked.heap.construct<LCDBitmap_32>(cranked, width, height);
-        else
+        else if (mask != this) // Avoid infinite loop
             mask->clear(color);
     }
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
             drawPixel(x, y, color);
-}
-
-void LCDBitmap_32::drawLine(int x1, int y1, int x2, int y2, LCDColor color) {
-    // Todo: Line ending styles
-    // Todo: Draws slightly differently from official implementation, steps differently
-    bool vertical = abs(y2 - y1) > abs(x2 - x1);
-    if (vertical) {
-        swap(x1, y1);
-        swap(x2, y2);
-    }
-    if (x1 > x2) {
-        swap(x1, x2);
-        swap(y1, y2);
-    }
-    int dx = x2 - x1;
-    int dy = abs(y2 - y1);
-    int err = dx / 2;
-    int yStep = y1 < y2 ? 1 : -1;
-    for (; x1 <= x2; x1++) {
-        if (vertical)
-            drawPixel(y1, x1, color);
-        else
-            drawPixel(x1, y1, color);
-        err -= dy;
-        if (err < 0) { // Todo: Maybe err check should happen before first draw
-            y1 += yStep;
-            err += dx;
-            if (vertical)
-                drawPixel(y1, x1, color);
-            else
-                drawPixel(x1, y1, color);
-        }
-    }
-}
-
-// Todo: Can be more efficient since it's done in horizontal segments
-void LCDBitmap_32::fillRect(int x, int y, int w, int h, LCDColor color) {
-    for (int i = 0; i < h; i++) {
-        if (y + i >= height)
-            break;
-        for (int j = 0; j < w; j++) {
-            if (x + j >= width)
-                break;
-            drawPixel(x, y, color);
-        }
-    }
 }
 
 // Todo: Can be more efficient
@@ -322,7 +450,10 @@ DisplayContext::DisplayContext(Bitmap bitmap, FontFamily fonts) : bitmap(bitmap)
 
 DisplayContext &Graphics::pushContext(Bitmap target) {
     // Todo: Should this copy the existing context? Do fonts always default to system fonts?
-    return displayContextStack.emplace_back(getCurrentDisplayContext());
+    auto &ctx = displayContextStack.emplace_back(getCurrentDisplayContext());
+    if (target)
+        ctx.bitmap = target;
+    return ctx;
 }
 
 void Graphics::popContext() {
@@ -331,32 +462,80 @@ void Graphics::popContext() {
     displayContextStack.pop_back();
 }
 
-void Graphics::drawPixel(int x, int y, LCDColor color, bool ignoreOffset) {
+void Graphics::drawPixel(int x, int y, const Color &color, bool ignoreOffset) {
     ZoneScoped;
     auto &context = getCurrentDisplayContext();
     auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
         return;
-    context.bitmap->drawPixel(pos.x, pos.y, color);
+    if (context.stencil) {
+        int stencilX = pos.x, stencilY = pos.y;
+        if (stencilX < 0 or stencilY < 0) return;
+        if (context.stencilTiled) {
+            stencilX %= context.stencil->width;
+            stencilY %= context.stencil->height;
+        } else if (x >= context.stencil->width or y >= context.stencil->height)
+            return;
+        if (context.stencil->getPixel(stencilX, stencilY) == LCDSolidColor::Black)
+            return;
+    }
+    context.getTargetBitmap()->drawPixel(pos.x, pos.y, color);
 }
 
 LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
     auto &context = getCurrentDisplayContext();
     auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
-    return context.bitmap->getPixel(pos.x, pos.y);
+    return context.getTargetBitmap()->getPixel(pos.x, pos.y);
 }
 
-void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, LCDColor color) {
-    auto &context = getCurrentDisplayContext();
-    auto start = IntVec2{x1, y1} + context.drawOffset;
-    auto end = IntVec2{x2, y2} + context.drawOffset;
-    // Todo: Clipping
-    // Todo: Width
+void Graphics::drawLine(int x1, int y1, int x2, int y2, const Color &color) {
+    bool vertical = abs(y2 - y1) > abs(x2 - x1);
+    if (vertical) {
+        swap(x1, y1);
+        swap(x2, y2);
+    }
+    if (x1 > x2) {
+        swap(x1, x2);
+        swap(y1, y2);
+    }
+    int dx = x2 - x1;
+    int dy = abs(y2 - y1);
+    int err = dx / 2;
+    int yStep = y1 < y2 ? 1 : -1;
+    for (; x1 <= x2; x1++) {
+        if (vertical)
+            drawPixel(y1, x1, color);
+        else
+            drawPixel(x1, y1, color);
+        err -= dy;
+        if (err < 0) { // Todo: Maybe err check should happen before first draw
+            y1 += yStep;
+            err += dx;
+            if (vertical)
+                drawPixel(y1, x1, color);
+            else
+                drawPixel(x1, y1, color);
+        }
+    }
+}
+
+void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, const Color &color) {
     // Todo: Line caps
-    context.bitmap->drawLine(start.x, start.y, end.x, end.y, color);
+    // Todo: Draws slightly differently from official implementation, steps differently
+    // Todo: A DDA algorithm for thickness would be better
+    Vec2 tangent = IntVec2{ y2 - y1, x2 - x1 }.as<float>().normalized();
+    int steps = (int)ceilf((float)width / 2.0f);
+    for (int i = 0; i < steps; i++) {
+        Vec2 offset = (tangent * i);
+        int xOff = (int)round(offset.x);
+        int yOff = (int)round(offset.y);
+        drawLine(x1 + xOff, y1 + yOff, x2 + xOff, y2 + yOff, color);
+        if (i > 0 and (steps % 2 == 0 or i < width - 1))
+            drawLine(x1 - xOff, y1 - yOff, x2 - xOff, y2 - yOff, color);
+    }
 }
 
-void Graphics::drawRect(int x, int y, int width, int height, LCDColor color) {
+void Graphics::drawRect(int x, int y, int width, int height, const Color &color) {
     auto &context = getCurrentDisplayContext();
     auto shift = 2 * context.lineWidth;
     if (context.strokeLocation == StrokeLocation::Inside) {
@@ -376,22 +555,22 @@ void Graphics::drawRect(int x, int y, int width, int height, LCDColor color) {
     drawLine(x, y + height, x + width, y + height, context.lineWidth, color);
 }
 
-void Graphics::fillRect(int x, int y, int width, int height, LCDColor color) {
+void Graphics::fillRect(int x, int y, int width, int height, const Color &color) {
     for (int i = 0; i < height; i++)
         drawLine(x, y + i, x + width - 1, y + i, 1, color);
 }
 
-void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
+void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, const Color &color) {
     // Todo
     drawRect(x, y, width, height, color);
 }
 
-void Graphics::fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color) {
+void Graphics::fillRoundRect(int x, int y, int width, int height, int radius, const Color &color) {
     // Todo
     fillRect(x, y, width, height, color);
 }
 
-void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
+void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color) {
     auto lineWidth = getCurrentDisplayContext().lineWidth;
     drawLine(x1, y1, x2, y2, lineWidth, color);
     drawLine(x1, y1, x3, y3, lineWidth, color);
@@ -400,7 +579,7 @@ void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
 
 void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, optional<IntRect> sourceRect) {
     ZoneScoped;
-    // Todo: This could be heavly optimized with bitwise operations
+    // Todo: This could be heavily optimized with bitwise operations
     auto &context = getCurrentDisplayContext();
     auto mode = context.bitmapDrawMode;
     bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
@@ -468,7 +647,7 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
     const char *string = (const char *) text;
     auto &context = getCurrentDisplayContext();
     if (!font)
-        font = (context.getFont(PDFontVariant::Normal) ? context.getFont(PDFontVariant::Normal) : getSystemFont()).get();
+        font = context.getFont(PDFontVariant::Normal) ? context.getFont(PDFontVariant::Normal) : getSystemFont();
     for (int i = 0; i < len; i++) {
         char character = string[i];
         int pageIndex = 0; // Todo: Temp ascii
@@ -481,7 +660,7 @@ void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, in
     }
 }
 
-void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color) {
+void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color) {
     int a, b, y, last;
     if (y1 > y2) {
         swap(y1, y2);
@@ -524,10 +703,10 @@ void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
     }
     sa = dx23 * (y - y2);
     sb = dx13 * (y - y1);
-    for (; y <= last; y++) {
-        a = x1 + sa / dy23;
+    for (; y <= y3; y++) {
+        a = x2 + sa / dy23;
         b = x1 + sb / dy13;
-        sa += dx12;
+        sa += dx23;
         sb += dx13;
         if (a > b)
             swap(a, b);
@@ -535,7 +714,7 @@ void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDC
     }
 }
 
-void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, LCDColor color, bool filled) {
+void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, const Color &color, bool filled) {
     // Todo: The angle checks need normalization
     int xc = rectX + width / 2;
     int yc = rectY + height / 2;
@@ -623,11 +802,11 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
     }
 }
 
-void Graphics::fillPolygon(int32 *coords, int32 points, LCDColor color, LCDPolygonFillRule fillType) {
-
+void Graphics::fillPolygon(int32 *coords, int32 points, const Color &color, LCDPolygonFillRule fillType) {
+    // Todo
 }
 
-void Graphics::drawPolygon(int32 *coords, int32 points, LCDColor color) {
+void Graphics::drawPolygon(int32 *coords, int32 points, const Color &color) {
     if (!points)
         return;
     for (int i = 0; i < points - 1; i++)
@@ -657,36 +836,136 @@ Bitmap Graphics::scaleBitmap(Bitmap bitmap, float xScale, float yScale) {
 void Graphics::drawRotatedBitmap(Bitmap bitmap, int x, int y, float angle, float centerX, float centerY, float xScale, float yScale) {
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = rotateBitmap(bitmap, angle, centerX, centerY, xScale, yScale);
-    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+    // Todo: Image position is slightly off
+    drawBitmap(ref.get(), x - (int)(centerX * (float)ref->width), y - (int)(centerY * (float)ref->height), GraphicsFlip::Unflipped);
 }
 
 Bitmap Graphics::rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale) {
-    auto rotated = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height); // Actual size will be different
+    // Todo: Optimizations for axis-aligned rotations
+    // Todo: Rotate bitmaps using three shears method?: https://gautamnagrawal.medium.com/rotating-image-by-any-angle-shear-transformation-using-only-numpy-d28d16eb5076
+    Vec2 offset{ centerX * (float)bitmap->width, centerY * (float)bitmap->height };
+    // Todo: Image position is slightly off
+    auto affine =
+        Transform::translate(offset)
+        * Transform::rotate(angle * numbers::pi_v<float> / 180)
+        * Transform::translate(-offset)
+        * Transform::scale(xScale, yScale);
+    return transformBitmap(bitmap, affine);
+}
+
+void Graphics::drawTransformedBitmap(Bitmap bitmap, const Transform &transform, int x, int y) {
+    // Todo: Making a copy each time is probably not particularly efficient
+    BitmapRef ref = transformBitmap(bitmap, transform);
+    drawBitmap(ref.get(), x - ref->width / 2, y - ref->height / 2, GraphicsFlip::Unflipped); // Coordinates are centered
+}
+
+Bitmap Graphics::transformBitmap(Bitmap bitmap, const Transform &transform) {
+    vector corners {
+        transform * IntVec2{0, 0},
+        transform * IntVec2{bitmap->width, 0},
+        transform * IntVec2{0, bitmap->height},
+        transform * IntVec2{bitmap->width, bitmap->height}
+    };
+    IntVec2 minBound = corners[0].as<int32>(), maxBound = corners[0].as<int32>();
+    for (auto [x, y] : corners) {
+        minBound = { min(minBound.x, x), min(minBound.y, y) };
+        maxBound = { max(maxBound.x, x), max(maxBound.y, y) };
+    }
+
+    auto transformed = heap.construct<LCDBitmap_32>(cranked, maxBound.x + 1, maxBound.y + 1);
     if (bitmap->mask)
-        rotated->mask = rotateBitmap(bitmap->mask.get(), angle, centerX, centerY, xScale, yScale);
-    // Todo
-    return rotated;
+        transformed->mask = transformBitmap(bitmap->mask.get(), transform);
+
+    Transform inv = transform.invert();
+
+    for (int y = minBound.y; y <= maxBound.y; y++) {
+        for (int x = minBound.x; x <= maxBound.x; x++) {
+            IntVec2 point{ x, y };
+            IntVec2 srcPoint = inv * point;
+            if (srcPoint.x < 0 or srcPoint.y < 0 or srcPoint.x >= bitmap->width or srcPoint.y >= bitmap->height)
+                continue;
+            transformed->setBufferPixel(x, y, bitmap->getBufferPixel(srcPoint.x, srcPoint.y));
+        }
+    }
+
+    return transformed;
+}
+
+void Graphics::drawSampledBitmap(Bitmap image, int x, int y, int width, int height, float centerX, float centerY, float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile) {
+    // Todo: How is this actually supposed to work? Take Z and tilt to apply perspective, apply affine, then texture?
+    // Todo: Does not respect bitmap drawing modes
+    Transform affine{ dxx, dxy, dx, dyy, dyx, dy };
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            IntVec2 point{ j + x, i + y };
+            IntVec2 srcPoint = affine * point;
+            if (tile) {
+                srcPoint.x = srcPoint.x % image->width;
+                if (srcPoint.x < 0)
+                    srcPoint.x += image->width;
+                srcPoint.y = srcPoint.y % image->height;
+                if (srcPoint.y < 0)
+                    srcPoint.y += image->height;
+            } else if (srcPoint.x < 0 or srcPoint.y < 0 or srcPoint.x >= image->width or srcPoint.y >= image->height)
+                continue;
+            drawPixel(point.x, point.y, image->getBufferPixel(srcPoint.x, srcPoint.y));
+        }
+    }
 }
 
 void Graphics::drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase) {
+    // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = blurredBitmap(bitmap, radius, numPasses, type, false, xPhase, yPhase);
     drawBitmap(ref.get(), x, y, flip);
 }
 
-Bitmap Graphics::blurredBitmap(Bitmap bitmap, float radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase) {
-    auto blurred = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
-    // Todo
+Bitmap Graphics::blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase) {
+    // Todo: Use moving window or something for performance
+    // Todo: Support multiple passes and edge padding
+    // Todo: No diffusion option is a blank image?
+    // Todo: This is probably using the mask image incorrectly
+    auto blurred = heap.construct<LCDBitmap_32>(*bitmap);
+    if (bitmap->mask) {
+        blurred->mask = blurredBitmap(bitmap->mask.get(), radius, numPasses, type, padEdges, xPhase, yPhase);
+        return blurred;
+    }
+    GrayscaleImage grayscale{ bitmap->width, bitmap->height };
+    for (int y = 0; y < bitmap->height; y++)
+        for (int x = 0; x < bitmap->width; x++)
+            grayscale[y][x] = (float)bitmap->getBufferPixel(x, y);
+    GrayscaleImage grayscaleBlurred{ bitmap->width, bitmap->height };
+    for (int y = 0; y < bitmap->height; y++) {
+        for (int x = 0; x < bitmap->width; x++) {
+            float sum{};
+            for (int i = -radius; i <= radius; i++) {
+                for (int j = -radius; j <= radius; j++) {
+                    int px = x + j, py = y + i;
+                    if (px >= 0 and py >= 0 and px < grayscale.width() and py < grayscale.height())
+                        sum += grayscale[py][px];
+                }
+            }
+            grayscaleBlurred[y][x] = sum / (((float)radius * 2 + 1) * ((float)radius * 2 + 1));
+        }
+    }
+    grayscaleBlurred.dither(blurred, type, xPhase, yPhase);
     return blurred;
 }
 
 void Graphics::drawFadedBitmap(Bitmap bitmap, int x, int y, float alpha, DitherType type) {
+    // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = fadedBitmap(bitmap, alpha, type);
     drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
 }
 
 Bitmap Graphics::fadedBitmap(Bitmap bitmap, float alpha, DitherType type) {
-    auto faded = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height);
-    // Todo
+    // Todo: Supposed to act on mask if present, should do same operation to both or just mask?
+    auto faded = heap.construct<LCDBitmap_32>(*bitmap);
+    if (bitmap->mask) {
+        faded->mask = fadedBitmap(bitmap->mask.get(), alpha, type);
+        return faded;
+    }
+    GrayscaleImage grayscale{ bitmap, alpha };
+    grayscale.dither(faded, type);
     return faded;
 }
 
@@ -699,8 +978,16 @@ Bitmap Graphics::invertedBitmap(Bitmap bitmap) {
 }
 
 Bitmap Graphics::blendedBitmap(Bitmap bitmap, Bitmap other, float alpha, DitherType type) {
-    auto blended = heap.construct<LCDBitmap_32>(cranked, bitmap->width, bitmap->height); // Size is probably either intersection or bitmap's
-    // Todo
+    auto blended = heap.construct<LCDBitmap_32>(cranked, max(bitmap->width, other->width), max(bitmap->height, other->height));
+    GrayscaleImage grayscale{ blended->width, blended->height };
+    float otherAlpha = 1 - alpha;
+    for (int y = 0; y < bitmap->height; y++)
+        for (int x = 0; x < bitmap->width; x++)
+            grayscale[y][x] = (float)bitmap->getBufferPixel(x, y) * alpha;
+    for (int y = 0; y < other->height; y++)
+        for (int x = 0; x < other->width; x++)
+            grayscale[y][x] += (float)other->getBufferPixel(x, y) * otherAlpha;
+    grayscale.dither(blended, type);
     return blended;
 }
 
@@ -763,7 +1050,7 @@ void Graphics::updateSprites() {
 
 void Graphics::drawSprites() {
     auto &context = getCurrentDisplayContext();
-    context.bitmap->clear(context.backgroundColor);
+    context.bitmap->clear(LCDColor(context.backgroundColor));
     // Todo: Dirty rect support
     auto sprites = vector(spriteDrawList);
     stable_sort(sprites.begin(), sprites.end(), [](const SpriteRef &a, const SpriteRef &b) { return a->zIndex < b->zIndex; }); // Todo: Does this need to be a stable sort within same Z layer?
@@ -863,14 +1150,14 @@ Font Graphics::getFont(const uint8 *data, bool wide) {
 }
 
 Font Graphics::getSystemFont(PDFontVariant variant) {
-    return systemFonts.getFont(variant).get();
+    return systemFonts.getFont(variant);
 }
 
 void Graphics::init() {
     frameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     previousFrameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     for (int i = 0; i < 3; i++)
-        systemFonts.getFont((PDFontVariant) i) = getFont(systemFontSources[i]);
+        systemFonts.setFont((PDFontVariant) i, getFont(systemFontSources[i]));
     frameBufferContext = DisplayContext(frameBuffer.get(), systemFonts);
 }
 
@@ -904,8 +1191,8 @@ void Graphics::update() {
     ZoneScoped;
     frameBufferContext.clipRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
     // Todo: Is this supposed to be done here?
-    while (!displayContextStack.empty())
-        popContext();
+    displayContextStack.clear();
+    frameBufferContext = DisplayContext(frameBuffer.get(), systemFonts);
 }
 
 void Graphics::flushDisplayBuffer() {

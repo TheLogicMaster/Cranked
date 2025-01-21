@@ -7,7 +7,10 @@ using namespace cranked;
 // Todo: Use new functions (setResourceElement/setResourceField, returnValues, rectFromArgs, intRectFromArgs, LuaValRet without calling pushResource/pushRect/pushVec)
 
 static LuaRet import_lua(Cranked *cranked, const char *name) {
-    // Todo: Properly normailze paths
+    string nameStr = name;
+    if (nameStr.ends_with(".png")) // Todo: Better way to handle legacy looking imports of asset files (Seen in Mode7Driver)
+        return 0;
+    // Todo: Properly normalize paths
     if (cranked->luaEngine.loadedLuaFiles.contains(name))
         return 0;
     for (auto &file: cranked->rom->pdzFiles)
@@ -391,7 +394,7 @@ static LuaValRet playdate_graphics_image_new_lua(Cranked *cranked, LuaVal width,
             return pushNil(cranked);
         }
     } else {
-        image = cranked->graphics.createBitmap(width, height);
+        image = cranked->graphics.createBitmap(width.asInt(), height);
         image->clear(bgcolor.isNil() ? LCDSolidColor::Clear : bgcolor.asEnum<LCDSolidColor>());
     }
     return pushResource(cranked, image);
@@ -514,28 +517,25 @@ static LuaValRet playdate_graphics_image_rotatedImage_lua(Cranked *cranked, Bitm
 }
 
 static void playdate_graphics_image_drawScaled_lua(Cranked *cranked, Bitmap image, int x, int y, float scale, LuaVal yScale) {
-    float scaleY = yScale.isNumeric() ? yScale.asFloat() : 1.0f;
+    float scaleY = yScale.isNumeric() ? yScale.asFloat() : scale;
     cranked->graphics.drawScaledBitmap(image, x, y, scale, scaleY);
 }
 
 static LuaValRet playdate_graphics_image_scaledImage_lua(Cranked *cranked, Bitmap image, float scale, LuaVal yScale) {
-    float scaleY = yScale.isNumeric() ? yScale.asFloat() : 1.0f;
+    float scaleY = yScale.isNumeric() ? yScale.asFloat() : scale;
     return pushResource(cranked, cranked->graphics.scaleBitmap(image, scale, scaleY));
 }
 
-static void playdate_graphics_image_drawWithTransform_lua(Cranked *cranked, Bitmap image, LuaVal xform, int x, int y) {
-    // Coordinates are centered
-    // Todo
+static void playdate_graphics_image_drawWithTransform_lua(Cranked *cranked, Bitmap image, Transform xform, int x, int y) {
+    cranked->graphics.drawTransformedBitmap(image, xform, x, y);
 }
 
-static LuaRet playdate_graphics_image_transformedImage_lua(Cranked *cranked, Bitmap image) {
-    // Todo
-    return 0;
+static LuaValRet playdate_graphics_image_transformedImage_lua(Cranked *cranked, Bitmap image, Transform xform) {
+    return pushResource(cranked, cranked->graphics.transformBitmap(image, xform));
 }
 
 static void playdate_graphics_image_drawSampled_lua(Cranked *cranked, Bitmap image, int x, int y, int width, int height, float centerX, float centerY, float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile) {
-    // Basically `Mode 7`
-    // Todo
+    cranked->graphics.drawSampledBitmap(image, x, y, width, height, centerX, centerY, dxx, dyx, dxy, dyy, dx, dy, z, tiltAngle, tile);
 }
 
 static void playdate_graphics_image_setMaskImage_lua(Cranked *cranked, Bitmap image, Bitmap maskImage) {
@@ -610,7 +610,7 @@ static LuaValRet playdate_graphics_image_blendWithImage_lua(Cranked *cranked, Bi
     return pushResource(cranked, cranked->graphics.blendedBitmap(self, image, alpha, ditherType));
 }
 
-static LuaValRet playdate_graphics_image_blurredImage_lua(Cranked *cranked, Bitmap image, float radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
+static LuaValRet playdate_graphics_image_blurredImage_lua(Cranked *cranked, Bitmap image, int radius, int numPasses, DitherType ditherType, bool padEdges, int xPhase, int yPhase) {
     return pushResource(cranked, cranked->graphics.blurredBitmap(image, radius, numPasses, ditherType, padEdges, xPhase, yPhase));
 }
 
@@ -636,8 +636,9 @@ static bool playdate_graphics_checkAlphaCollision_lua(Cranked *cranked, Bitmap i
 }
 
 static void playdate_graphics_setColor_lua(Cranked *cranked, LCDSolidColor color) {
-    // Todo: Disable pattern/stencil stuff
-    cranked->graphics.getCurrentDisplayContext().drawingColor = color;
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    ctx.color = color;
+    ctx.drawingColor = color;
 }
 
 static LCDSolidColor playdate_graphics_getColor_lua(Cranked *cranked) {
@@ -649,23 +650,34 @@ static LCDSolidColor playdate_graphics_getBackgroundColor_lua(Cranked *cranked) 
 }
 
 static void playdate_graphics_setPattern_lua(Cranked *cranked, LuaVal pattern, int x, int y) {
-    // Todo
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    if (pattern.isUserdataObject()) {
+        // Todo
+    } else {
+        auto &color = ctx.color.emplace<PatternColor>();
+        for (int i = 0; i < 8; i++)
+            color.pattern[i] = pattern.getIntElement(i + 1);
+        if (auto firstMask = pattern.getElement(9); !lua_isnil(cranked->getLuaContext(), firstMask.val)) {
+            for (int i = 8; i < 16; i++)
+                color.pattern[i] = pattern.getIntElement(i + 1);
+        } else
+            memset(color.pattern.data() + 8, 0xFF, 8);
+    }
 }
 
 static void playdate_graphics_setDitherPattern_lua(Cranked *cranked, float alpha, DitherType ditherType) {
     auto &ctx = cranked->graphics.getCurrentDisplayContext();
-    ctx.ditherAlpha = alpha;
-    ctx.ditherPattern = ditherType;
-    ctx.usingDither = true;
-    ctx.usingStencil = false;
+    ctx.color = DitherColor{ ditherType, alpha };
 }
 
-static void playdate_graphics_drawLine_lua(Cranked *cranked, LuaVal x1, int y1, int x2, int y2) {
+static void playdate_graphics_drawLine_lua(Cranked *cranked, LuaVal x1, int y1, int x2, int y2, int lineWidth) {
     auto &context = cranked->graphics.getCurrentDisplayContext();
+    if (lineWidth == 0) // Todo: Is undocumented line width parameter also used for line segment override?
+        lineWidth = context.lineWidth;
     if (x1.isTable())
-        cranked->graphics.drawLine(x1.getIntField("x1"), x1.getIntField("y1"), x1.getIntField("x2"), x1.getIntField("y2"), context.lineWidth, context.drawingColor);
+        cranked->graphics.drawLine(x1.getIntField("x1"), x1.getIntField("y1"), x1.getIntField("x2"), x1.getIntField("y2"), lineWidth, context.color);
     else
-        cranked->graphics.drawLine(x1.asInt(), y1, x2, y2, context.lineWidth, context.drawingColor);
+        cranked->graphics.drawLine(x1.asInt(), y1, x2, y2, lineWidth, context.color);
 }
 
 static void playdate_graphics_setLineCapStyle_lua(Cranked *cranked, LCDLineCapStyle style) {
@@ -674,41 +686,41 @@ static void playdate_graphics_setLineCapStyle_lua(Cranked *cranked, LCDLineCapSt
 
 static void playdate_graphics_drawPixel_lua(Cranked *cranked, LuaVal x, int y) {
     if (x.isTable())
-        cranked->graphics.drawPixel(x.getIntField("x"), x.getIntField("y"), cranked->graphics.getCurrentDisplayContext().drawingColor);
+        cranked->graphics.drawPixel(x.getIntField("x"), x.getIntField("y"), cranked->graphics.getCurrentDisplayContext().color);
     else
-        cranked->graphics.drawPixel(x.asInt(), y, cranked->graphics.getCurrentDisplayContext().drawingColor);
+        cranked->graphics.drawPixel(x.asInt(), y, cranked->graphics.getCurrentDisplayContext().color);
 }
 
 static void playdate_graphics_drawRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h) {
     auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        cranked->graphics.drawRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
+        cranked->graphics.drawRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.color);
     else
-        cranked->graphics.drawRect(x.asInt(), y, w, h, context.drawingColor);
+        cranked->graphics.drawRect(x.asInt(), y, w, h, context.color);
 }
 
 static void playdate_graphics_fillRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h) {
     auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        cranked->graphics.fillRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.drawingColor);
+        cranked->graphics.fillRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), context.color);
     else
-        cranked->graphics.fillRect(x.asInt(), y, w, h, context.drawingColor);
+        cranked->graphics.fillRect(x.asInt(), y, w, h, context.color);
 }
 
 static void playdate_graphics_drawRoundRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h, int radius) {
     auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        cranked->graphics.drawRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
+        cranked->graphics.drawRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.color);
     else
-        cranked->graphics.drawRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
+        cranked->graphics.drawRoundRect(x.asInt(), y, w, h, radius, context.color);
 }
 
 static void playdate_graphics_fillRoundRect_lua(Cranked *cranked, LuaVal x, int y, int w, int h, int radius) {
     auto &context = cranked->graphics.getCurrentDisplayContext();
     if (x.isTable())
-        cranked->graphics.fillRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.drawingColor);
+        cranked->graphics.fillRoundRect(x.getIntField("x"), x.getIntField("y"), x.getIntField("width"), x.getIntField("height"), y, context.color);
     else
-        cranked->graphics.fillRoundRect(x.asInt(), y, w, h, radius, context.drawingColor);
+        cranked->graphics.fillRoundRect(x.asInt(), y, w, h, radius, context.color);
 }
 
 static void drawEllipse(Cranked *cranked, LuaVal arg1, bool filled) {
@@ -719,10 +731,10 @@ static void drawEllipse(Cranked *cranked, LuaVal arg1, bool filled) {
         rect = arg1.asIntRect();
         startAngleArg = arg1 + 1;
     } else
-        rect = {arg1.asInt(), (arg1 + 1).asInt(), (arg1 + 2).asInt(), (arg1 + 3).asInt()};
+        rect = {arg1.asInt(), (arg1 + 1).asInt(), (arg1 + 2).asInt() - 1, (arg1 + 3).asInt() - 1};
     float startAngle = startAngleArg.asFloat();
     float endAngle = (startAngleArg + 1).isNil() ? 360 : (startAngleArg + 1).asFloat();
-    cranked->graphics.drawEllipse(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, context.lineWidth, startAngle, endAngle, context.drawingColor, filled);
+    cranked->graphics.drawEllipse(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, context.lineWidth, startAngle, endAngle, context.color, filled);
 }
 
 static void playdate_graphics_drawEllipseInRect_lua(Cranked *cranked, LuaVal arg1) {
@@ -755,13 +767,13 @@ static vector<int32> getPolygonPoints(Cranked *cranked, LuaVal arg) {
 
 static void playdate_graphics_drawPolygon_lua(Cranked *cranked, LuaVal arg1) {
     auto points = getPolygonPoints(cranked, arg1);
-    cranked->graphics.drawPolygon(points.data(), (int)points.size() / 2, cranked->graphics.getCurrentDisplayContext().drawingColor);
+    cranked->graphics.drawPolygon(points.data(), (int)points.size() / 2, cranked->graphics.getCurrentDisplayContext().color);
 }
 
 static void playdate_graphics_fillPolygon_lua(Cranked *cranked, LuaVal arg1) {
     auto points = getPolygonPoints(cranked, arg1);
     auto &ctx = cranked->graphics.getCurrentDisplayContext();
-    cranked->graphics.fillPolygon(points.data(), (int)points.size() / 2, ctx.drawingColor, ctx.polygonFillRule);
+    cranked->graphics.fillPolygon(points.data(), (int)points.size() / 2, ctx.color, ctx.polygonFillRule);
 }
 
 static void playdate_graphics_setPolygonFillRule_lua(Cranked *cranked, LCDPolygonFillRule rule) {
@@ -769,11 +781,11 @@ static void playdate_graphics_setPolygonFillRule_lua(Cranked *cranked, LCDPolygo
 }
 
 static void playdate_graphics_drawTriangle_lua(Cranked *cranked, int x1, int y1, int x2, int y2, int x3, int y3) {
-    cranked->graphics.drawTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().drawingColor);
+    cranked->graphics.drawTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().color);
 }
 
 static void playdate_graphics_fillTriangle_lua(Cranked *cranked, int x1, int y1, int x2, int y2, int x3, int y3) {
-    cranked->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().drawingColor);
+    cranked->graphics.fillTriangle(x1, y1, x2, y2, x3, y3, cranked->graphics.getCurrentDisplayContext().color);
 }
 
 static float playdate_graphics_perlin_lua(Cranked *cranked, float x, float y, float z, int repeat, int octaves, float persistence) {
@@ -816,16 +828,16 @@ static LuaRet playdate_graphics_getScreenClipRect_lua(Cranked *cranked) {
 
 static void playdate_graphics_setStencilImage_lua(Cranked *cranked, Bitmap image, bool tile) {
     auto &ctx = cranked->graphics.getCurrentDisplayContext();
-    ctx.stencilImage = image;
+    ctx.stencil = image;
     ctx.stencilTiled = tile;
 }
 
 static void playdate_graphics_setStencilPattern_lua(Cranked *cranked, LuaVal arg1) {
-    // Todo
+    // Todo: Can this just be implemented as creating an image, adding the pattern or dither, then setting it as the stencil?
 }
 
 static void playdate_graphics_clearStencil_lua(Cranked *cranked) {
-    // Todo
+    cranked->graphics.getCurrentDisplayContext().stencil = nullptr;
 }
 
 static LCDBitmapDrawMode playdate_graphics_getImageDrawMode_lua(Cranked *cranked) {
@@ -1331,11 +1343,11 @@ static LuaValRet playdate_graphics_tilemap_getCollisionRects_lua(Cranked *cranke
 }
 
 static void playdate_graphics_setFont_lua(Cranked *cranked, Font font, PDFontVariant variant) {
-    cranked->graphics.getCurrentDisplayContext().getFont(variant) = font;
+    cranked->graphics.getCurrentDisplayContext().setFont(variant, font);
 }
 
 static LuaValRet playdate_graphics_getFont_lua(Cranked *cranked, PDFontVariant variant) {
-    return pushResource(cranked, cranked->graphics.getCurrentDisplayContext().getFont(variant).get());
+    return pushResource(cranked, cranked->graphics.getCurrentDisplayContext().getFont(variant));
 }
 
 static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFamily) {
@@ -1343,7 +1355,7 @@ static void playdate_graphics_setFontFamily_lua(Cranked *cranked, LuaVal fontFam
         auto font = fontFamily.getElement(i);
         if (font.val.isNil())
             continue;
-        cranked->graphics.getCurrentDisplayContext().getFont((PDFontVariant)i) = font.val.asUserdataObject<Font>();
+        cranked->graphics.getCurrentDisplayContext().setFont((PDFontVariant)i, font.val.asUserdataObject<Font>());
     }
 }
 
@@ -1448,10 +1460,11 @@ static LuaValRet playdate_graphics_sprite_new_lua(Cranked *context, LuaVal image
     if (imageOrTilemap.isTable()) { // Todo: Helper checks for correct argument?
         if (LuaValGuard metaTable(imageOrTilemap.getMetaTable()); not metaTable.val.isNil()) {
             if (auto str = metaTable.val.getStringField("__name")) {
-                if (string name = str; name == "playdate.graphics.tilemap")
+                if (string name = str; name == "playdate.graphics.tilemap") {
                     sprite->tileMap = imageOrTilemap.asUserdataObject<TileMap>();
-                else if (name == "playdate.graphics.image")
-                    sprite->image = imageOrTilemap.asUserdataObject<Bitmap>();
+                    // Todo: Fix bound and such like setImage does
+                } else if (name == "playdate.graphics.image")
+                    sprite->setImage(imageOrTilemap.asUserdataObject<Bitmap>());
             }
         }
     }
@@ -1711,7 +1724,8 @@ static LuaRet moveOrCheckCollisions(LuaVal spriteVal, LuaVal arg1, LuaVal arg2, 
     bool hasResponseFunc = response.val.isFunction();
     auto responseType = hasResponseFunc ? Bump::ResponseType{} : response.val.asCollisionResponse();
     auto [actual, collisions] = cranked->bump.move(sprite, goal, sim, [&](Sprite a, Sprite b){
-        // Todo: Group mask checking
+        if (a->collidesWithGroupMask and b->groupMask and not (a->collidesWithGroupMask & b->groupMask))
+            return Bump::ResponseType::Ignore;
         if (hasResponseFunc) {
             lua_pushvalue(context, response.val);
             pushResource(cranked, a);

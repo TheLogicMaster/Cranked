@@ -135,6 +135,7 @@ namespace cranked {
         }
 
     private:
+        // Todo: How should a max number of cells be implemented? Cramming everything past max distance into edge cells?
         static inline const float DELTA = 1e-10;
         static inline const int CELL_SIZE = 64; // Todo: Correct value? Should probably be smaller to be effective?
 

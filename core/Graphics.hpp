@@ -19,6 +19,91 @@ namespace cranked {
         cref_t pattern;
     };
 
+    struct PatternColor {
+        array<uint8, 16> pattern;
+    };
+
+    struct DitherColor {
+        DitherType type;
+        float alpha;
+    };
+
+    using Color = variant<LCDColor, PatternColor, DitherColor>;
+
+    template<int N>
+    class BayerTable {
+    public:
+        constexpr BayerTable() : table() {
+            for (int i = 0; i < N * N; i++) {
+                const int q = i ^ i >> 3;
+                table[i] = (float)((i & 4) >> 2 | (q & 4) >> 1 | (i & 2) << 1 | (q & 2) << 2 | (i & 1) << 4 | (q & 1) << 5) / (float)(N * N);
+            }
+        }
+
+        [[nodiscard]] constexpr float get(int x, int y) const {
+            return table[y % N * N + x % N];
+        }
+
+    private:
+        float table[N * N];
+    };
+
+    class GrayscaleImage {
+    public:
+        GrayscaleImage(int width, int height) {
+            data.resize(height);
+            for (auto &row : data)
+                row.resize(width);
+        }
+
+        explicit GrayscaleImage(Bitmap bitmap, float alpha = 1);
+
+        [[nodiscard]] int height() const {
+            return (int)data.size();
+        }
+
+        [[nodiscard]] int width() const {
+            return height() == 0 ? 0 : (int)data[0].size();
+        }
+
+        vector<float> &operator[](int row) {
+            return data[row];
+        }
+
+        void copyInto(Bitmap bitmap, float threshold = numeric_limits<float>::epsilon()) const;
+
+        void diagonalLines(Bitmap bitmap, int xPhase, int yPhase) const;
+
+        void verticalLines(Bitmap bitmap, int xPhase) const;
+
+        void horizontalLines(Bitmap bitmap, int yPhase) const;
+
+        void screenDoor(Bitmap bitmap, int xPhase, int yPhase) const;
+
+        void bayer2x2(Bitmap bitmap, int xPhase, int yPhase) const;
+
+        void bayer4x4(Bitmap bitmap, int xPhase, int yPhase) const;
+
+        void bayer8x8(Bitmap bitmap, int xPhase, int yPhase) const;
+
+        void floydSteinberg(Bitmap bitmap);
+
+        void burkes(Bitmap bitmap);
+
+        void atkinson(Bitmap bitmap);
+
+        void dither(Bitmap bitmap, DitherType type, int xPhase, int yPhase);
+
+    private:
+        void diffuseError(int x, int y, float error, float weight) {
+            if (x < 0 or x >= width() or y < 0 or y >= height())
+                return;
+            data[y][x] += error * weight;
+        }
+
+        vector<vector<float>> data;
+    };
+
     struct LCDVideoPlayer_32 final : NativeResource {
         explicit LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size);
 
@@ -46,22 +131,15 @@ namespace cranked {
 
         void setBufferPixel(int x, int y, bool color);
 
-        void drawPixel(int x, int y, LCDColor color);
+        void drawPixel(int x, int y, const Color &color);
 
         [[nodiscard]] LCDSolidColor getPixel(int x, int y) const;
 
-        void clear(LCDColor color);
-
-        void drawLine(int x1, int y1, int x2, int y2, LCDColor color);
-
-        // Todo: Can be more efficient since it's done in horizontal segments
-        void fillRect(int x, int y, int w, int h, LCDColor color);
+        void clear(const Color &color);
 
         void drawBitmap(Bitmap image, int x, int y, int w = -1, int h = -1, int sourceX = 0, int sourceY = 0); // Todo: Support more options
 
         [[nodiscard]] vector<uint8> toRGB() const;
-
-        // Todo: Rotate bitmaps using three shears method: https://gautamnagrawal.medium.com/rotating-image-by-any-angle-shear-transformation-using-only-numpy-d28d16eb5076
 
         int width;
         int height;
@@ -145,7 +223,7 @@ namespace cranked {
         }
 
         /// Sets the image and adjusts the bounds to maintain the same position
-        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip, float xScale = 1, float yScale = 1) {
+        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip = GraphicsFlip::Unflipped, float xScale = 1, float yScale = 1) {
             // Todo: Figure out how this relates to stencil
             if (!dontRedrawOnImageChange)
                 dirty = true;
@@ -169,11 +247,6 @@ namespace cranked {
         }
 
         void updateLuaPosition();
-
-        void setImage(Bitmap bitmap) {
-            image = bitmap;
-            collideRectFlip = GraphicsFlip::Unflipped;
-        }
 
         void draw();
 
@@ -263,14 +336,28 @@ namespace cranked {
     };
 
     struct FontFamily {
-        FontRef &getFont(PDFontVariant variant) {
+        [[nodiscard]] Font getFont(PDFontVariant variant) const {
             switch (variant) {
                 case PDFontVariant::Bold:
-                    return bold;
+                    return bold.get();
                 case PDFontVariant::Italic:
-                    return italic;
+                    return italic.get();
                 default:
-                    return regular;
+                    return regular.get();
+            }
+        }
+
+        void setFont(PDFontVariant variant, Font font) {
+            switch (variant) {
+                case PDFontVariant::Bold:
+                    bold = font;;
+                    break;
+                case PDFontVariant::Italic:
+                    italic = font;
+                    break;
+                default:
+                    regular = font;
+                    break;
             }
         }
 
@@ -290,31 +377,35 @@ namespace cranked {
 
         void reset() {
             bitmap.reset();
-            stencilImage.reset();
+            color = LCDSolidColor::Black;
             focusedImage.reset();
             fonts.reset();
         }
 
-        FontRef &getFont(PDFontVariant variant) {
+        [[nodiscard]] Font getFont(PDFontVariant variant) const {
             return fonts.getFont(variant);
+        }
+
+        void setFont(PDFontVariant variant, Font font) {
+            fonts.setFont(variant, font);
+        }
+
+        [[nodiscard]] Bitmap getTargetBitmap() const {
+            return (focusedImage ? focusedImage : bitmap).get();
         }
 
         BitmapRef bitmap;
         IntVec2 drawOffset{};
         IntRect clipRect{0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT}; // In world-space (Offset by drawOffset)
-        LCDSolidColor drawingColor{};
+        Color color = LCDSolidColor::Black;
+        LCDSolidColor drawingColor{}; // Copy of last set solid color for Lua getColor
         LCDSolidColor backgroundColor = LCDSolidColor::White;
+        BitmapRef stencil{};
+        bool stencilTiled{};
         int lineWidth = 1;
         LCDLineCapStyle lineEndCapStyle{};
         StrokeLocation strokeLocation{}; // Only used by drawRect
-        BitmapRef stencilImage{};
-        bool stencilTiled{};
-        uint8 stencilPattern[8]{}; // Todo: This is only used when stencilImage isn't set? `setPattern` disables it, so probably need a flag to determine current color
-        bool usingStencil{};
         BitmapRef focusedImage; // Todo: Is this global or context specific?
-        bool usingDither{};
-        DitherType ditherPattern{};
-        float ditherAlpha{};
         LCDBitmapDrawMode bitmapDrawMode{};
         FontFamily fonts;
         LCDPolygonFillRule polygonFillRule{};
@@ -338,40 +429,37 @@ namespace cranked {
             return displayContextStack.empty() ? frameBufferContext : displayContextStack.back();
         }
 
-        Bitmap getTargetBitmap() {
-            auto &context = getCurrentDisplayContext();
-            return (context.focusedImage ? context.focusedImage : context.bitmap).get();
-        }
-
         DisplayContext &pushContext(Bitmap target);
 
         void popContext();
 
-        void drawPixel(int x, int y, LCDColor color, bool ignoreOffset = false);
+        void drawPixel(int x, int y, const Color &color, bool ignoreOffset = false);
 
         LCDSolidColor getPixel(int x, int y, bool ignoreOffset = false);
 
-        void drawLine(int x1, int y1, int x2, int y2, int width, LCDColor color);
+        void drawLine(int x1, int y1, int x2, int y2, const Color &color);
 
-        void drawRect(int x, int y, int width, int height, LCDColor color);
+        void drawLine(int x1, int y1, int x2, int y2, int width, const Color &color);
 
-        void fillRect(int x, int y, int width, int height, LCDColor color);
+        void drawRect(int x, int y, int width, int height, const Color &color);
 
-        void drawRoundRect(int x, int y, int width, int height, int radius, LCDColor color);
+        void fillRect(int x, int y, int width, int height, const Color &color);
 
-        void fillRoundRect(int x, int y, int width, int height, int radius, LCDColor color);
+        void drawRoundRect(int x, int y, int width, int height, int radius, const Color &color);
 
-        void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
+        void fillRoundRect(int x, int y, int width, int height, int radius, const Color &color);
+
+        void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color);
 
         void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, Font font = nullptr);
 
-        void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, LCDColor color);
+        void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color);
 
-        void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, LCDColor color, bool filled);
+        void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, const Color &color, bool filled);
 
-        void fillPolygon(int32 *coords, int32 points, LCDColor color, LCDPolygonFillRule fillType);
+        void fillPolygon(int32 *coords, int32 points, const Color &color, LCDPolygonFillRule fillType);
 
-        void drawPolygon(int32 *coords, int32 points, LCDColor color);
+        void drawPolygon(int32 *coords, int32 points, const Color &color);
 
         void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip = GraphicsFlip::Unflipped, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
 
@@ -385,9 +473,15 @@ namespace cranked {
 
         Bitmap rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale);
 
+        void drawTransformedBitmap(Bitmap bitmap, const Transform &transform, int x, int y);
+
+        Bitmap transformBitmap(Bitmap bitmap, const Transform &transform);
+
+        void drawSampledBitmap(Bitmap image, int x, int y, int width, int height, float centerX, float centerY, float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile);
+
         void drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase);
 
-        Bitmap blurredBitmap(Bitmap bitmap, float radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase);
+        Bitmap blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase);
 
         void drawFadedBitmap(Bitmap bitmap, int x, int y, float alpha, DitherType type);
 

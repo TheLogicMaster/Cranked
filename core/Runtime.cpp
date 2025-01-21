@@ -70,7 +70,9 @@ void cranked::playdate_graphics_setBackgroundColor(Cranked *cranked, int32 color
 }
 
 void cranked::playdate_graphics_setStencil(Cranked *cranked, Bitmap stencil) {
-    cranked->graphics.getCurrentDisplayContext().stencilImage = stencil;
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    ctx.stencil = stencil;
+    ctx.stencilTiled = false;
 }
 
 int32 cranked::playdate_graphics_setDrawMode(Cranked *cranked, int32 mode) {
@@ -97,7 +99,7 @@ void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32 endCapSt
 }
 
 void cranked::playdate_graphics_setFont(Cranked *cranked, Font font) {
-    cranked->graphics.getCurrentDisplayContext().getFont(PDFontVariant::Normal) = font;
+    cranked->graphics.getCurrentDisplayContext().setFont(PDFontVariant::Normal, font);
 }
 
 void cranked::playdate_graphics_setTextTracking(Cranked *cranked, int32 tracking) {
@@ -331,6 +333,7 @@ void cranked::playdate_graphics_display(Cranked *cranked) {
 
 void cranked::playdate_graphics_setColorToPattern(Cranked *cranked, uint32 *color, Bitmap bitmap, int32 x, int32 y) {
     // Todo: Does this set color to a pointer which must be freed by the caller? Or just point to the bitmap data?
+    // Todo: Or does this just copy a portion of an array into a 8x8 (Plus mask) pattern array?
 }
 
 int32 cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, Bitmap bitmap1, int32 x1, int32 y1, int32 flip1, Bitmap bitmap2, int32 x2, int32 y2, int32 flip2, LCDRect_32 rect) {
@@ -374,8 +377,9 @@ Bitmap cranked::playdate_graphics_getBitmapMask([[maybe_unused]] Cranked *cranke
 }
 
 void cranked::playdate_graphics_setStencilImage(Cranked *cranked, Bitmap stencil, int32 tile) {
-    cranked->graphics.getCurrentDisplayContext().stencilImage = stencil;
-    cranked->graphics.getCurrentDisplayContext().stencilTiled = tile;
+    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    ctx.stencil = stencil;
+    ctx.stencilTiled = tile;
 }
 
 Font cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 *data, int32 wide) {

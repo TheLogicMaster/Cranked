@@ -19,6 +19,8 @@ void Cranked::init() {
     debugger.init();
     startTime = elapsedTimeStart = chrono::system_clock::now();
     initialized = true;
+
+    graphics.flushDisplayBuffer(); // Todo: Is this where this is supposed to happen? imagesample example stops prevents first update loop call with playdate.stop
 }
 
 void Cranked::load(const string &path) {
@@ -49,6 +51,7 @@ void Cranked::reset() {
     menu.reset();
     files.reset();
     bump.reset();
+    luaEngine.reset();
     nativeEngine.reset();
 
     currentInputs = previousInputs = pressedInputs = releasedInputs = 0;

@@ -151,6 +151,13 @@ namespace cranked {
             return {getIntField("x"), getIntField("y")};
         }
 
+        [[nodiscard]] Transform asTransform() const {
+            return {
+                getFloatField("m11"), getFloatField("m12"), getFloatField("tx"),
+                getFloatField("m21"), getFloatField("m22"), getFloatField("ty")
+            };
+        }
+
         [[nodiscard]] FontFamily asFontFamily() {
             return {
                 getUserdataObjectElement<Font>((int)PDFontVariant::Normal),
@@ -635,6 +642,20 @@ namespace cranked {
             auto floatPoint = point.template as<float>();
             val.setFloatField("x", floatPoint.x);
             val.setFloatField("y", floatPoint.y);
+            return val;
+        }
+
+        LuaVal pushTransform(const Transform &transform) {
+            LuaVal val = pushTable();
+            if (!getQualifiedLuaGlobal("playdate.geometry.transform"))
+                throw CrankedError("Transform table missing");
+            lua_setmetatable(getContext(), -2);
+            val.setFloatField("m11", transform.m11);
+            val.setFloatField("m12", transform.m12);
+            val.setFloatField("m21", transform.m21);
+            val.setFloatField("m22", transform.m22);
+            val.setFloatField("tx", transform.tx);
+            val.setFloatField("ty", transform.ty);
             return val;
         }
 

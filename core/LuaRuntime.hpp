@@ -54,6 +54,10 @@ namespace cranked {
         return cranked->luaEngine.pushPoint(point);
     }
 
+    inline LuaVal pushTransform(Cranked *cranked, const Transform &transform) {
+        return cranked->luaEngine.pushTransform(transform);
+    }
+
     inline LuaVal pushResource(Cranked *cranked, NativeResource *resource) {
         return cranked->luaEngine.pushResource(resource);
     }
@@ -146,6 +150,8 @@ namespace cranked {
             return LuaVal{context, I}.asIntRect();
         else if constexpr (is_same_v<T, Point>)
             return Point(LuaVal{context, I}.asPoint());
+        else if constexpr (is_same_v<T, Transform>)
+            return Transform(LuaVal{context, I}.asTransform());
         else if constexpr (is_same_v<T, uint8 *> or is_same_v<T, const char *>)
             return (T)lua_tostring(context, I);
         else if constexpr (is_pointer_v<T>) {
@@ -179,6 +185,8 @@ namespace cranked {
             pushRect(Cranked::fromLuaContext(context), val);
         else if constexpr (is_same_v<T, Point>)
             pushPoint(Cranked::fromLuaContext(context), val.vec);
+        else if constexpr (is_same_v<T, Transform>)
+            pushTransform(Cranked::fromLuaContext(context), val);
         else if constexpr (is_same_v<T, string *>) {
             lua_pushstring(context, val->c_str());
             delete val;
@@ -310,6 +318,8 @@ namespace cranked {
                 cranked->luaEngine.pushRect(arg);
             else if constexpr (is_same_v<A, IntVec2> or is_same_v<A, Vec2>)
                 cranked->luaEngine.pushVec(arg);
+            else if constexpr (is_same_v<A, Transform>)
+                cranked->luaEngine.pushTransform(arg);
             else
                 static_assert(dependent_false_v<A>, "Invalid return value");
         }()

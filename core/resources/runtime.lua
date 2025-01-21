@@ -230,7 +230,7 @@ function playdate.geometry.rect.fast_intersection(x1, y1, w1, h1, x2, y2, w2, h2
     local x, y, width, height
     if (x2 > x1) then
         x = x2
-        height = math.max(0, math.min(w2, w1 - (x2 - x1)))
+        width = math.max(0, math.min(w2, w1 - (x2 - x1)))
     else
         x = x1
         width = math.max(0, math.min(w1, w2 - (x1 - x2)))
@@ -920,7 +920,7 @@ function playdate.geometry.polygon.new(...)
 end
 
 function playdate.geometry.polygon:copy()
-    local polygon = {}
+    local polygon = { numberOfVertices = self.numberOfVertices }
     setmetatable(polygon, geometry.polygon)
     for i = 1, self.numberOfVertices do
         polygon[i] = self[i]
@@ -998,7 +998,7 @@ function playdate.geometry.polygon:getBounds()
     local minY = 0
     local maxX = 0
     local maxY = 0
-    for i = 0, self.numberOfVertices do
+    for i = 1, self.numberOfVertices do
         local p = self[i]
         minX = math.min(minX, p.x)
         minY = math.min(minY, p.y)
@@ -1083,9 +1083,11 @@ function playdate.geometry.polygon:translate(dx, dy)
 end
 
 function playdate.geometry.polygon:__mul(t)
+    local copy = self:copy()
     for i = 1, self.numberOfVertices do
-        t:transformPoint(self[i])
+        t:transformPoint(copy[i])
     end
+    return copy;
 end
 
 function playdate.geometry.polygon:__eq(other)
