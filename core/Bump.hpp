@@ -241,7 +241,7 @@ namespace cranked {
             for (int y = rect.pos.y; y <= rect.pos.y + rect.size.y - 1; y++)
                 for (int x = rect.pos.x; x <= rect.pos.x + rect.size.x - 1; x++)
                     for (auto &cell : cells[y][x].sprites)
-                        sprites.push_back(cell.get());
+                        sprites.push_back(cell);
             return sprites;
         }
 

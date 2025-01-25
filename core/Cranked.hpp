@@ -16,6 +16,7 @@ namespace cranked {
     // Todo: A wrapper class to hide internals
     // Todo: Extract Lua functionality to some LuaEngine class
     // Todo: A safe way to either call control functions (reset) within updateInternals callbacks, or assertions to prevent doing so, or deferring until unwinding stack
+    // Todo: Serial callbacks
     class Cranked {
     public:
         static inline const Version version{PLAYDATE_SDK_VERSION};

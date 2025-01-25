@@ -171,7 +171,7 @@ void GrayscaleImage::dither(Bitmap bitmap, DitherType type, int xPhase = 0, int 
 LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked, ResourceType::VideoPlayer, this), frameRate(frameRate), size(size) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(width * height / 8, cranked.heap.allocator<uint8>())), mask(nullptr) {}
+        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(ceilDiv(width, 8) * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
         : NativeResource(other.cranked, ResourceType::Bitmap, this), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}
@@ -186,8 +186,8 @@ LCDBitmap_32& LCDBitmap_32::operator=(const LCDBitmap_32 &other) {
     return *this;
 }
 
-LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable)
-        : NativeResource(bitmap->cranked, ResourceType::FontGlyph, this), advance(advance), shortKerningTable(shortKerningTable), longKerningTable(longKerningTable), bitmap(bitmap) {}
+LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &kerningTable)
+        : NativeResource(bitmap->cranked, ResourceType::FontGlyph, this), advance(advance), kerningTable(kerningTable), bitmap(bitmap) {}
 
 LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked, ResourceType::FontPage, this) {}
 
@@ -336,6 +336,30 @@ void LCDSprite_32::updateCollisionWorld() {
     cranked.bump.updateSprite(this);
 }
 
+void LCDSprite_32::setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip, float xScale, float yScale) {
+    // Todo: Figure out how this relates to stencil
+    if (!dontRedrawOnImageChange)
+        dirty = true;
+    if (bitmap and !bitmap->mask)
+        opaque = true;
+    image = bitmap;
+    flip = bitmapFlip;
+    scale = { xScale, yScale };
+    if (bitmap)
+        setSize({ (float)bitmap->width, (float)bitmap->height });
+}
+
+void LCDSprite_32::setTileMap(TileMap tileMap) {
+    if (!dontRedrawOnImageChange)
+        dirty = true;
+    opaque = true; // Todo: Opaque?
+    image = nullptr;
+    flip = GraphicsFlip::Unflipped;
+    scale = { 1, 1 };
+    if (tileMap)
+        setSize(IntVec2{ tileMap->width * tileMap->getCellSize().x, tileMap->getHeight() * tileMap->getCellSize().x }.as<float>());
+}
+
 void LCDSprite_32::updateLuaPosition() {
     if (!cranked.luaEngine.isLoaded())
         return;
@@ -353,18 +377,19 @@ void LCDSprite_32::draw() {
     if (!visible or !inDrawList)
         return;
     Vec2 drawPos = bounds.pos;
-    // Todo: Support tilemap
-    Rect dirtyRect = { -bounds.pos, { DISPLAY_WIDTH, DISPLAY_HEIGHT } }; // Todo
+    Rect dirtyRect = { -bounds.pos, { DISPLAY_WIDTH, DISPLAY_HEIGHT } }; // Todo (Pass in union of all dirty rects as parameter?)
 
-    auto &context = cranked.graphics.getCurrentDisplayContext();
+    auto &context = cranked.graphics.getContext();
     auto drawOffset = context.drawOffset;
     ScopeExitHelper cleanupDrawOffset{ [=, &context]{ context.drawOffset = drawOffset; } };
     context.drawOffset = drawPos.as<int32>();
 
     if (image) {
-        // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect)
-        cranked.graphics.drawBitmap(image.get(), 0, 0, flip, ignoresDrawOffset);
-    } else if (drawFunction)
+        // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect, or like drawOffset)
+        cranked.graphics.drawBitmap(image, 0, 0, flip, ignoresDrawOffset);
+    } else if (tileMap)
+        cranked.graphics.drawTileMap(tileMap, 0, 0, ignoresDrawOffset);
+    else if (drawFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::struct4f_t, ArgType::struct4f_t>
                 (drawFunction, this, fromRect(Rect{ drawPos, bounds.size }), fromRect(dirtyRect)); // Todo: Correct args?
     else if (LuaValGuard value{ cranked.luaEngine.getResourceValue(this) }; value.val.isTable()) {
@@ -450,7 +475,7 @@ DisplayContext::DisplayContext(Bitmap bitmap, FontFamily fonts) : bitmap(bitmap)
 
 DisplayContext &Graphics::pushContext(Bitmap target) {
     // Todo: Should this copy the existing context? Do fonts always default to system fonts?
-    auto &ctx = displayContextStack.emplace_back(getCurrentDisplayContext());
+    auto &ctx = displayContextStack.emplace_back(getContext());
     if (target)
         ctx.bitmap = target;
     return ctx;
@@ -464,7 +489,7 @@ void Graphics::popContext() {
 
 void Graphics::drawPixel(int x, int y, const Color &color, bool ignoreOffset) {
     ZoneScoped;
-    auto &context = getCurrentDisplayContext();
+    auto &context = getContext();
     auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
         return;
@@ -483,11 +508,12 @@ void Graphics::drawPixel(int x, int y, const Color &color, bool ignoreOffset) {
 }
 
 LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
-    auto &context = getCurrentDisplayContext();
+    auto &context = getContext();
     auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
     return context.getTargetBitmap()->getPixel(pos.x, pos.y);
 }
 
+// Todo: Specialized horizontal/vertical variants for efficiency
 void Graphics::drawLine(int x1, int y1, int x2, int y2, const Color &color) {
     bool vertical = abs(y2 - y1) > abs(x2 - x1);
     if (vertical) {
@@ -536,7 +562,7 @@ void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, const Color &
 }
 
 void Graphics::drawRect(int x, int y, int width, int height, const Color &color) {
-    auto &context = getCurrentDisplayContext();
+    auto &context = getContext();
     auto shift = 2 * context.lineWidth;
     if (context.strokeLocation == StrokeLocation::Inside) {
         x++;
@@ -561,17 +587,85 @@ void Graphics::fillRect(int x, int y, int width, int height, const Color &color)
 }
 
 void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, const Color &color) {
-    // Todo
-    drawRect(x, y, width, height, color);
+    radius = min(radius, min(width, height) / 2);
+
+    auto drawCorner = [&](int xOff, int yOff, int corner) {
+        int f = 1 - radius;
+        int dx = 1, dy = -2 * radius;
+        int cx = 0, cy = radius;
+        int x0 = x + xOff, y0 = y + yOff;
+        while (cx < cy) {
+            if (f >= 0) {
+                cy--;
+                dy += 2;
+                f += dy;
+            }
+            cx++;
+            dx += 2;
+            f += dx;
+            if (corner == 2) {
+                drawPixel(x0 + cx, y0 + cy, color);
+                drawPixel(x0 + cy, y0 + cx, color);
+            } else if (corner == 1) {
+                drawPixel(x0 + cx, y0 - cy, color);
+                drawPixel(x0 + cy, y0 - cx, color);
+            } else if (corner == 3) {
+                drawPixel(x0 - cx, y0 + cy, color);
+                drawPixel(x0 - cy, y0 + cx, color);
+            } else if (corner == 0) {
+                drawPixel(x0 - cx, y0 - cy, color);
+                drawPixel(x0 - cy, y0 - cx, color);
+            }
+        }
+    };
+
+    drawLine(x + radius, y, x + width - radius, y, color);
+    drawLine(x + radius, y + height - 1, x + width - radius, y + height - 1, color);
+    drawLine(x, y + radius, x, y + height - radius, color);
+    drawLine(x + width - 1, y + radius, x + width - 1, y + height - radius, color);
+
+    drawCorner(radius, radius, 0);
+    drawCorner(width - radius - 1, radius, 1);
+    drawCorner(width - radius - 1, height - radius - 1, 2);
+    drawCorner(radius, height - radius - 1, 3);
 }
 
 void Graphics::fillRoundRect(int x, int y, int width, int height, int radius, const Color &color) {
-    // Todo
-    fillRect(x, y, width, height, color);
+    radius = min(radius, min(width, height) / 2);
+
+    auto fillCorners = [&](int x0, int y0, int corner, int delta) {
+        int f = 1 - radius;
+        int dx = 1, dy = -2 * radius;
+        int cx = 0, cy = radius;
+        int px = cx, py = cy;
+        while (cx < cy) {
+            if (f >= 0) {
+                cy--;
+                dy += 2;
+                f += dy;
+            }
+            cx++;
+            dx += 2;
+            f += dx;
+            if (corner == 0) {
+                drawLine(x0 + cx, y0 - cy, x0 + cx, y0 + cy + delta, color);
+                drawLine(x0 + py, y0 - px, x0 + py, y0 + px + delta, color);
+            } else {
+                drawLine(x0 - cx, y0 - cy, x0 - cx, y0 + cy + delta, color);
+                drawLine(x0 - py, y0 - px, x0 - py, y0 + px + delta, color);
+            }
+            py = cy;
+            px = cx;
+        }
+    };
+
+    fillRect(x + radius, y, width - 2 * radius, height, color);
+    fillCorners(x + width - radius - 1, y + radius, 0, height - 2 * radius - 1);
+    fillCorners(x + radius, y + radius, 1, height - 2 * radius - 1);
 }
 
 void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color) {
-    auto lineWidth = getCurrentDisplayContext().lineWidth;
+    auto lineWidth = getContext().lineWidth;
     drawLine(x1, y1, x2, y2, lineWidth, color);
     drawLine(x1, y1, x3, y3, lineWidth, color);
     drawLine(x2, y2, x3, y3, lineWidth, color);
@@ -580,7 +674,7 @@ void Graphics::drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, cons
 void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool ignoreOffset, optional<IntRect> sourceRect) {
     ZoneScoped;
     // Todo: This could be heavily optimized with bitwise operations
-    auto &context = getCurrentDisplayContext();
+    auto &context = getContext();
     auto mode = context.bitmapDrawMode;
     bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
     bool flipX = flip == LCDBitmapFlip::FlippedX or flip == LCDBitmapFlip::FlippedXY;
@@ -640,24 +734,151 @@ void Graphics::drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int heigh
     }
 }
 
-void Graphics::drawText(const void* text, int len, PDStringEncoding encoding, int x, int y, Font font) {
+void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, int leadingAdjust, int charCount) {
     ZoneScoped;
-    // Todo: Support encodings, font families
-    // Todo: Kerning
-    const char *string = (const char *) text;
-    auto &context = getCurrentDisplayContext();
-    if (!font)
-        font = context.getFont(PDFontVariant::Normal) ? context.getFont(PDFontVariant::Normal) : getSystemFont();
-    for (int i = 0; i < len; i++) {
-        char character = string[i];
-        int pageIndex = 0; // Todo: Temp ascii
-        try {
-            auto &page = font->pages.at(pageIndex);
-            auto &glyph = *page->glyphs.at(character);
-            drawBitmap(glyph.bitmap.get(), x, y, LCDBitmapFlip::Unflipped);
-            x += glyph.advance + font->tracking;
-        } catch (out_of_range &ignored) {} // Todo: Prevent exceptions?
+
+    // Todo: Support alignment
+
+    auto &ctx = getContext();
+    const bool useStyling = !font;
+
+    char32_t prevChar{};
+    FontVariant variant{};
+    Font currentFont = font ? font : fonts.regular.get();
+
+    u32string characters;
+    characters.reserve(text.size());
+    switch (encoding) {
+        case PDStringEncoding::UFT8:
+            unicode::utf8::decode(text.data(), text.size(), characters);
+            break;
+        case PDStringEncoding::LE16Bit:
+            unicode::utf16::decode((char16_t *)text.data(), text.size() / 2, characters);
+            break;
+        case PDStringEncoding::ASCII:
+        default:
+            for (char c : text)
+                characters.push_back(c);
+            break;
     }
+    if (charCount > 0 and (int)characters.size() > charCount)
+        characters.resize(charCount);
+
+    int wrapX = size.x ? x + size.x : 0; // Todo: Wrap at screen if bounds not set?
+    int clipY = size.y ? y + size.y : 0; // Todo: Set clip rect for bitmap drawing rather than chopping off text which doesn't fit?
+
+    struct WordChar {
+        FontGlyph glyph;
+        int kerning;
+    };
+
+    int currentX = x;
+    int currentY = y;
+    vector<WordChar> currentWord;
+
+    for (int i = 0; i < (int)characters.size(); i++) {
+        char32 c = characters[i];
+        char32 lastChar = prevChar;
+        prevChar = c;
+
+        if (useStyling and (c == '*' or c == '_')) {
+            variant = variant != FontVariant::Normal ? FontVariant::Normal : c == '*' ? FontVariant::Bold : FontVariant::Italic;
+            currentFont = fonts.getFont(variant);
+            if (lastChar != c)
+                continue;
+        }
+
+        if (!currentFont)
+            continue;
+
+        FontGlyph glyph;
+        try {
+            glyph = currentFont->pages.at((int)(c / 256))->glyphs.at((int)(c % 256));
+        } catch (out_of_range &) {
+            continue;
+        }
+
+        int kerning = 0;
+        if (auto it = glyph->kerningTable.find((int)lastChar); it != glyph->kerningTable.end()) // Todo: Is this correct or backwards?
+            kerning = (short)it->second;
+
+        bool clips = wrapX > 0 and currentX + kerning + glyph->advance + currentFont->tracking + ctx.textTracking > wrapX;
+        if (wrap == TextWrap::Word) {
+            currentWord.emplace_back(glyph, kerning);
+            if (i == (int)characters.size() - 1 or unicode::is_white_space(characters[i]) or unicode::is_white_space(characters[i + 1])) {
+                bool atStart = currentX == x;
+                if (clips and not atStart) {
+                    currentY += currentFont->leading + ctx.textLeading + leadingAdjust;
+                    currentX = x;
+                    currentWord[0].kerning = 0;
+                }
+                if (clipY > 0 and currentY + currentFont->leading + ctx.textLeading + leadingAdjust > clipY)
+                    return;
+                for (auto &[glyph, kern] : currentWord) {
+                    drawBitmap(glyph->bitmap, currentX + kern, currentY, LCDBitmapFlip::Unflipped);
+                    currentX += kern + glyph->advance + currentFont->tracking + ctx.textTracking;
+                }
+                currentWord.clear();
+            }
+        } else {
+            if (wrap == TextWrap::Character and clips) {
+                currentX = x;
+                currentY += currentFont->leading + ctx.textLeading + leadingAdjust;
+                kerning = 0;
+            }
+            if (clipY > 0 and currentY + currentFont->leading + ctx.textLeading + leadingAdjust > clipY)
+                return;
+            drawBitmap(glyph->bitmap, currentX + kerning, currentY, LCDBitmapFlip::Unflipped);
+            currentX += kerning + glyph->advance + currentFont->tracking + ctx.textTracking;
+        }
+    }
+}
+
+int Graphics::getTextWidth(Font font, string_view text, StringEncoding encoding, int tracking, int charCount) {
+    auto &ctx = getContext();
+
+    u32string characters;
+    characters.reserve(text.size());
+    switch (encoding) {
+        case PDStringEncoding::UFT8:
+            unicode::utf8::decode(text.data(), text.size(), characters);
+        break;
+        case PDStringEncoding::LE16Bit:
+            unicode::utf16::decode((char16_t *)text.data(), text.size() / 2, characters);
+        break;
+        case PDStringEncoding::ASCII:
+        default:
+            for (char c : text)
+                characters.push_back(c);
+        break;
+    }
+    if (charCount > 0 and (int)characters.size() > charCount)
+        characters.resize(charCount);
+
+    int width = 0;
+    char32 prev{};
+    for (char32 c : characters) {
+        FontGlyph glyph;
+        try {
+            glyph = font->pages.at((int)(c / 256))->glyphs.at((int)(c % 256));
+        } catch (out_of_range &) {
+            continue;
+        }
+
+        int kerning = 0;
+        if (auto it = glyph->kerningTable.find((int)prev); it != glyph->kerningTable.end()) // Todo: Is this correct or backwards?
+            kerning = (short)it->second;
+
+        width += kerning + glyph->advance + font->tracking + ctx.textTracking + tracking;
+    }
+    return width;
+}
+
+const char *Graphics::getLocalizedText(const char *key, PDLanguage language) {
+    auto &table = localizedStrings[language];
+    if (auto it = table.strings.find(key); it != table.strings.end())
+        return it->second.c_str();
+    return nullptr;
 }
 
 void Graphics::fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color) {
@@ -803,21 +1024,45 @@ void Graphics::drawEllipse(int rectX, int rectY, int width, int height, int line
 }
 
 void Graphics::fillPolygon(int32 *coords, int32 points, const Color &color, LCDPolygonFillRule fillType) {
-    // Todo
+    // Todo: Support non-zero rule mode
+    if (points < 2) return;
+    vector<int> nodes;
+    int yMin = coords[1], yMax = coords[1];
+    for (int i = 1; i < points; i++) {
+        int y = coords[i * 2 + 1];
+        yMin = min(yMin, y);
+        yMax = max(yMax, y);
+    }
+    for (int y = yMin; y <= yMax; y++) {
+        nodes.clear();
+        int j = points - 1;
+        for (int i = 0; i < points; i++) {
+            int ix = coords[i * 2 + 0], iy = coords[i * 2 + 1];
+            int jx = coords[j * 2 + 0], jy = coords[j * 2 + 1];
+            if (iy < y and jy >= y or jy < y and iy >= y)
+                nodes.push_back(ix + (y - iy) * (jx - ix) / (jy - iy));
+            j = i;
+        }
+        sort(nodes.begin(), nodes.end());
+        for (int i = 0; i < (int)nodes.size() - 1; i += 2) {
+            for (int x = nodes[i]; x <= nodes[i + 1]; x++)
+                drawPixel(x, y, color);
+        }
+    }
 }
 
 void Graphics::drawPolygon(int32 *coords, int32 points, const Color &color) {
     if (!points)
         return;
     for (int i = 0; i < points - 1; i++)
-        drawLine(coords[i * 2 + 0], coords[i * 2 + 1], coords[i * 2 + 2], coords[i * 2 + 3], getCurrentDisplayContext().lineWidth, color);
-    drawLine(coords[0], coords[1], coords[points * 2 - 2], coords[points * 2 - 1], getCurrentDisplayContext().lineWidth, color);
+        drawLine(coords[i * 2 + 0], coords[i * 2 + 1], coords[i * 2 + 2], coords[i * 2 + 3], getContext().lineWidth, color);
+    drawLine(coords[0], coords[1], coords[points * 2 - 2], coords[points * 2 - 1], getContext().lineWidth, color);
 }
 
 void Graphics::drawScaledBitmap(Bitmap bitmap, int x, int y, float xScale, float yScale) {
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = scaleBitmap(bitmap, xScale, yScale);
-    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+    drawBitmap(ref, x, y, GraphicsFlip::Unflipped);
 }
 
 Bitmap Graphics::scaleBitmap(Bitmap bitmap, float xScale, float yScale) {
@@ -826,7 +1071,7 @@ Bitmap Graphics::scaleBitmap(Bitmap bitmap, float xScale, float yScale) {
     int width = (int)((float)bitmap->width * xScale), height = (int)((float)bitmap->height * yScale);
     auto scaled = heap.construct<LCDBitmap_32>(cranked, width, height);
     if (bitmap->mask)
-        scaled->mask = scaleBitmap(bitmap->mask.get(), xScale, yScale);
+        scaled->mask = scaleBitmap(bitmap->mask, xScale, yScale);
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
             scaled->setBufferPixel(x, y, bitmap->getBufferPixel((int)((float)x * xInv), (int)((float)y * yInv)));
@@ -837,7 +1082,7 @@ void Graphics::drawRotatedBitmap(Bitmap bitmap, int x, int y, float angle, float
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = rotateBitmap(bitmap, angle, centerX, centerY, xScale, yScale);
     // Todo: Image position is slightly off
-    drawBitmap(ref.get(), x - (int)(centerX * (float)ref->width), y - (int)(centerY * (float)ref->height), GraphicsFlip::Unflipped);
+    drawBitmap(ref, x - (int)(centerX * (float)ref->width), y - (int)(centerY * (float)ref->height), GraphicsFlip::Unflipped);
 }
 
 Bitmap Graphics::rotateBitmap(Bitmap bitmap, float angle, float centerX, float centerY, float xScale, float yScale) {
@@ -856,7 +1101,7 @@ Bitmap Graphics::rotateBitmap(Bitmap bitmap, float angle, float centerX, float c
 void Graphics::drawTransformedBitmap(Bitmap bitmap, const Transform &transform, int x, int y) {
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = transformBitmap(bitmap, transform);
-    drawBitmap(ref.get(), x - ref->width / 2, y - ref->height / 2, GraphicsFlip::Unflipped); // Coordinates are centered
+    drawBitmap(ref, x - ref->width / 2, y - ref->height / 2, GraphicsFlip::Unflipped); // Coordinates are centered
 }
 
 Bitmap Graphics::transformBitmap(Bitmap bitmap, const Transform &transform) {
@@ -874,7 +1119,7 @@ Bitmap Graphics::transformBitmap(Bitmap bitmap, const Transform &transform) {
 
     auto transformed = heap.construct<LCDBitmap_32>(cranked, maxBound.x + 1, maxBound.y + 1);
     if (bitmap->mask)
-        transformed->mask = transformBitmap(bitmap->mask.get(), transform);
+        transformed->mask = transformBitmap(bitmap->mask, transform);
 
     Transform inv = transform.invert();
 
@@ -913,10 +1158,10 @@ void Graphics::drawSampledBitmap(Bitmap image, int x, int y, int width, int heig
     }
 }
 
-void Graphics::drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase) {
+void Graphics::drawBlurredBitmap(Bitmap bitmap, int x, int y, int radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase) {
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = blurredBitmap(bitmap, radius, numPasses, type, false, xPhase, yPhase);
-    drawBitmap(ref.get(), x, y, flip);
+    drawBitmap(ref, x, y, flip);
 }
 
 Bitmap Graphics::blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase) {
@@ -926,7 +1171,7 @@ Bitmap Graphics::blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherT
     // Todo: This is probably using the mask image incorrectly
     auto blurred = heap.construct<LCDBitmap_32>(*bitmap);
     if (bitmap->mask) {
-        blurred->mask = blurredBitmap(bitmap->mask.get(), radius, numPasses, type, padEdges, xPhase, yPhase);
+        blurred->mask = blurredBitmap(bitmap->mask, radius, numPasses, type, padEdges, xPhase, yPhase);
         return blurred;
     }
     GrayscaleImage grayscale{ bitmap->width, bitmap->height };
@@ -954,14 +1199,14 @@ Bitmap Graphics::blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherT
 void Graphics::drawFadedBitmap(Bitmap bitmap, int x, int y, float alpha, DitherType type) {
     // Todo: Making a copy each time is probably not particularly efficient
     BitmapRef ref = fadedBitmap(bitmap, alpha, type);
-    drawBitmap(ref.get(), x, y, GraphicsFlip::Unflipped);
+    drawBitmap(ref, x, y, GraphicsFlip::Unflipped);
 }
 
 Bitmap Graphics::fadedBitmap(Bitmap bitmap, float alpha, DitherType type) {
     // Todo: Supposed to act on mask if present, should do same operation to both or just mask?
     auto faded = heap.construct<LCDBitmap_32>(*bitmap);
     if (bitmap->mask) {
-        faded->mask = fadedBitmap(bitmap->mask.get(), alpha, type);
+        faded->mask = fadedBitmap(bitmap->mask, alpha, type);
         return faded;
     }
     GrayscaleImage grayscale{ bitmap, alpha };
@@ -1007,13 +1252,13 @@ void Graphics::drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset, opt
             int index = tilemap->tiles[i * tilemap->width + j];
             if (index < 0 or index >= tilemap->table->bitmaps.size())
                 continue;
-            drawBitmap(tilemap->table->bitmaps[index].get(), x + cellSize.x * j, drawY, GraphicsFlip::Unflipped, ignoreOffset); // Todo: Support sourceRect
+            drawBitmap(tilemap->table->bitmaps[index], x + cellSize.x * j, drawY, GraphicsFlip::Unflipped, ignoreOffset); // Todo: Support sourceRect
         }
     }
 }
 
 IntVec2 Graphics::measureText(const char *text, const FontFamily &fonts, int leadingAdjustment) {
-    auto font = fonts.regular.get() ? fonts.regular.get() : getSystemFont(PDFontVariant::Normal); // Todo: Support families properly
+    auto font = fonts.regular ? fonts.regular.get() : getSystemFont(PDFontVariant::Normal); // Todo: Support families properly
     return { (int)strlen(text) * font->glyphWidth, font->glyphWidth }; // Todo: Measure properly
 }
 
@@ -1049,7 +1294,7 @@ void Graphics::updateSprites() {
 }
 
 void Graphics::drawSprites() {
-    auto &context = getCurrentDisplayContext();
+    auto &context = getContext();
     context.bitmap->clear(LCDColor(context.backgroundColor));
     // Todo: Dirty rect support
     auto sprites = vector(spriteDrawList);
@@ -1057,6 +1302,11 @@ void Graphics::drawSprites() {
     for (auto &sprite : sprites) {
         sprite->draw();
     }
+    spriteDirtyRects.clear();
+}
+
+void Graphics::addSpriteDirtyRect(IntRect rect) {
+    spriteDirtyRects.emplace_back(rect);
 }
 
 void Graphics::addSpriteToDrawList(Sprite sprite) {
@@ -1075,7 +1325,7 @@ void Graphics::removeSpriteFromDrawList(Sprite sprite) {
 
 void Graphics::clearSpriteDrawList() {
     for (auto &sprite : spriteDrawList) {
-        cranked.bump.removeSprite(sprite.get());
+        cranked.bump.removeSprite(sprite);
         sprite->inDrawList = false;
     }
     spriteDrawList.clear();
@@ -1092,7 +1342,7 @@ BitmapTable Graphics::getBitmapTable(const string &path) {
 
 VideoPlayer Graphics::getVideoPlayer(const string &path) {
     auto video = cranked.rom->getVideo(path);
-    auto stride = (int) ceil((float) video.width / 8);
+    auto stride = ceilDiv(video.width, 8);
     auto player = heap.construct<LCDVideoPlayer_32>(cranked, video.framerate, IntVec2{ video.width, video.height });
     for (auto data : video.frames) {
         auto bitmap = heap.construct<LCDBitmap_32>(cranked, video.width, video.height);
@@ -1112,7 +1362,7 @@ Bitmap Graphics::getImage(const string &path) {
 
 Bitmap Graphics::getImage(const Rom::ImageCell &source) {
     auto bitmap = heap.construct<LCDBitmap_32>(cranked, source.width, source.height);
-    auto stride = (int) ceil((float) source.width / 8);
+    auto stride = ceilDiv(source.width, 8);
     auto readBitmapData = [&](const uint8 *src, uint8 *dest){
         for (int i = 0; i < source.height; i++)
             for (int j = 0; j < source.width; j++)
@@ -1137,7 +1387,7 @@ Font Graphics::getFont(const Rom::Font &source) {
         auto &page = font->pages[pageEntry.first] = heap.construct<LCDFontPage_32>(cranked);
         for (auto &glyphEntry : pageEntry.second) {
             auto &glyph = glyphEntry.second;
-            page->glyphs[glyphEntry.first] = heap.construct<LCDFontGlyph_32>(getImage(glyph.cell), glyph.advance, glyph.shortKerningTable, glyph.longKerningTable);
+            page->glyphs[glyphEntry.first] = heap.construct<LCDFontGlyph_32>(getImage(glyph.cell), glyph.advance, glyph.kerningTable);
         }
     }
     return font;
@@ -1158,13 +1408,15 @@ void Graphics::init() {
     previousFrameBuffer = createBitmap(DISPLAY_BUFFER_WIDTH, DISPLAY_HEIGHT);
     for (int i = 0; i < 3; i++)
         systemFonts.setFont((PDFontVariant) i, getFont(systemFontSources[i]));
-    frameBufferContext = DisplayContext(frameBuffer.get(), systemFonts);
+    frameBufferContext = DisplayContext(frameBuffer, systemFonts);
+    localizedStrings = cranked.rom->getStrings();
 }
 
 void Graphics::reset() {
     frameBuffer.reset();
     previousFrameBuffer.reset();
     systemFonts.reset();
+    localizedStrings.clear();
 
     for (auto &context : displayContextStack)
         context.reset();
@@ -1190,9 +1442,8 @@ void Graphics::reset() {
 void Graphics::update() {
     ZoneScoped;
     frameBufferContext.clipRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
-    // Todo: Is this supposed to be done here?
     displayContextStack.clear();
-    frameBufferContext = DisplayContext(frameBuffer.get(), systemFonts);
+    frameBufferContext = DisplayContext(frameBuffer, systemFonts);
 }
 
 void Graphics::flushDisplayBuffer() {
@@ -1206,7 +1457,7 @@ void Graphics::flushDisplayBuffer() {
             int x = (displayFlippedX ? DISPLAY_WIDTH - 1 - j : j) - displayOffset.x;
             if (x >= 0 and x < DISPLAY_WIDTH)
                 x /= displayScale;
-            auto color = frameBuffer->getBufferPixel(x, y) ? displayBufferOnColor : displayBufferOffColor;
+            auto color = frameBuffer->getBufferPixel(x, y) ^ displayInverted ? displayBufferOnColor : displayBufferOffColor;
             if (y < 0 or y >= DISPLAY_HEIGHT / displayScale or x < 0 or x >= DISPLAY_WIDTH / displayScale)
                 color = frameBufferContext.backgroundColor == LCDSolidColor::White ? displayBufferOnColor : displayBufferOffColor;
             if (displayBufferNativeEndian)

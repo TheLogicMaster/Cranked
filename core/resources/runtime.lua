@@ -151,6 +151,7 @@ function playdate.setGCScaling() end
 -- Simulator-only
 function playdate.clearConsole() end
 function playdate.setDebugDrawColor() end
+function playdate.debugDraw() end
 
 function playdate.inputHandlers.push(handler, masks)
     if masks == nil then

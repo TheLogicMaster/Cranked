@@ -7,7 +7,8 @@
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
 #include "unicorn/unicorn.h"
-
+#include "cpp-unicodelib/unicodelib.h"
+#include "cpp-unicodelib/unicodelib_encodings.h"
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
@@ -53,6 +54,8 @@
 #include <utility>
 #include <variant>
 #include <numbers>
+#include <algorithm>
+#include <locale>
 
 namespace cranked {
 
@@ -62,7 +65,7 @@ namespace cranked {
 
     using std::stoi, std::stol, std::from_chars, std::to_string, std::isalpha, std::popcount;
     using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round;
-    using std::string, std::basic_string, std::string_view;
+    using std::string, std::u16string, std::u32string, std::basic_string, std::string_view;
     using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue, std::priority_queue;
     using std::function, std::invoke;
     using std::exception, std::runtime_error, std::range_error, std::out_of_range, std::logic_error;
@@ -94,6 +97,8 @@ namespace cranked {
     typedef uint16_t uint16;
     typedef int8_t int8;
     typedef uint8_t uint8;
+    typedef char16_t char16;
+    typedef char32_t char32;
 
     enum class LogLevel {
         Verbose,
@@ -318,6 +323,11 @@ namespace cranked {
         return abs(a - val) < abs(b - val) ? a : b;
     }
 
+    template<integral A, integral B>
+    constexpr auto ceilDiv(A a, B b) {
+        return (a + b - 1) / b;
+    }
+
     template<typename T, typename V>
         bool containsEquivalentValue(vector<T> &vec, const V &value) {
         return find_if(vec.begin(), vec.end(), [&](const T &t) { return t == value; }) != vec.end();
@@ -529,7 +539,14 @@ namespace cranked {
 
         bool operator==(const ResourceRef &other) const = default;
 
-        bool operator==(const T *other) const {
+        // This is templated to work around the mess created by the implicit conversion operator
+        template<typename S>
+        bool operator==(const S *other) const {
+            return resource == other;
+        }
+
+        template<typename S>
+        bool operator==(S *other) const {
             return resource == other;
         }
 
@@ -542,6 +559,11 @@ namespace cranked {
         }
 
         operator bool() const { // NOLINT(*-explicit-constructor)
+            return resource;
+        }
+
+        // This is convenient, but probably makes issues just to save a few characters
+        operator T*() const { // NOLINT(*-explicit-constructor)
             return resource;
         }
 

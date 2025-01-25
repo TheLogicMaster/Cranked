@@ -65,3 +65,6 @@
 [submodule "core/libs/gif-h"]
 	path = core/libs/gif-h
 	url = https://github.com/charlietangora/gif-h
+[submodule "core/libs/cpp-unicodelib"]
+	path = core/libs/cpp-unicodelib
+	url = https://github.com/yhirose/cpp-unicodelib

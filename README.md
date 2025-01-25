@@ -42,13 +42,11 @@ There is currently no support for running encrypted ROMs from the Catalog.
 
 ## Todo
 - Finish Sprites (Collision occasionally phases a sprite off-screen in Sprite Collision example)
-- Graphical effects
-- Pattern/stencil drawing
-- Polygon, rounded rect drawing, Mode 7, image rotation and affine transforms
+- Remaining graphical effects (And effects on sprites)
+- Polygon (Non-zero fill rule), Mode 7
 - Audio
-- Full font support
+- Full font support (Alignment)
 - WAV writing
-- Respect all graphical context options like clip rect
 - Finish C JSON decoding
 - Test building on Windows/Mac
 - Create a testing framework to compare console output to the official simulator (Graphics, Collisions)
@@ -57,7 +55,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Java library with native libs for Android app consumption
 - Scoreboard support
 - Investigate Catalog app (Web API already documented elsewhere)
-- Ability to act as simulator
+- Ability to act as simulator (Useful debug features)
 - See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
 - System UI/software from SDK (Create replacement assets, *Darker Grotesque* should be able to be adopted in place of *Roobert* system font)
 - Investigate pre-2.0.0 binaries to handle uncompressed data
@@ -74,7 +72,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Better exception handling and stack traces, potentially with disassembled Asm and Lua for context, especially more Lua context, maybe even decompilation
 - Lua debugger functionality
 - Support Debug Adaptor Protocol like Simulator
-
+~~~~~~~~~~~~
 ## Example Compatibility
 - [x] Hello World
 - [x] Sprite Collisions
@@ -92,7 +90,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - [ ] Level 1-1 (Basic level loading seems to mostly work, but with tons of graphical issues and no floor, also no audio)
 - [x] Hammer Down (No audio)
 - [x] Game Template
-- [x] Flippy Fish (Display inversion on game over is missing)
+- [x] Flippy Fish
 - [ ] Drum Machine
 - [x] Controller Test
 - [ ] Asheteroids (Issue with sprites and Bump, huge memory usage for cells)
@@ -111,7 +109,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
   - [ ] Draw Sampled 2
   - [x] Fade Fast (Text formatting)
   - [ ] File (Output does not match)
-  - [x] Grid View (Text formatting, minor graphical issues)
+  - [x] Grid View (Minor graphical issues)
   - [x] Icosohedron
   - [x] Image Sample
   - [x] Pachinko
@@ -184,3 +182,4 @@ git submodule foreach git pull
 - https://github.com/scratchminer/pd-emu
 - https://github.com/ARM-software/abi-aa/blob/2982a9f3b512a5bfdc9e3fea5d3b298f9165c36b/aapcs32/aapcs32.rst
 - https://www.lua.org/manual/5.4/
+- https://github.com/adafruit/Adafruit-GFX-Library

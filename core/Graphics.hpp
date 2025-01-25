@@ -223,18 +223,9 @@ namespace cranked {
         }
 
         /// Sets the image and adjusts the bounds to maintain the same position
-        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip = GraphicsFlip::Unflipped, float xScale = 1, float yScale = 1) {
-            // Todo: Figure out how this relates to stencil
-            if (!dontRedrawOnImageChange)
-                dirty = true;
-            if (bitmap and !bitmap->mask)
-                opaque = true;
-            image = bitmap;
-            flip = bitmapFlip;
-            scale = { xScale, yScale };
-            if (bitmap)
-                setSize({ (float)bitmap->width, (float)bitmap->height });
-        }
+        void setImage(Bitmap bitmap, LCDBitmapFlip bitmapFlip = GraphicsFlip::Unflipped, float xScale = 1, float yScale = 1);
+
+        void setTileMap(TileMap tileMap);
 
         /// Returns the offset from the world space top-left corner to the sprite's considered position
         [[nodiscard]] Vec2 getCenterOffset() const {
@@ -279,7 +270,6 @@ namespace cranked {
         cref_t collideResponseFunction{};
         cref_t userdata{};
         bool dirty = true;
-        vector<LCDRect_32> dirtyRects;
 
     private:
         bool collisionsEnabled = true;
@@ -312,11 +302,10 @@ namespace cranked {
     };
 
     struct LCDFontGlyph_32 : NativeResource {
-        explicit LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &shortKerningTable, const map<int, int8> &longKerningTable);
+        explicit LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8> &kerningTable);
 
         int advance;
-        map<int, int8> shortKerningTable; // Page 0 entries
-        map<int, int8> longKerningTable;
+        map<int, int8> kerningTable;
         BitmapRef bitmap;
     };
 
@@ -329,7 +318,8 @@ namespace cranked {
     struct LCDFont_32 : NativeResource {
         explicit LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight);
 
-        int tracking;
+        int tracking; // Space between characters
+        int leading; // Space between lines
         int glyphWidth;
         int glyphHeight;
         unordered_map<int, FontPageRef> pages;
@@ -339,11 +329,11 @@ namespace cranked {
         [[nodiscard]] Font getFont(PDFontVariant variant) const {
             switch (variant) {
                 case PDFontVariant::Bold:
-                    return bold.get();
+                    return bold;
                 case PDFontVariant::Italic:
-                    return italic.get();
+                    return italic;
                 default:
-                    return regular.get();
+                    return regular;
             }
         }
 
@@ -391,7 +381,7 @@ namespace cranked {
         }
 
         [[nodiscard]] Bitmap getTargetBitmap() const {
-            return (focusedImage ? focusedImage : bitmap).get();
+            return focusedImage ? focusedImage : bitmap;
         }
 
         BitmapRef bitmap;
@@ -425,7 +415,7 @@ namespace cranked {
 
         void flushDisplayBuffer();
 
-        DisplayContext &getCurrentDisplayContext() {
+        DisplayContext &getContext() {
             return displayContextStack.empty() ? frameBufferContext : displayContextStack.back();
         }
 
@@ -451,19 +441,23 @@ namespace cranked {
 
         void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color);
 
-        void drawText(const void *text, int len, PDStringEncoding encoding, int x, int y, Font font = nullptr);
+        void drawText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int leadingAdjust = 0, int charCount = 0);
+
+        int getTextWidth(Font font, string_view text, StringEncoding encoding = PDStringEncoding::UFT8, int tracking = 0, int charCount = 0);
+
+        const char *getLocalizedText(const char *key, PDLanguage language);
 
         void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color);
 
         void drawEllipse(int rectX, int rectY, int width, int height, int lineWidth, float startAngle, float endAngle, const Color &color, bool filled);
 
-        void fillPolygon(int32 *coords, int32 points, const Color &color, LCDPolygonFillRule fillType);
+        void fillPolygon(int32 *coords, int32 points, const Color &color, PolygonFillRule fillType);
 
         void drawPolygon(int32 *coords, int32 points, const Color &color);
 
-        void drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip = GraphicsFlip::Unflipped, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
+        void drawBitmap(Bitmap bitmap, int x, int y, GraphicsFlip flip = GraphicsFlip::Unflipped, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
 
-        void drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, LCDBitmapFlip flip);
+        void drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int height, GraphicsFlip flip);
 
         void drawScaledBitmap(Bitmap bitmap, int x, int y, float xScale, float yScale);
 
@@ -479,7 +473,7 @@ namespace cranked {
 
         void drawSampledBitmap(Bitmap image, int x, int y, int width, int height, float centerX, float centerY, float dxx, float dyx, float dxy, float dyy, float dx, float dy, float z, float tiltAngle, bool tile);
 
-        void drawBlurredBitmap(Bitmap bitmap, int x, int y, float radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase);
+        void drawBlurredBitmap(Bitmap bitmap, int x, int y, int radius, int numPasses, DitherType type, GraphicsFlip flip, int xPhase, int yPhase);
 
         Bitmap blurredBitmap(Bitmap bitmap, int radius, int numPasses, DitherType type, bool padEdges, int xPhase, int yPhase);
 
@@ -502,6 +496,8 @@ namespace cranked {
         void updateSprites();
 
         void drawSprites();
+
+        void addSpriteDirtyRect(IntRect rect);
 
         void setSpriteClipRectsInRage(IntRect rect, int startZ, int endZ) const {
             for (auto sprite : allocatedSprites) {
@@ -553,15 +549,16 @@ namespace cranked {
 
         Cranked &cranked;
         HeapAllocator &heap;
-        Rom::Font systemFontSources[3]{}; // Todo: Convert to a FontFamily structure in PlaydateTypes
+        Rom::Font systemFontSources[3]{};
         FontFamily systemFonts;
         uint32 displayBufferRGBA[DISPLAY_HEIGHT][DISPLAY_WIDTH]{};
         bool displayBufferNativeEndian = false;
         uint32 displayBufferOnColor = 0xB0AEA7FF;
         uint32 displayBufferOffColor = 0x302E27FF;
         BitmapRef frameBuffer, previousFrameBuffer;
-        DisplayContext frameBufferContext{ frameBuffer.get() };
+        DisplayContext frameBufferContext{ frameBuffer };
         vector<DisplayContext> displayContextStack;
+        map<PDLanguage, Rom::StringTable> localizedStrings;
         IntVec2 displayOffset{};
         int32 displayScale{};
         bool displayInverted{};
@@ -571,6 +568,7 @@ namespace cranked {
         bool alwaysRedrawSprites{};
         unordered_set<Sprite> allocatedSprites;
         vector<SpriteRef> spriteDrawList;
+        vector<IntRect> spriteDirtyRects;
     };
 
 }

@@ -51,7 +51,7 @@ namespace cranked {
 
         int write(File file, void *buf, int len);
 
-        int seek(File file, int pos, int whence);
+        int seek(File file, int pos, SeekWhence whence);
 
         int tell(File file);
 

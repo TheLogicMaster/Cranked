@@ -26,7 +26,7 @@ void LuaEngine::init() {
     registerLuaGlobals();
     tracy::LuaRegister(luaInterpreter);
 
-    // Load argv like simulator (Not modifyable)
+    // Load argv like simulator (Not modifiable)
     auto argv = pushTable();
     for (int i = 0; i < cranked.config.argv.size(); i++)
         argv.setStringElement(i + 1, cranked.config.argv[i].c_str());

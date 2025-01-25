@@ -57,7 +57,7 @@ int main(int argc, const char *args[]) {
     bool startPaused = result["pause"].as_optional<bool>().value_or(false);
     vector<string> commandLineArgs = result["arg"].as_optional<vector<string>>().value_or(vector<string>{});
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER))
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO/* | SDL_INIT_GAMECONTROLLER*/)) // Initializing controller support takes several seconds...
         throw CrankedError("Failed to init SDL: {}", SDL_GetError());
 
 #ifdef SDL_HINT_IME_SHOW_UI

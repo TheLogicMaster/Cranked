@@ -48,6 +48,8 @@ namespace cranked {
         LowPower,
     };
 
+    typedef PDSystemEvent SystemEvent;
+
     enum class PDButtons : int32 {
         Left = 1 << 0,
         Right = 1 << 1,
@@ -58,6 +60,8 @@ namespace cranked {
         Lock = 1 << 6, // Internal-only from here
         Menu = 1 << 7,
     };
+
+    typedef PDButtons Buttons;
 
     enum class PDLanguage : int32 {
         English,
@@ -71,11 +75,15 @@ namespace cranked {
         Italic,
     };
 
+    typedef PDFontVariant FontVariant;
+
     enum class PDPeripherals : int32 {
         None,
         Accelerometer,
         All = 0xFFFF,
     };
+
+    typedef PDPeripherals Peripherals;
 
     enum class JsonValueType : int32 {
         Null,
@@ -94,6 +102,12 @@ namespace cranked {
         Write = 1 << 2,
         Append = 1 << 3,
         ReadDataFallback = Read | ReadData, // Read data then fallback to ROM
+    };
+
+    enum class SeekWhence : int32 {
+        Set,
+        Current,
+        End
     };
 
     enum class LuaType : int32 {
@@ -144,6 +158,22 @@ namespace cranked {
 
     typedef GraphicsFlip LCDBitmapFlip;
 
+    enum class TextWrap : int32 {
+        Clip,
+        Character,
+        Word
+    };
+
+    typedef TextWrap PDTextWrappingMode;
+
+    enum class TextAlign : int32 {
+        Left,
+        Center,
+        Right
+    };
+
+    typedef TextAlign PDTextAlignment;
+
     enum class LCDSolidColor : int32 {
         Black,
         White,
@@ -151,11 +181,15 @@ namespace cranked {
         XOR,
     };
 
+    typedef LCDSolidColor SolidColor;
+
     enum class LCDLineCapStyle : int32 {
         Butt,
         Square,
         Round,
     };
+
+    typedef LCDLineCapStyle LineCapStyle;
 
     enum class PDStringEncoding : int32 {
         ASCII,
@@ -163,10 +197,14 @@ namespace cranked {
         LE16Bit,
     };
 
+    typedef PDStringEncoding StringEncoding;
+
     enum class LCDPolygonFillRule : int32 {
         NonZero,
         EvenOdd,
     };
+
+    typedef LCDPolygonFillRule PolygonFillRule;
 
     enum class StrokeLocation : int32 {
         Centered,

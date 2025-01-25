@@ -348,7 +348,7 @@ Rom::Font Rom::readFontData(const uint8 *data, bool wide) {
 
             // Read short kerning table
             for (int j = 0; j < shortKerningEntries; j++) {
-                glyph.shortKerningTable[glyphData[0]] = *(int8 *) &glyphData[1];
+                glyph.kerningTable[page * 256 + glyphData[0]] = *(int8 *) &glyphData[1];
                 glyphData += 2;
             }
 
@@ -359,7 +359,7 @@ Rom::Font Rom::readFontData(const uint8 *data, bool wide) {
             // Read long kerning table
             for (int j = 0; j < longKerningEntries; j++) {
                 auto entry = readUint32LE(glyphData);
-                glyph.longKerningTable[int(entry >> 8)] = *(int8 *) &entry;
+                glyph.kerningTable[int(entry >> 8)] = *(int8 *) &entry;
                 glyphData += 4;
             }
 

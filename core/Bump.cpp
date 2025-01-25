@@ -178,9 +178,9 @@ vector<Bump::SpriteSegmentIntersectionInfo> Bump::querySegmentInfo(LineSeg seg, 
     Vec2 delta = seg.end - seg.start;
     for (auto cell : getCellsTouchedBySegment(seg)) {
         for (auto &sprite : cell->sprites) {
-            if (!visited.emplace(sprite.get()).second)
+            if (!visited.emplace(sprite).second)
                 continue;
-            if (filter and !filter->operator()(sprite.get()))
+            if (filter and !filter->operator()(sprite))
                 continue;
             float ti1, ti2;
             Vec2 n1, n2;
@@ -188,7 +188,7 @@ vector<Bump::SpriteSegmentIntersectionInfo> Bump::querySegmentInfo(LineSeg seg, 
                 continue;
             float tii1, tii2;
             getSegmentIntersectionIndices(sprite->getWorldCollideRect(), seg, true, true, tii1, tii2, n1, n2);
-            info.emplace_back(sprite.get(), ti1, ti2, LineSeg{ seg.start + delta * ti1, seg.start + delta * ti2 }, min(tii1, tii2));
+            info.emplace_back(sprite, ti1, ti2, LineSeg{ seg.start + delta * ti1, seg.start + delta * ti2 }, min(tii1, tii2));
         }
     }
     sort(info.begin(), info.end(), [](SpriteSegmentIntersectionInfo &a, SpriteSegmentIntersectionInfo &b){ return a.weight < b.weight; });
@@ -221,7 +221,7 @@ vector<Sprite> Bump::getAllOverlappingSprites() {
     unordered_map<Sprite, unordered_set<Sprite>> overlapping;
     std::vector<Sprite> results;
     for (const SpriteRef &ref : cranked.graphics.spriteDrawList) {
-        for (auto sprite = ref.get(); auto overlap : queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; })) {
+        for (auto sprite = ref; auto overlap : queryRect(sprite->getWorldCollideRect(), [sprite](Sprite s){ return s != sprite; })) {
             if (overlapping[overlap].contains(sprite) or !overlapping[sprite].emplace(overlap).second)
                 continue;
             results.emplace_back(sprite);

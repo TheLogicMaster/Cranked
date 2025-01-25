@@ -156,6 +156,7 @@ constexpr char LUA_RUNTIME_SOURCE[] =
 	"-- Simulator-only\n"
 	"function playdate.clearConsole() end\n"
 	"function playdate.setDebugDrawColor() end\n"
+	"function playdate.debugDraw() end\n"
 	"\n"
 	"function playdate.inputHandlers.push(handler, masks)\n"
 	"    if masks == nil then\n"

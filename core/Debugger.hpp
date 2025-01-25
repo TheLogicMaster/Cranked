@@ -3,6 +3,8 @@
 #include "PlaydateTypes.hpp"
 #include "Utils.hpp"
 
+// Todo: Debug Adaptor Protocol support for Lua and native code
+
 namespace cranked {
 
     namespace asio = boost::asio;

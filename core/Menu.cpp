@@ -86,7 +86,7 @@ void Menu::removeItem(MenuItem item) {
 
 void Menu::clearItems() {
     for (auto &item : items)
-        removeItem(item.get());
+        removeItem(item);
 }
 
 int Menu::findItem(MenuItem item) {

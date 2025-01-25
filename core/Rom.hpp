@@ -69,8 +69,7 @@ namespace cranked {
 
         struct FontGlyph {
             int advance{};
-            map<int, int8> shortKerningTable; // Page 0 entries
-            map<int, int8> longKerningTable;
+            map<int, int8> kerningTable;
             ImageCell cell;
         };
 
@@ -182,6 +181,22 @@ namespace cranked {
         StringTable getStringTable(const string &name) {
             auto data = readRomFile(name, ".pds", { ".strings" });
             return readStringTable(data.data(), data.size());
+        }
+
+        map<PDLanguage, StringTable> getStrings() {
+            map<PDLanguage, StringTable> mapping;
+
+            auto loadLanguage = [&](PDLanguage language, const string &name) {
+                auto &table = mapping[language];
+                try {
+                    table = getStringTable(name + ".strings");
+                } catch (exception &) {}
+            };
+
+            loadLanguage(PDLanguage::English, "en");
+            loadLanguage(PDLanguage::Japanese, "jp");
+
+            return mapping;
         }
 
         Font getFont(const string &name) {

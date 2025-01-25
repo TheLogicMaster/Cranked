@@ -24,7 +24,7 @@ void Files::init() {
 void Files::reset() {
     for (FileRef &file : vector(openFiles.begin(), openFiles.end())) {
         try {
-            close(file.get());
+            close(file);
         } catch (exception &ex) {
             cranked.logMessage(LogLevel::Error, "Exception closing file: %s", ex.what());
         }
@@ -296,20 +296,20 @@ int Files::write(File file, void *buf, int len) {
     return result;
 }
 
-int Files::seek(File file, int pos, int whence) {
+int Files::seek(File file, int pos, SeekWhence whence) {
     if (!isFileOpen(file)) {
         lastError = cranked.getEmulatedStringLiteral("File closed");
         return -1;
     }
     if (file->file)
-        return fseek(file->file, pos, whence) ? -1 : 0;
+        return fseek(file->file, pos, (int)whence) ? -1 : 0;
     auto romData = file->romData;
     int target;
-    if (whence == SEEK_END)
+    if (whence == SeekWhence::End)
         target = (int) romData->size() + pos;
-    else if (whence == SEEK_CUR)
+    else if (whence == SeekWhence::Current)
         target = file->romFilePosition + pos;
-    else if (whence == SEEK_SET)
+    else if (whence == SeekWhence::Set)
         target = pos;
     else {
         lastError = cranked.getEmulatedStringLiteral("Invalid seek whence");

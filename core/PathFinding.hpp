@@ -66,7 +66,7 @@ namespace cranked {
         [[nodiscard]] GraphNode findById(int id) const {
             for (const auto& node : nodes) {
                 if (node->id == id)
-                    return node.get();
+                    return node;
             }
             return nullptr;
         }
@@ -74,7 +74,7 @@ namespace cranked {
         [[nodiscard]] GraphNode findByXY(int x, int y) const {
             for (const auto& node : nodes) {
                 if (node->x == x and node->y == y)
-                    return node.get();
+                    return node;
             }
             return nullptr;
         }

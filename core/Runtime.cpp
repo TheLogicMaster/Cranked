@@ -34,7 +34,7 @@ int32 cranked::playdate_video_renderFrame(Cranked *cranked, VideoPlayer p, int32
         return false;
     }
     p->currentFrame = n;
-    p->target->drawBitmap(p->frames[n].get(), 0, 0);
+    p->target->drawBitmap(p->frames[n], 0, 0);
     return true;
 }
 
@@ -58,7 +58,7 @@ void cranked::playdate_video_getInfo(Cranked *cranked, VideoPlayer p, int32 *out
 Bitmap cranked::playdate_video_getContext(Cranked *cranked, VideoPlayer p) {
     if (!p->target)
         p->target = cranked->heap.construct<LCDBitmap_32>(*cranked, p->size.x, p->size.y);
-    return p->target.get();
+    return p->target;
 }
 
 void cranked::playdate_graphics_clear(Cranked *cranked, uint32 color) {
@@ -66,44 +66,44 @@ void cranked::playdate_graphics_clear(Cranked *cranked, uint32 color) {
 }
 
 void cranked::playdate_graphics_setBackgroundColor(Cranked *cranked, int32 color) {
-    cranked->graphics.getCurrentDisplayContext().backgroundColor = LCDSolidColor(color);
+    cranked->graphics.getContext().backgroundColor = LCDSolidColor(color);
 }
 
 void cranked::playdate_graphics_setStencil(Cranked *cranked, Bitmap stencil) {
-    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    auto &ctx = cranked->graphics.getContext();
     ctx.stencil = stencil;
     ctx.stencilTiled = false;
 }
 
 int32 cranked::playdate_graphics_setDrawMode(Cranked *cranked, int32 mode) {
-    auto &context = cranked->graphics.getCurrentDisplayContext();
+    auto &context = cranked->graphics.getContext();
     auto prev = context.bitmapDrawMode;
     context.bitmapDrawMode = LCDBitmapDrawMode(mode);
     return (int32)prev;
 }
 
 void cranked::playdate_graphics_setDrawOffset(Cranked *cranked, int32 dx, int32 dy) {
-    cranked->graphics.getCurrentDisplayContext().drawOffset = {dx, dy};
+    cranked->graphics.getContext().drawOffset = {dx, dy};
 }
 
 void cranked::playdate_graphics_setClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
-    cranked->graphics.getCurrentDisplayContext().clipRect = {x, y, width, height};
+    cranked->graphics.getContext().clipRect = {x, y, width, height};
 }
 
 void cranked::playdate_graphics_clearClipRect(Cranked *cranked) {
-    cranked->graphics.getCurrentDisplayContext().clipRect = {};
+    cranked->graphics.getContext().clipRect = {};
 }
 
 void cranked::playdate_graphics_setLineCapStyle(Cranked *cranked, int32 endCapStyle) {
-    cranked->graphics.getCurrentDisplayContext().lineEndCapStyle = LCDLineCapStyle(endCapStyle);
+    cranked->graphics.getContext().lineEndCapStyle = LCDLineCapStyle(endCapStyle);
 }
 
 void cranked::playdate_graphics_setFont(Cranked *cranked, Font font) {
-    cranked->graphics.getCurrentDisplayContext().setFont(PDFontVariant::Normal, font);
+    cranked->graphics.getContext().setFont(PDFontVariant::Normal, font);
 }
 
 void cranked::playdate_graphics_setTextTracking(Cranked *cranked, int32 tracking) {
-    cranked->graphics.getCurrentDisplayContext().textTracking = tracking;
+    cranked->graphics.getContext().textTracking = tracking;
 }
 
 void cranked::playdate_graphics_pushContext(Cranked *cranked, Bitmap target) {
@@ -151,7 +151,7 @@ void cranked::playdate_graphics_drawScaledBitmap(Cranked *cranked, Bitmap bitmap
 }
 
 int32 cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32 len, int32 encoding, int32 x, int32 y) {
-    cranked->graphics.drawText(text, (int)len, PDStringEncoding(encoding), x, y);
+    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, cranked->graphics.getContext().fonts, nullptr, (PDStringEncoding)encoding, {}, {}, {}, 0, (int)len);
     return 0; // Todo: Return value?
 }
 
@@ -246,7 +246,7 @@ void cranked::playdate_graphics_loadIntoBitmapTable(Cranked *cranked, uint8 *pat
 }
 
 Bitmap cranked::playdate_graphics_getTableBitmap(Cranked *cranked, BitmapTable table, int32 idx) {
-    return idx < table->bitmaps.size() ? table->bitmaps[idx].get() : nullptr;
+    return idx < table->bitmaps.size() ? table->bitmaps[idx] : nullptr;
 }
 
 Font cranked::playdate_graphics_loadFont(Cranked *cranked, uint8 *path, cref_t *outerr) {
@@ -262,8 +262,8 @@ Font cranked::playdate_graphics_loadFont(Cranked *cranked, uint8 *path, cref_t *
 
 FontPage cranked::playdate_graphics_getFontPage(Cranked *cranked, Font font, uint32 c) {
     try {
-        return font->pages.at((int)c / 256).get();
-    } catch (out_of_range &) { // Todo: Don't use exceptions
+        return font->pages.at((int)c / 256);
+    } catch (out_of_range &) {
         return nullptr;
     }
 }
@@ -275,40 +275,23 @@ LCDFontGlyph_32 *cranked::playdate_graphics_getPageGlyph(Cranked *cranked, FontP
             *bitmap = cranked->toVirtualAddress(glyph->bitmap.get());
         if (advance)
             *advance = glyph->advance;
-        return glyph.get();
-    } catch (out_of_range &) { // Todo: Don't use exceptions
+        return glyph;
+    } catch (out_of_range &) {
         return nullptr;
     }
 }
 
 int32 cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_32 *glyph, uint32 glyphcode, uint32 nextcode) {
+    // Todo: Is this correct or backwards?
     try {
-        return nextcode < 256 ? glyph->shortKerningTable.at((int)nextcode) : glyph->longKerningTable.at((int)nextcode);
-    } catch (out_of_range &) { // Todo: Don't use exceptions
+        return glyph->kerningTable.at((int)nextcode);
+    } catch (out_of_range &) {
         return 0;
     }
 }
 
 int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void *text, uint32 len, int32 encoding, int32 tracking) {
-    // Todo: Support other encodings
-    int size = 0;
-    auto string = (const char *) text;
-    while (*string) {
-        LCDFontGlyph_32 *glyph{};
-        char character = *string;
-        size += font->glyphWidth;
-        try {
-            glyph = font->pages.at(character / 256)->glyphs.at(character % 256).get();
-        } catch (out_of_range &) {}
-        if (glyph) {
-            size += glyph->advance;
-            // Todo: Kerning
-        }
-        string++;
-        if (*string)
-            size += tracking;
-    }
-    return size;
+    return cranked->graphics.getTextWidth(font, { (char *)text, strlen((char *)text) }, (StringEncoding)encoding, tracking, (int)len);
 }
 
 uint8 *cranked::playdate_graphics_getFrame(Cranked *cranked) {
@@ -341,7 +324,7 @@ int32 cranked::playdate_graphics_checkMaskCollision(Cranked *cranked, Bitmap bit
 }
 
 void cranked::playdate_graphics_setScreenClipRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height) {
-    cranked->graphics.getCurrentDisplayContext().clipRect = { x, y, width, height };
+    cranked->graphics.getContext().clipRect = { x, y, width, height };
 }
 
 void cranked::playdate_graphics_fillPolygon(Cranked *cranked, int32 nPoints, int32 *coords, uint32 color, int32 fillrule) {
@@ -353,7 +336,7 @@ uint8 cranked::playdate_graphics_getFontHeight(Cranked *cranked, Font font) {
 }
 
 Bitmap cranked::playdate_graphics_getDisplayBufferBitmap(Cranked *cranked) {
-    return cranked->graphics.frameBuffer.get();
+    return cranked->graphics.frameBuffer;
 }
 
 void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, Bitmap bitmap, int32 x, int32 y, float rotation, float centerx, float centery, float xscale, float yscale) {
@@ -361,7 +344,7 @@ void cranked::playdate_graphics_drawRotatedBitmap(Cranked *cranked, Bitmap bitma
 }
 
 void cranked::playdate_graphics_setTextLeading(Cranked *cranked, int32 lineHeightAdustment) {
-    cranked->graphics.getCurrentDisplayContext().textLeading = lineHeightAdustment;
+    cranked->graphics.getContext().textLeading = lineHeightAdustment;
 }
 
 int32 cranked::playdate_graphics_setBitmapMask(Cranked *cranked, Bitmap bitmap, Bitmap mask) {
@@ -373,11 +356,11 @@ Bitmap cranked::playdate_graphics_getBitmapMask([[maybe_unused]] Cranked *cranke
     if (!bitmap->mask)
         return nullptr;
     bitmap->mask->reference();
-    return bitmap->mask.get();
+    return bitmap->mask;
 }
 
 void cranked::playdate_graphics_setStencilImage(Cranked *cranked, Bitmap stencil, int32 tile) {
-    auto &ctx = cranked->graphics.getCurrentDisplayContext();
+    auto &ctx = cranked->graphics.getContext();
     ctx.stencil = stencil;
     ctx.stencilTiled = tile;
 }
@@ -387,7 +370,7 @@ Font cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_3
 }
 
 int32 cranked::playdate_graphics_getTextTracking(Cranked *cranked) {
-    return cranked->graphics.getCurrentDisplayContext().textTracking;
+    return cranked->graphics.getContext().textTracking;
 }
 
 void cranked::playdate_graphics_setPixel(Cranked *cranked, int32 x, int32 y, uint32 c) {
@@ -406,7 +389,8 @@ void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable
 }
 
 void cranked::playdate_graphics_drawTextInRect(Cranked *cranked, void *text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align) {
-    // Todo
+    auto &ctx = cranked->graphics.getContext();
+    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, ctx.fonts, nullptr, (StringEncoding)encoding, { width, height }, (TextWrap)wrap, (TextAlign)align, 0, (int)len);
 }
 
 void *cranked::playdate_sys_realloc(Cranked *cranked, void *ptr, uint32 size) {
@@ -438,7 +422,7 @@ void cranked::playdate_sys_logToConsole([[maybe_unused]] Cranked *cranked, uint8
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
     va_end(args);
-    printf("\n");// Doesn't depend on Lua setNewlinePrinted flag
+    printf("\n"); // Doesn't depend on Lua setNewlinePrinted flag
 }
 
 void cranked::playdate_sys_error(Cranked *cranked, uint8 *fmt, ...) {
@@ -446,12 +430,12 @@ void cranked::playdate_sys_error(Cranked *cranked, uint8 *fmt, ...) {
     va_start(args, fmt);
     vprintf((const char *) fmt, args);
     va_end(args);
-    printf("\n");// Doesn't depend on Lua setNewlinePrinted flag
+    printf("\n"); // Doesn't depend on Lua setNewlinePrinted flag
     cranked->stop();
 }
 
-int32 cranked::playdate_sys_getLanguage([[maybe_unused]] Cranked *cranked) {
-    return (int) PDLanguage::English;
+int32 cranked::playdate_sys_getLanguage(Cranked *cranked) {
+    return (int) cranked->systemLanguage;
 }
 
 uint32 cranked::playdate_sys_getCurrentTimeMilliseconds(Cranked *cranked) {
@@ -472,9 +456,9 @@ void cranked::playdate_sys_drawFPS(Cranked *cranked, int32 x, int32 y) {
     if (string.length() < 2)
         string = "0" + string;
     cranked->graphics.fillRect(x - 2, y - 2, 14 * (int)string.size() + 2, 30, LCDSolidColor::White);
-    auto context = cranked->graphics.pushContext(cranked->graphics.frameBuffer.get());
+    auto context = cranked->graphics.pushContext(cranked->graphics.frameBuffer);
     context.bitmapDrawMode = LCDBitmapDrawMode::Copy;
-    cranked->graphics.drawText(string.c_str(), (int)string.size(), PDStringEncoding::ASCII, x, y, cranked->graphics.getSystemFont());
+    cranked->graphics.drawText(x, y, string, cranked->graphics.getContext().fonts);
     cranked->graphics.popContext();
 }
 
@@ -610,12 +594,33 @@ int32 cranked::playdate_sys_shouldDisplay24HourTime(Cranked *cranked) {
 }
 
 void cranked::playdate_sys_convertEpochToDateTime(Cranked *cranked, uint32 epoch, PDDateTime_32 *datetime) {
-    // Todo
+    if (!datetime)
+        return;
+    auto time = chrono::system_clock::from_time_t(epoch);
+    auto ymd = chrono::year_month_day{chrono::floor<chrono::days>(time)};
+    auto weekday = chrono::weekday{chrono::floor<chrono::days>(time)};
+    auto timeOffset = time - chrono::floor<chrono::days>(time);
+    chrono::hh_mm_ss hms{timeOffset};
+    datetime->year = (int) ymd.year();
+    datetime->month = (int) (uint) ymd.month();
+    datetime->day = (int) (uint) ymd.day();
+    datetime->hour = (int) hms.hours().count();
+    datetime->minute = (int) hms.minutes().count();
+    datetime->second = (int) hms.seconds().count();
+    datetime->weekday = weekday.iso_encoding();
 }
 
 uint32 cranked::playdate_sys_convertDateTimeToEpoch(Cranked *cranked, PDDateTime_32 *datetime) {
-    // Todo
-    return 0;
+    if (!datetime)
+        return 0;
+    chrono::system_clock::time_point time{};
+    time += chrono::years(datetime->year);
+    time += chrono::months(datetime->month);
+    time += chrono::days(datetime->day);
+    time += chrono::hours(datetime->hour);
+    time += chrono::minutes(datetime->minute);
+    time += chrono::seconds(datetime->second);
+    return (uint32)chrono::system_clock::to_time_t(time);
 }
 
 void cranked::playdate_sys_clearICache(Cranked *cranked) {
@@ -1609,7 +1614,7 @@ int32 cranked::playdate_file_tell(Cranked *cranked, File file) {
 }
 
 int32 cranked::playdate_file_seek(Cranked *cranked, File file, int32 pos, int32 whence) {
-    return cranked->files.seek(file, pos, whence);
+    return cranked->files.seek(file, pos, (SeekWhence)whence);
 }
 
 void cranked::playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32 flag) {
@@ -1617,7 +1622,7 @@ void cranked::playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32 flag) {
 }
 
 void cranked::playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRect) {
-    // Todo
+    cranked->graphics.addSpriteDirtyRect(toRect(dirtyRect));
 }
 
 void cranked::playdate_sprite_drawSprites(Cranked *cranked) {
@@ -1686,7 +1691,7 @@ void cranked::playdate_sprite_setImage(Cranked *cranked, Sprite sprite, Bitmap i
 }
 
 Bitmap cranked::playdate_sprite_getImage(Cranked *cranked, Sprite sprite) {
-    return sprite->image.get();
+    return sprite->image;
 }
 
 void cranked::playdate_sprite_setSize(Cranked *cranked, Sprite s, float width, float height) {
@@ -2397,7 +2402,7 @@ void cranked::playdate_sound_synth_setFrequencyModulator(Cranked *cranked, Synth
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getFrequencyModulator(Cranked *cranked, Synth synth) {
-    return synth->frequencyModulator.get();
+    return synth->frequencyModulator;
 }
 
 void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, Synth synth, SynthSignalValue modDerived) {
@@ -2405,7 +2410,7 @@ void cranked::playdate_sound_synth_setAmplitudeModulator(Cranked *cranked, Synth
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getAmplitudeModulator(Cranked *cranked, Synth synth) {
-    return synth->amplitudeModulator.get();
+    return synth->amplitudeModulator;
 }
 
 int32 cranked::playdate_sound_synth_getParameterCount(Cranked *cranked, Synth synth) {
@@ -2423,7 +2428,7 @@ void cranked::playdate_sound_synth_setParameterModulator(Cranked *cranked, Synth
 }
 
 SynthSignalValue cranked::playdate_sound_synth_getParameterModulator(Cranked *cranked, Synth synth, int32 parameter) {
-    return synth->parameterModulators[parameter].get();
+    return synth->parameterModulators[parameter];
 }
 
 void cranked::playdate_sound_synth_playNote(Cranked *cranked, Synth synth, float freq, float vel, float len, uint32 when) {
@@ -2459,7 +2464,7 @@ int32 cranked::playdate_sound_synth_isPlaying(Cranked *cranked, Synth synth) {
 }
 
 SynthEnvelope cranked::playdate_sound_synth_getEnvelope(Cranked *cranked, Synth synth) {
-    return synth->envelope.get();
+    return synth->envelope;
 }
 
 int32 cranked::playdate_sound_synth_setWavetable(Cranked *cranked, Synth synth, AudioSample sample, int32 log2size, int32 columns, int32 rows) {
@@ -2567,7 +2572,7 @@ void cranked::playdate_sound_track_setInstrument(Cranked *cranked, SequenceTrack
 }
 
 SynthInstrument cranked::playdate_sound_track_getInstrument(Cranked *cranked, SequenceTrack track) {
-    return track->instrument.get();
+    return track->instrument;
 }
 
 void cranked::playdate_sound_track_addNoteEvent(Cranked *cranked, SequenceTrack track, uint32 step, uint32 len, float note, float velocity) {
@@ -2743,7 +2748,7 @@ void cranked::playdate_sound_effect_twopolefilter_setFrequencyModulator(Cranked 
 }
 
 SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getFrequencyModulator(Cranked *cranked, TwoPoleFilter filter) {
-    return filter->frequencyModulator.get();
+    return filter->frequencyModulator;
 }
 
 void cranked::playdate_sound_effect_twopolefilter_setGain(Cranked *cranked, TwoPoleFilter filter, float gain) {
@@ -2759,7 +2764,7 @@ void cranked::playdate_sound_effect_twopolefilter_setResonanceModulator(Cranked 
 }
 
 SynthSignalValue cranked::playdate_sound_effect_twopolefilter_getResonanceModulator(Cranked *cranked, TwoPoleFilter filter) {
-    return filter->resonanceModulator.get();
+    return filter->resonanceModulator;
 }
 
 OnePoleFilter cranked::playdate_sound_effect_onepolefilter_newFilter(Cranked *cranked) {
@@ -2779,7 +2784,7 @@ void cranked::playdate_sound_effect_onepolefilter_setParameterModulator(Cranked 
 }
 
 SynthSignalValue cranked::playdate_sound_effect_onepolefilter_getParameterModulator(Cranked *cranked, OnePoleFilter filter) {
-    return filter->cutoffFrequencyModulator.get();
+    return filter->cutoffFrequencyModulator;
 }
 
 BitCrusher cranked::playdate_sound_effect_bitcrusher_newBitCrusher(Cranked *cranked) {
@@ -2799,7 +2804,7 @@ void cranked::playdate_sound_effect_bitcrusher_setAmountModulator(Cranked *crank
 }
 
 SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getAmountModulator(Cranked *cranked, BitCrusher filter) {
-    return filter->amountModulator.get();
+    return filter->amountModulator;
 }
 
 void cranked::playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked, BitCrusher filter, float undersampling) {
@@ -2811,7 +2816,7 @@ void cranked::playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *
 }
 
 SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher filter) {
-    return filter->undersamplingModulator.get();
+    return filter->undersamplingModulator;
 }
 
 RingModulator cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
@@ -2831,7 +2836,7 @@ void cranked::playdate_sound_effect_ringmodulator_setFrequencyModulator(Cranked 
 }
 
 SynthSignalValue cranked::playdate_sound_effect_ringmodulator_getFrequencyModulator(Cranked *cranked, RingModulator filter) {
-    return filter->frequencyModulator.get();
+    return filter->frequencyModulator;
 }
 
 DelayLine cranked::playdate_sound_effect_delayline_newDelayLine(Cranked *cranked, int32 length, int32 stereo) {
@@ -2868,7 +2873,7 @@ void cranked::playdate_sound_effect_delayline_setTapDelayModulator(Cranked *cran
 }
 
 SynthSignalValue cranked::playdate_sound_effect_delayline_getTapDelayModulator(Cranked *cranked, DelayLineTap t) {
-    return t->delayModulator.get();
+    return t->delayModulator;
 }
 
 void cranked::playdate_sound_effect_delayline_setTapChannelsFlipped(Cranked *cranked, DelayLineTap t, int32 flip) {
@@ -2896,7 +2901,7 @@ void cranked::playdate_sound_effect_overdrive_setLimitModulator(Cranked *cranked
 }
 
 SynthSignalValue cranked::playdate_sound_effect_overdrive_getLimitModulator(Cranked *cranked, Overdrive o) {
-    return o->limitModulator.get();
+    return o->limitModulator;
 }
 
 void cranked::playdate_sound_effect_overdrive_setOffset(Cranked *cranked, Overdrive o, float offset) {
@@ -2908,7 +2913,7 @@ void cranked::playdate_sound_effect_overdrive_setOffsetModulator(Cranked *cranke
 }
 
 SynthSignalValue cranked::playdate_sound_effect_overdrive_getOffsetModulator(Cranked *cranked, Overdrive o) {
-    return o->offsetModulator.get();
+    return o->offsetModulator;
 }
 
 SoundEffect cranked::playdate_sound_effect_newEffect(Cranked *cranked, cref_t proc, void *userdata) {
@@ -2929,7 +2934,7 @@ void cranked::playdate_sound_effect_setMixModulator(Cranked *cranked, SoundEffec
 }
 
 SynthSignalValue cranked::playdate_sound_effect_getMixModulator(Cranked *cranked, SoundEffect effectDerived) {
-    return cranked->audio.effectFromDerived(effectDerived)->mixModulator.get();
+    return cranked->audio.effectFromDerived(effectDerived)->mixModulator;
 }
 
 void cranked::playdate_sound_effect_setUserdata(Cranked *cranked, SoundEffect effectDerived, void *userdata) {
@@ -2951,7 +2956,6 @@ void cranked::playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel 
 }
 
 int32 cranked::playdate_sound_channel_addSource(Cranked *cranked, SoundChannel channel, SoundSource sourceDerived) {
-
     auto source = cranked->audio.sourceFromDerived(sourceDerived);
     if (find(channel->sources.begin(), channel->sources.end(), source) != channel->sources.end())
         return false;
@@ -2990,7 +2994,7 @@ void cranked::playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundC
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getVolumeModulator(Cranked *cranked, SoundChannel channel) {
-    return channel->volumeModulator.get();
+    return channel->volumeModulator;
 }
 
 void cranked::playdate_sound_channel_setPan(Cranked *cranked, SoundChannel channel, float pan) {
@@ -3002,15 +3006,15 @@ void cranked::playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChan
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel channel) {
-    return channel->panModulator.get();
+    return channel->panModulator;
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel channel) {
-    return channel->drySignal.get();
+    return channel->drySignal;
 }
 
 SynthSignalValue cranked::playdate_sound_channel_getWetLevelSignal(Cranked *cranked, SoundChannel channel) {
-    return channel->wetSignal.get();
+    return channel->wetSignal;
 }
 
 uint32 cranked::playdate_sound_getCurrentTime(Cranked *cranked) {
@@ -3023,7 +3027,7 @@ SoundSource cranked::playdate_sound_addSource(Cranked *cranked, cref_t callback,
 }
 
 SoundChannel cranked::playdate_sound_getDefaultChannel(Cranked *cranked) {
-    return cranked->audio.mainChannel.get();
+    return cranked->audio.mainChannel;
 }
 
 int32 cranked::playdate_sound_addChannel(Cranked *cranked, SoundChannel channel) {
