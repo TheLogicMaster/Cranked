@@ -178,39 +178,28 @@ namespace cranked {
             return time;
         }
 
-        [[nodiscard]] GraphicsFlip asFlip() const {
+        template<typename T>
+        [[nodiscard]] T asNamedEnum(T defaultVal = {}) const {
             if (isInt())
-                return (GraphicsFlip)asInt();
-            if (isString()) {
-                auto str = stringToLower(asString());
-                if (str == "flipX")
-                    return GraphicsFlip::FlippedX;
-                if (str == "flipY")
-                    return GraphicsFlip::FlippedY;
-                if (str == "flipXY")
-                    return GraphicsFlip::FlippedXY;
-            }
-            return GraphicsFlip::Unflipped;
+                return (T)asInt();
+            if (isString())
+                return magic_enum::enum_cast<T>(asString(), magic_enum::case_insensitive).value_or(defaultVal);
+            return defaultVal;
         }
 
-        [[nodiscard]] PDFontVariant asFontVariant() const {
-            if (isInt())
-                return (PDFontVariant)asInt();
-            if (isString()) {
-                auto str = stringToLower(asString());
-                if (str == "normal")
-                    return PDFontVariant::Normal;
-                if (str == "bold")
-                    return PDFontVariant::Bold;
-                if (str == "italic")
-                    return PDFontVariant::Italic;
-            }
-            return PDFontVariant::Normal;
+        [[nodiscard]] GraphicsFlip asFlip() const {
+            return asNamedEnum<GraphicsFlip>();
+        }
+
+        [[nodiscard]] BitmapDrawMode asBitmapDrawMode() const {
+            return asNamedEnum<BitmapDrawMode>();
+        }
+
+        [[nodiscard]] FontVariant asFontVariant() const {
+            return asNamedEnum<FontVariant>();
         }
 
         [[nodiscard]] PDLanguage asLanguage() const {
-            if (isInt())
-                return (PDLanguage)asInt();
             if (isString()) {
                 auto str = stringToLower(asString());
                 if (str == "en")
@@ -218,45 +207,15 @@ namespace cranked {
                 if (str == "jp")
                     return PDLanguage::Japanese;
             }
-            return PDLanguage::English;
+            return asNamedEnum<PDLanguage>();
         }
 
         [[nodiscard]] PDButtons asButton() const {
-            if (isInt())
-                return (PDButtons)asInt();
-            if (isString()) {
-                auto str = stringToLower(asString());
-                if (str == "left")
-                    return PDButtons::Left;
-                if (str == "right")
-                    return PDButtons::Right;
-                if (str == "up")
-                    return PDButtons::Up;
-                if (str == "down")
-                    return PDButtons::Down;
-                if (str == "b")
-                    return PDButtons::B;
-                if (str == "a")
-                    return PDButtons::A;
-            }
-            return {};
+            return asNamedEnum<PDButtons>();
         }
 
         [[nodiscard]] Bump::ResponseType asCollisionResponse() const {
-            if (isInt())
-                return (Bump::ResponseType)asInt();
-            if (isString()) {
-                auto str = stringToLower(asString());
-                if (str == "slide")
-                    return Bump::ResponseType::Slide;
-                if (str == "freeze")
-                    return Bump::ResponseType::Freeze;
-                if (str == "overlap")
-                    return Bump::ResponseType::Overlap;
-                if (str == "bounce")
-                    return Bump::ResponseType::Bounce;
-            }
-            return Bump::ResponseType::Freeze;
+            return asNamedEnum<Bump::ResponseType>();
         }
 
         void setStringElement(int n, const char *value) const {
@@ -454,6 +413,18 @@ namespace cranked {
         ~LuaValGuard() noexcept(false) {
             if (!popped)
                 pop();
+        }
+
+        LuaVal *operator->() {
+            return &val;
+        }
+
+        LuaVal &operator*() {
+            return val;
+        }
+
+        operator LuaVal() const { // NOLINT(*-explicit-constructor)
+            return val;
         }
 
         void pop() {

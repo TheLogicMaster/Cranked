@@ -414,27 +414,29 @@ void LCDSprite_32::update() {
         return;
     if (updateFunction)
         cranked.nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t>(updateFunction, this);
-    else if (LuaValGuard value{ cranked.luaEngine.getResourceValue(this) }; value.val.isTable()) {
-        if (auto callback = value.val.getFieldRaw("update"); callback.isFunction()) {
-            bool isUpdateFunc; // Guard against playdate.graphics.sprite.update being found and causing C stack overflow
-            {
-                if (!cranked.luaEngine.getQualifiedLuaGlobal("playdate.graphics.sprite.update"))
-                    throw CrankedError("Missing Sprite table");
-                LuaValGuard updateFunc { LuaVal(cranked.getLuaContext()) };
-                isUpdateFunc = lua_compare(cranked.getLuaContext(), callback, updateFunc.val, LUA_OPEQ);
-            }
-            if (isUpdateFunc) {
+    else if (cranked.luaEngine.isLoaded()) {
+        if (LuaValGuard value{ cranked.luaEngine.getResourceValue(this) }; value.val.isTable()) {
+            if (auto callback = value.val.getFieldRaw("update"); callback.isFunction()) {
+                bool isUpdateFunc; // Guard against playdate.graphics.sprite.update being found and causing C stack overflow
+                {
+                    if (!cranked.luaEngine.getQualifiedLuaGlobal("playdate.graphics.sprite.update"))
+                        throw CrankedError("Missing Sprite table");
+                    LuaValGuard updateFunc { LuaVal(cranked.getLuaContext()) };
+                    isUpdateFunc = lua_compare(cranked.getLuaContext(), callback, updateFunc.val, LUA_OPEQ);
+                }
+                if (isUpdateFunc) {
+                    lua_pop(cranked.getLuaContext(), 1);
+                    return;
+                }
+                cranked.luaEngine.pushResource(this);
+                if (int result = lua_pcall(cranked.getLuaContext(), 1, 0, 0); result != LUA_OK) {
+                    string errStr = lua_isstring(cranked.getLuaContext(), -1) ? lua_tostring(cranked.getLuaContext(), -1) : "";
+                    lua_pop(cranked.getLuaContext(), 1);
+                    throw CrankedError("Exception in Sprite update: {}, ({})", cranked.luaEngine.getLuaError(result), errStr);
+                }
+            } else
                 lua_pop(cranked.getLuaContext(), 1);
-                return;
-            }
-            cranked.luaEngine.pushResource(this);
-            if (int result = lua_pcall(cranked.getLuaContext(), 1, 0, 0); result != LUA_OK) {
-                string errStr = lua_isstring(cranked.getLuaContext(), -1) ? lua_tostring(cranked.getLuaContext(), -1) : "";
-                lua_pop(cranked.getLuaContext(), 1);
-                throw CrankedError("Exception in Sprite update: {}, ({})", cranked.luaEngine.getLuaError(result), errStr);
-            }
-        } else
-            lua_pop(cranked.getLuaContext(), 1);
+        }
     }
 }
 
@@ -550,6 +552,8 @@ void Graphics::drawLine(int x1, int y1, int x2, int y2, int width, const Color &
     // Todo: Draws slightly differently from official implementation, steps differently
     // Todo: A DDA algorithm for thickness would be better
     Vec2 tangent = IntVec2{ y2 - y1, x2 - x1 }.as<float>().normalized();
+    if (tangent.isInvalid())
+        tangent = {};
     int steps = (int)ceilf((float)width / 2.0f);
     for (int i = 0; i < steps; i++) {
         Vec2 offset = (tangent * i);
@@ -587,6 +591,8 @@ void Graphics::fillRect(int x, int y, int width, int height, const Color &color)
 }
 
 void Graphics::drawRoundRect(int x, int y, int width, int height, int radius, const Color &color) {
+    // Todo: Support line thickness
+
     radius = min(radius, min(width, height) / 2);
 
     auto drawCorner = [&](int xOff, int yOff, int corner) {
@@ -676,8 +682,8 @@ void Graphics::drawBitmap(Bitmap bitmap, int x, int y, LCDBitmapFlip flip, bool 
     // Todo: This could be heavily optimized with bitwise operations
     auto &context = getContext();
     auto mode = context.bitmapDrawMode;
-    bool flipY = flip == LCDBitmapFlip::FlippedY or flip == LCDBitmapFlip::FlippedXY;
-    bool flipX = flip == LCDBitmapFlip::FlippedX or flip == LCDBitmapFlip::FlippedXY;
+    bool flipY = flip == LCDBitmapFlip::FlipY or flip == LCDBitmapFlip::FlipXY;
+    bool flipX = flip == LCDBitmapFlip::FlipX or flip == LCDBitmapFlip::FlipXY;
     if (sourceRect)
         sourceRect = *sourceRect - IntVec2{x, y};
     for (int i = 0; i < bitmap->height; i++)
@@ -738,6 +744,7 @@ void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts,
     ZoneScoped;
 
     // Todo: Support alignment
+    // Todo: Respect newline characters
 
     auto &ctx = getContext();
     const bool useStyling = !font;
@@ -834,7 +841,9 @@ void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts,
     }
 }
 
-int Graphics::getTextWidth(Font font, string_view text, StringEncoding encoding, int tracking, int charCount) {
+IntVec2 Graphics::measureText(Font font, string_view text, StringEncoding encoding, int tracking, int leadingAdjustment, int charCount) {
+    // Todo: This needs to behave the same as drawText, so the logic to layout the text into lines without drawing needs to be pulled out
+
     auto &ctx = getContext();
 
     u32string characters;
@@ -871,7 +880,7 @@ int Graphics::getTextWidth(Font font, string_view text, StringEncoding encoding,
 
         width += kerning + glyph->advance + font->tracking + ctx.textTracking + tracking;
     }
-    return width;
+    return { width, font->glyphHeight }; // Todo: Actual height
 }
 
 const char *Graphics::getLocalizedText(const char *key, PDLanguage language) {
@@ -1255,11 +1264,6 @@ void Graphics::drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset, opt
             drawBitmap(tilemap->table->bitmaps[index], x + cellSize.x * j, drawY, GraphicsFlip::Unflipped, ignoreOffset); // Todo: Support sourceRect
         }
     }
-}
-
-IntVec2 Graphics::measureText(const char *text, const FontFamily &fonts, int leadingAdjustment) {
-    auto font = fonts.regular ? fonts.regular.get() : getSystemFont(PDFontVariant::Normal); // Todo: Support families properly
-    return { (int)strlen(text) * font->glyphWidth, font->glyphWidth }; // Todo: Measure properly
 }
 
 bool Graphics::checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect) {

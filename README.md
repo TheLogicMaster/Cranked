@@ -58,7 +58,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Ability to act as simulator (Useful debug features)
 - See if emulator can play encrypted games with a dumped key or something (Maybe limiting to just decrypted games)
 - System UI/software from SDK (Create replacement assets, *Darker Grotesque* should be able to be adopted in place of *Roobert* system font)
-- Investigate pre-2.0.0 binaries to handle uncompressed data
+- Investigate pre-2.0.0 binaries to handle uncompressed data (Use PDC flag)
 - Emulator API wrapper to hide all the messy internals, possible C compatible
 - Values checks, since plenty of null/illegal API parameters will cause a native seg-fault
 - Dynarmic native engine support for more portability
@@ -72,7 +72,8 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Better exception handling and stack traces, potentially with disassembled Asm and Lua for context, especially more Lua context, maybe even decompilation
 - Lua debugger functionality
 - Support Debug Adaptor Protocol like Simulator
-~~~~~~~~~~~~
+- Events/callbacks for pausing/stopping
+
 ## Example Compatibility
 - [x] Hello World
 - [x] Sprite Collisions
@@ -96,18 +97,19 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - [ ] Asheteroids (Issue with sprites and Bump, huge memory usage for cells)
 - [x] Accelerometer Test
 - [x] 2020
+- [ ] JSON
 - Single File Examples
   - [ ] Animator (Animation of crank-star is messed up at polygon close region, font measuring is wrong, ellipse drawing needs angle normalization)
   - [ ] Arcs (Ellipse drawing needs work)
   - [ ] Audio
-  - [ ] Balls (Kinda works until crash)
+  - [x] Balls
   - [x] Blur Dither (Text formatting, many graphical differences, un-implemented blur features)
-  - [ ] Collisions (Works with poor performance until crash)
+  - [x] Collisions
   - [x] Crank
   - [x] Draw Mode
   - [ ] Draw Sampled (Mode 7 not implemented)
   - [ ] Draw Sampled 2
-  - [x] Fade Fast (Text formatting)
+  - [x] Fade Fast (Text alignment not implemented)
   - [ ] File (Output does not match)
   - [x] Grid View (Minor graphical issues)
   - [x] Icosohedron
@@ -126,6 +128,9 @@ There is currently no support for running encrypted ROMs from the Catalog.
   - [x] Tile Map Test
   - [ ] Wave Table
   - [x] Zorder
+
+# Game Compatibility
+- [x] [Bobby](https://github.com/yannicka/bobby-playdate) (Graphical differences with text measuring and round rect thickness, BG sprite not working)
 
 ## Internals
 - Unicorn to provide Arm CPU emulation

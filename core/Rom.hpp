@@ -104,66 +104,81 @@ namespace cranked {
 
         vector<uint8> readRomFile(string name, const string &extension = "", const vector<string> &replacedExtensions = {});
 
-        File *findRomFile(const string &name);
+        File *findRomFile(string name);
 
         vector<string> listRomFiles(string base, bool recursive); // Doesn't include PDZ contents
 
-        string getName() {
-            return manifest["name"];
+        const char *getManifestString(const string &name) {
+            if (auto it = manifest.find(name); it != manifest.end())
+                return it->second.c_str();
+            return nullptr;
         }
 
-        string getAuthor() {
-            return manifest["author"];
+        const char * getName() {
+            return getManifestString("name");
         }
 
-        string getDescription() {
-            return manifest["description"];
+        const char *getAuthor() {
+            return getManifestString("author");
         }
 
-        string getBundleID() {
-            return manifest["bundleID"];
+        const char *getDescription() {
+            return getManifestString("description");
         }
 
-        string getVersion() {
-            return manifest["version"];
+        const char *getBundleID() {
+            return getManifestString("bundleID");
+        }
+
+        const char *getVersion() {
+            return getManifestString("version");
         }
 
         int getBuildNumber() {
+            auto buildNumber = getManifestString("buildNumber");
+            if (not buildNumber)
+                return -1;
             try {
-                return stoi(manifest["buildNumber"]);
-            } catch (exception &ex) {
+                return stoi(buildNumber);
+            } catch (exception &) {
                 return -1;
             }
         }
 
-        string getImagePath() {
-            return manifest["imagePath"];
+        const char *getImagePath() {
+            return getManifestString("imagePath");
         }
 
-        string getLaunchSoundPath() {
-            return manifest["launchSoundPath"];
+        const char *getLaunchSoundPath() {
+            return getManifestString("launchSoundPath");
         }
 
-        string getContentWarning() {
-            return manifest["contentWarning"];
+        const char *getContentWarning() {
+            return getManifestString("contentWarning");
         }
 
-        string getContentWarning2() {
-            return manifest["contentWarning2"];
+        const char *getContentWarning2() {
+            return getManifestString("contentWarning2");
         }
 
         Version getPdxVersion() {
+            auto version = getManifestString("pdxversion");
+            if (not version)
+                return {};
             try {
-                return Version(stoi(manifest["pdxversion"]));
-            } catch (exception &ex) {
-                return Version(0);
+                return Version(stoi(version));
+            } catch (exception &) {
+                return {};
             }
         }
 
         int getBuildTime() {
+            auto buildTime = getManifestString("buildTime");
+            if (not buildTime)
+                return -1;
             try {
-                return stoi(manifest["buildtime"]);
-            } catch (exception &ex) {
+                return stoi(buildTime);
+            } catch (exception &) {
                 return -1;
             }
         }
@@ -189,7 +204,8 @@ namespace cranked {
             auto loadLanguage = [&](PDLanguage language, const string &name) {
                 auto &table = mapping[language];
                 try {
-                    table = getStringTable(name + ".strings");
+                    if (findRomFile(name))
+                        table = getStringTable(name);
                 } catch (exception &) {}
             };
 
@@ -236,10 +252,10 @@ namespace cranked {
 
         static vector<uint8> writeImage(Bitmap image);
 
-        static File *findSystemFile(const string &path);
+        static File *findSystemFile(string path);
 
         static Font readSystemFont(const string &path) {
-            auto file = findSystemFile(fs::path("Fonts") / path);
+            auto file = findSystemFile(fs::path("System/Fonts") / path);
             if (!file)
                 throw CrankedError("No such system file: " + path);
             return readFont(file->data.data(), file->data.size());
@@ -248,7 +264,7 @@ namespace cranked {
         Cranked *cranked; // Only present for logging, so optional
         bool loaded{};
         unique_ptr<libzippp::ZipArchive> zip;
-        fs::path path;
+        string path;
         map<string, string> manifest{};
         vector<File> outerFiles;
         vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?
@@ -285,7 +301,8 @@ namespace cranked {
 
         static ImageCell readImageCell(const uint8 *start);
 
-        static pair<string, File> makeSystemFilePair(const string &path, FileType type, const uint8 *data, size_t size) {
+        static pair<string, File> makeSystemFilePair(string path, FileType type, const uint8 *data, size_t size) {
+            path = fs::path(normalizePath(path)).replace_extension().string();
             return pair{ path, File{ path, type, false, (uint32)size, 0, vector(data, data + size), 0 } };
         }
 

@@ -7,9 +7,6 @@ using namespace cranked;
 // Todo: Use new functions (setResourceElement/setResourceField, returnValues, rectFromArgs, intRectFromArgs, LuaValRet without calling pushResource/pushRect/pushVec)
 
 static LuaRet import_lua(Cranked *cranked, const char *name) {
-    string nameStr = name;
-    if (nameStr.ends_with(".png")) // Todo: Better way to handle legacy looking imports of asset files (Seen in Mode7Driver)
-        return 0;
     // Todo: Properly normalize paths
     if (cranked->luaEngine.loadedLuaFiles.contains(name))
         return 0;
@@ -23,6 +20,8 @@ static LuaRet import_lua(Cranked *cranked, const char *name) {
             cranked->luaEngine.loadedLuaFiles.emplace(name);
             return 0;
         }
+    if (cranked->rom->findRomFile(name)) // Ignore imports for resource files
+        return 0;
     luaL_error(cranked->getLuaContext(), "Failed to load module: %s", name);
     return 1;
 }
@@ -105,6 +104,8 @@ static void playdate_setButtonQueueSize(Cranked *cranked, int size) {
 }
 
 static LuaRet playdate_file_modtime_lua(lua_State *context, const char *path) {
+    if (!path)
+        throw CrankedError("Nil path");
     FileStat_32 stat{}; // Official implementation returns garbage on non-existent file, so don't worry about error checking
     Cranked::fromLuaContext(context)->files.stat(path, stat);
     lua_createtable(context, 0, 6);
@@ -119,6 +120,8 @@ static LuaRet playdate_file_modtime_lua(lua_State *context, const char *path) {
 }
 
 static int playdate_file_getSize_lua(Cranked *context, const char *path) {
+    if (!path)
+        throw CrankedError("Nil path");
     FileStat_32 stat{};
     if (context->files.stat(path, stat))
         return -1;
@@ -126,6 +129,8 @@ static int playdate_file_getSize_lua(Cranked *context, const char *path) {
 }
 
 static LuaRet playdate_file_getType_lua(lua_State *context, const char *path) {
+    if (!path)
+        throw CrankedError("Nil path");
     auto type = Cranked::fromLuaContext(context)->files.getType(path);
     if (type)
         lua_pushstring(context, type);
@@ -135,12 +140,16 @@ static LuaRet playdate_file_getType_lua(lua_State *context, const char *path) {
 }
 
 static bool playdate_file_isdir_lua(Cranked *context, const char *path) {
+    if (!path)
+        throw CrankedError("Nil path");
     FileStat_32 stat{};
     context->files.stat(path, stat);
     return stat.isdir;
 }
 
 static LuaRet playdate_file_listFiles_lua(lua_State *context, const char *path, bool showHidden) {
+    if (!path)
+        throw CrankedError("Nil path");
     vector<string> files;
     if (Cranked::fromLuaContext(context)->files.listFiles(path, showHidden, files)) {
         lua_pushnil(context);
@@ -154,14 +163,20 @@ static LuaRet playdate_file_listFiles_lua(lua_State *context, const char *path, 
 }
 
 static bool playdate_file_delete_lua(Cranked *context, const char *path, bool recursive) {
+    if (!path)
+        throw CrankedError("Nil path");
     return !context->files.unlink(path, recursive);
 }
 
 static bool playdate_file_exists_lua(Cranked *context, const char *path) {
+    if (!path)
+        throw CrankedError("Nil path");
     return context->files.exists(path);
 }
 
 static LuaRet playdate_file_open_lua(lua_State *context, const char *path, int mode) {
+    if (!path)
+        throw CrankedError("Nil path");
     constexpr int kFileRead = 3;
     constexpr int kFileWrite = 4;
     constexpr int kFileAppend = 8;
@@ -235,6 +250,10 @@ static void playdate_file_seek_lua(Cranked *context, File file, int offset, Seek
 }
 
 static LuaRet json_decode_lua(Cranked *cranked, const char *str) {
+    if (!str) {
+        pushNil(cranked);
+        return 1;
+    }
     auto context = cranked->getLuaContext();
     function<void(const nlohmann::json&)> createTable;
     createTable = [&](const nlohmann::json &json){
@@ -268,7 +287,7 @@ static LuaRet json_decodeFile_lua(lua_State *context, File file) {
     auto cranked = Cranked::fromLuaContext(context);
     int size = 0;
     constexpr int BUFFER_SEGMENT = 512;
-    vector<char> buffer;
+    vector<char> buffer(BUFFER_SEGMENT);
     while (true) {
         auto returned = cranked->files.read(file, buffer.data() + size, (int) buffer.size() - size);
         if (returned < 0)
@@ -853,6 +872,10 @@ static void playdate_graphics_clearStencil_lua(Cranked *cranked) {
     cranked->graphics.getContext().stencil = nullptr;
 }
 
+static void playdate_graphics_setDrawMode_lua(Cranked *cranked, BitmapDrawMode drawMode) {
+    cranked->graphics.getContext().bitmapDrawMode = drawMode;
+}
+
 static LCDBitmapDrawMode playdate_graphics_getImageDrawMode_lua(Cranked *cranked) {
     return cranked->graphics.getContext().bitmapDrawMode;
 }
@@ -981,7 +1004,7 @@ static LuaRet playdate_getPowerStatus_lua(Cranked *cranked) {
 
 static LuaRet playdate_getSystemMenu_lua(Cranked *cranked) {
     pushTable(cranked); // Just use an empty table
-    if (cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu"))
+    if (!cranked->luaEngine.getQualifiedLuaGlobal("playdate.menu"))
         throw CrankedError("Playdate menu table missing");
     lua_setmetatable(cranked->getLuaContext(), -2);
     return 1;
@@ -1448,7 +1471,7 @@ static const char *playdate_graphics_getLocalizedText_lua(Cranked *cranked, cons
 
 static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *str, LuaVal fontFamily, int leadingAdjustment) {
     auto family = fontFamily.isTable() ? fontFamily.asFontFamily() : cranked->graphics.getContext().fonts;
-    return returnVecValues(cranked, cranked->graphics.measureText(str, family, leadingAdjustment));
+    return returnVecValues(cranked, cranked->graphics.measureText(family.regular, str)); // Todo: Fix
 }
 
 static LuaValRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
@@ -1505,7 +1528,7 @@ static int playdate_graphics_font_getHeight_lua(Cranked *cranked, Font font) {
 }
 
 static int playdate_graphics_font_getTextWidth_lua(Cranked *cranked, Font font, const char *text) {
-    return cranked->graphics.getTextWidth(font, {text, strlen(text)});
+    return cranked->graphics.measureText(font, {text, strlen(text)}).x;
 }
 
 static void playdate_graphics_font_setTracking_lua(Cranked *cranked, Font font, int pixels) {
@@ -1729,7 +1752,7 @@ static LuaValRet playdate_graphics_sprite_overlappingSprites_lua(Cranked *cranke
     auto table = pushTable(cranked);
     for (int i = 0; i < overlapping.size(); i++) {
         LuaValGuard ref(pushResource(cranked, overlapping[i]));
-        table.setElement(i + 1, ref.val);
+        table.setElement(i + 1, ref);
     }
     return table;
 }
@@ -1737,9 +1760,13 @@ static LuaValRet playdate_graphics_sprite_overlappingSprites_lua(Cranked *cranke
 static LuaValRet playdate_graphics_sprite_allOverlappingSprites_lua(Cranked *cranked) {
     auto overlapping = cranked->bump.getAllOverlappingSprites();
     auto table = pushTable(cranked);
-    for (int i = 0; i < overlapping.size(); i++) {
-        LuaValGuard ref(pushResource(cranked, overlapping[i]));
-        table.setElement(i + 1, ref.val);
+    for (int i = 0; i < (int)overlapping.size() / 2; i++) {
+        LuaValGuard pair(pushTable(cranked));
+        LuaValGuard first(pushResource(cranked, overlapping[i * 2]));
+        pair->setElement(1, first);
+        LuaValGuard second(pushResource(cranked, overlapping[i * 2 + 1]));
+        pair->setElement(2, second);
+        table.setElement(i + 1, pair);
     }
     return table;
 }
@@ -2888,6 +2915,7 @@ void LuaEngine::registerLuaGlobals() {
 
         {
             auto menuApi = LuaApiHelper(getContext(), "menu");
+            menuApi.setSelfIndex();
             menuApi.setString("__name", "playdate.menu");
             menuApi.setWrappedFunction<playdate_menu_addMenuItem_lua>("addMenuItem");
             menuApi.setWrappedFunction<playdate_menu_addCheckmarkMenuItem_lua>("addCheckmarkMenuItem");
@@ -2898,6 +2926,7 @@ void LuaEngine::registerLuaGlobals() {
 
             {
                 auto menuItem = LuaApiHelper(getContext(), "item");
+                menuItem.setSelfIndex();
                 menuItem.setString("__name", "playdate.menu.item");
                 menuItem.setWrappedFunction<playdate_menu_item_index_lua>("__index");
                 menuItem.setWrappedFunction<playdate_menu_item_newindex_lua>("__newindex");
@@ -2983,9 +3012,9 @@ void LuaEngine::registerLuaGlobals() {
             auto geometry = LuaApiHelper(getContext(), "geometry");
             geometry.setSelfIndex();
             geometry.setInteger("kUnflipped", (int)GraphicsFlip::Unflipped);
-            geometry.setInteger("kFlippedX", (int)GraphicsFlip::FlippedX);
-            geometry.setInteger("kFlippedY", (int)GraphicsFlip::FlippedY);
-            geometry.setInteger("kFlippedXY", (int)GraphicsFlip::FlippedXY);
+            geometry.setInteger("kFlippedX", (int)GraphicsFlip::FlipX);
+            geometry.setInteger("kFlippedY", (int)GraphicsFlip::FlipY);
+            geometry.setInteger("kFlippedXY", (int)GraphicsFlip::FlipXY);
 
             {
                 auto rect = LuaApiHelper(getContext(), "rect");
@@ -3050,9 +3079,9 @@ void LuaEngine::registerLuaGlobals() {
             gfx.setInteger("kDrawModeNXOR", (int)LCDBitmapDrawMode::NXOR);
             gfx.setInteger("kDrawModeInverted", (int)LCDBitmapDrawMode::Inverted);
             gfx.setInteger("kImageUnflipped", (int)LCDBitmapFlip::Unflipped);
-            gfx.setInteger("kImageFlippedX", (int)LCDBitmapFlip::FlippedX);
-            gfx.setInteger("kImageFlippedY", (int)LCDBitmapFlip::FlippedY);
-            gfx.setInteger("kImageFlippedXY", (int)LCDBitmapFlip::FlippedXY);
+            gfx.setInteger("kImageFlippedX", (int)LCDBitmapFlip::FlipX);
+            gfx.setInteger("kImageFlippedY", (int)LCDBitmapFlip::FlipY);
+            gfx.setInteger("kImageFlippedXY", (int)LCDBitmapFlip::FlipXY);
             gfx.setInteger("kLineCapStyleButt", (int)LCDLineCapStyle::Butt);
             gfx.setInteger("kLineCapStyleSquare", (int)LCDLineCapStyle::Square);
             gfx.setInteger("kLineCapStyleRound", (int)LCDLineCapStyle::Round);
@@ -3097,7 +3126,7 @@ void LuaEngine::registerLuaGlobals() {
             gfx.setWrappedFunction<playdate_graphics_setStencilPattern_lua>("setStencilPattern");
             gfx.setWrappedFunction<playdate_graphics_clearStencil_lua>("clearStencil");
             gfx.setWrappedFunction<playdate_graphics_clearStencil_lua>("clearStencilImage");
-            gfx.setWrappedFunction<playdate_graphics_setDrawMode>("setImageDrawMode");
+            gfx.setWrappedFunction<playdate_graphics_setDrawMode_lua>("setImageDrawMode");
             gfx.setWrappedFunction<playdate_graphics_getImageDrawMode_lua>("getImageDrawMode");
             gfx.setWrappedFunction<playdate_graphics_setLineWidth_lua>("setLineWidth");
             gfx.setWrappedFunction<playdate_graphics_getLineWidth_lua>("getLineWidth");

@@ -16,6 +16,7 @@
 #include "zlib.h"
 #include "tracy/Tracy.hpp"
 #include "tracy/TracyLua.hpp"
+#include "magic_enum.hpp"
 
 #ifdef USE_CAPSTONE
 #include "capstone/platform.h"
@@ -88,6 +89,7 @@ namespace cranked {
     namespace chrono = std::chrono;
     namespace this_thread = std::this_thread;
     namespace numbers = std::numbers;
+    namespace ranges = std::ranges;
 
     typedef int64_t int64;
     typedef uint64_t uint64;
@@ -162,6 +164,10 @@ namespace cranked {
     inline string stringToUpper(string str) {
         transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return toupper(c); });
         return str;
+    }
+
+    inline bool stringLowerEqual(string_view lhs, string_view rhs) {
+        return ranges::equal(lhs, rhs, [](char a, char b) { return tolower(a) == tolower(b); });
     }
 
     class Version {
@@ -252,6 +258,16 @@ namespace cranked {
     }
 
     void writeGIF(const char *path, const uint8 *data, int width, int height);
+
+    inline string normalizePath(string path) {
+        path = regex_replace(path, regex("\\.\\."), ""); // Prevent directory traversal
+        replace(path.begin(), path.end(), '\\', '/'); // Unix separators
+        if (!path.starts_with('/')) // Always start with a slash
+            path = '/' + path;
+        if (path.ends_with('/')) // Always end without a slash
+            path = path.substr(0, path.size() - 1);
+        return path;
+    }
 
     inline uint32 readUint32LE(const uint8 *data) {
         auto ptr = (uint8 *) data;

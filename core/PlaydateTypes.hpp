@@ -151,9 +151,9 @@ namespace cranked {
 
     enum class GraphicsFlip : int32 {
         Unflipped,
-        FlippedX,
-        FlippedY,
-        FlippedXY,
+        FlipX,
+        FlipY,
+        FlipXY,
     };
 
     typedef GraphicsFlip LCDBitmapFlip;

@@ -4,15 +4,23 @@
 #include "gen/AshevilleSans14Bold.hpp"
 #include "gen/AshevilleSans14LightOblique.hpp"
 #include "gen/AshevilleSans24Light.hpp"
+#include "gen/CrankNoticeText.hpp"
+#include "gen/CrankNoticeText2X.hpp"
+#include "gen/CrankFrames.hpp"
+#include "gen/CrankFrames2X.hpp"
+#include "gen/CrankFrames4X.hpp"
+#include "gen/CrankFrames8X.hpp"
+#include "gen/CrankNoticeBubble.hpp"
+#include "gen/CrankNoticeBubble2X.hpp"
+#include "gen/CrankNoticeBubble4X.hpp"
+#include "gen/CrankNoticeBubble8X.hpp"
+#include "gen/MenuCancel.hpp"
+#include "gen/MenuDel.hpp"
+#include "gen/MenuOk.hpp"
+#include "gen/MenuSpace.hpp"
+#include "gen/BounceSound.hpp"
 
 using namespace cranked;
-
-unordered_map<string, Rom::File> Rom::systemFiles {
-    makeSystemFilePair("Fonts/Asheville-Sans-14-Light.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT, ASHEVILLE_SANS_14_LIGHT_SIZE),
-    makeSystemFilePair("Fonts/Asheville-Sans-14-Bold.pft", FileType::PFT, ASHEVILLE_SANS_14_BOLD, ASHEVILLE_SANS_14_BOLD_SIZE),
-    makeSystemFilePair("Fonts/Asheville-Sans-14-Light-Oblique.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT_OBLIQUE, ASHEVILLE_SANS_14_LIGHT_OBLIQUE_SIZE),
-    makeSystemFilePair("Fonts/Asheville-Sans-24-Light.pft", FileType::PFT, ASHEVILLE_SANS_24_LIGHT, ASHEVILLE_SANS_24_LIGHT_SIZE),
-};
 
 Rom::Rom(const string &path, Cranked *cranked) : cranked(cranked), path(path) {
     if (!fs::is_directory(path)) {
@@ -27,12 +35,49 @@ Rom::Rom(const string &path, Cranked *cranked) : cranked(cranked), path(path) {
         logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
 }
 
+unordered_map<string, Rom::File> Rom::systemFiles {
+    makeSystemFilePair("System/Fonts/Asheville-Sans-14-Light.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT, ASHEVILLE_SANS_14_LIGHT_SIZE),
+    makeSystemFilePair("System/Fonts/Asheville-Sans-14-Bold.pft", FileType::PFT, ASHEVILLE_SANS_14_BOLD, ASHEVILLE_SANS_14_BOLD_SIZE),
+    makeSystemFilePair("System/Fonts/Asheville-Sans-14-Light-Oblique.pft", FileType::PFT, ASHEVILLE_SANS_14_LIGHT_OBLIQUE, ASHEVILLE_SANS_14_LIGHT_OBLIQUE_SIZE),
+    makeSystemFilePair("System/Fonts/Asheville-Sans-24-Light.pft", FileType::PFT, ASHEVILLE_SANS_24_LIGHT, ASHEVILLE_SANS_24_LIGHT_SIZE),
+
+    makeSystemFilePair("CoreLibs/assets/crank-notice-text.pdi", FileType::PDI, CRANK_NOTICE_TEXT, CRANK_NOTICE_TEXT_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank-notice-bubble.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE, CRANK_NOTICE_BUBBLE_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank-frames.pdt", FileType::PDT, CRANK_FRAMES, CRANK_FRAMES_SIZE),
+
+    makeSystemFilePair("CoreLibs/assets/crank/crank-frames-1x.pdt", FileType::PDT, CRANK_FRAMES, CRANK_FRAMES_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-frames-2x.pdt", FileType::PDT, CRANK_FRAMES_2X, CRANK_FRAMES_2X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-frames-4x.pdt", FileType::PDT, CRANK_FRAMES_4X, CRANK_FRAMES_4X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-frames-8x.pdt", FileType::PDT, CRANK_FRAMES_8X, CRANK_FRAMES_8X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-bubble.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE, CRANK_NOTICE_BUBBLE_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-bubble-1x.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE, CRANK_NOTICE_BUBBLE_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-bubble-2x.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE_2X, CRANK_NOTICE_BUBBLE_2X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-bubble-4x.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE_4X, CRANK_NOTICE_BUBBLE_4X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-bubble-8x.pdi", FileType::PDI, CRANK_NOTICE_BUBBLE_8X, CRANK_NOTICE_BUBBLE_8X_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-text-1x.pdi", FileType::PDI, CRANK_NOTICE_TEXT, CRANK_NOTICE_TEXT_SIZE),
+    makeSystemFilePair("CoreLibs/assets/crank/crank-notice-text-2x.pdi", FileType::PDI, CRANK_NOTICE_TEXT_2X, CRANK_NOTICE_TEXT_2X_SIZE),
+
+    makeSystemFilePair("CoreLibs/assets/keyboard/menu-cancel.pdi", FileType::PDI, MENU_CANCEL, MENU_CANCEL_SIZE),
+    makeSystemFilePair("CoreLibs/assets/keyboard/menu-del.pdi", FileType::PDI, MENU_DEL, MENU_DEL_SIZE),
+    makeSystemFilePair("CoreLibs/assets/keyboard/menu-ok.pdi", FileType::PDI, MENU_OK, MENU_OK_SIZE),
+    makeSystemFilePair("CoreLibs/assets/keyboard/menu-space.pdi", FileType::PDI, MENU_SPACE, MENU_SPACE_SIZE),
+    makeSystemFilePair("CoreLibs/assets/keyboard/Roobert-24-Keyboard-Medium.pft", FileType::PFT, ASHEVILLE_SANS_24_LIGHT, ASHEVILLE_SANS_24_LIGHT_SIZE), // Todo
+
+    makeSystemFilePair("CoreLibs/assets/sfx/click.pda", FileType::PDA, BOUNCE_SOUND, BOUNCE_SOUND_SIZE), // Todo
+    makeSystemFilePair("CoreLibs/assets/sfx/denial.pda", FileType::PDA, BOUNCE_SOUND, BOUNCE_SOUND_SIZE), // Todo
+    makeSystemFilePair("CoreLibs/assets/sfx/key.pda", FileType::PDA, BOUNCE_SOUND, BOUNCE_SOUND_SIZE), // Todo
+    makeSystemFilePair("CoreLibs/assets/sfx/selection-reverse.pda", FileType::PDA, BOUNCE_SOUND, BOUNCE_SOUND_SIZE), // Todo
+    makeSystemFilePair("CoreLibs/assets/sfx/selection.pda", FileType::PDA, BOUNCE_SOUND, BOUNCE_SOUND_SIZE), // Todo
+};
+
 Rom::~Rom() {
     if (zip)
         zip->close();
 }
 
 void Rom::loadManifest() {
+    if (not findRomFile("pdxinfo"))
+        return;
     auto data = readRomFile("pdxinfo");
     istringstream input((const char *) data.data());
     string line;
@@ -53,7 +98,8 @@ void Rom::load() {
 
     vector<uint8> pdzData;
     try {
-        pdzData = readRomFile("main.pdz");  // Todo: Don't use exceptions if not needed here
+        if (zip and zip->hasEntry("main.pdz") or !zip and fs::exists(path + "/main.pdz"))
+            pdzData = readRomFile("main.pdz");
     } catch (exception &) {}
     if (!pdzData.empty())
         pdzFiles = loadPDZ(pdzData);
@@ -64,48 +110,17 @@ void Rom::load() {
             break;
         }
 
-    vector<uint8> pdexData;
-    try {
-        pdexData = readRomFile("pdex.bin");
-    } catch (exception &) {}
-    if (!pdexData.empty()) {
-        // Format is 16 byte magic, 16 byte MD5, decompressed size, Code and data size, relative address of shim function, relocation count
-        // Last N 4-byte ints of compressed data are relocation offsets
-        const int HEADER_SIZE = 0x30; // Magic + 16 byte MD5 + 4 32-bit integers
-        if (strcmp((char *) pdexData.data(), PDX_MAGIC) != 0)
-            throw CrankedError("Invalid PDX magic");
-        auto decompressedSize = *(uint32 *) &pdexData[0x20];
-        combinedProgramSize = *(uint32 *) &pdexData[0x24];
-        auto shimOffset = *(uint32 *) &pdexData[0x28];
-        auto relocationCount = *(uint32 *) &pdexData[0x2C];
-
-        // Todo: Detect uncompressed binary gracefully (Test with older version of SDK)
-        try {
-            binary = decompressData(pdexData.data() + HEADER_SIZE, pdexData.size() - HEADER_SIZE, decompressedSize);
-        } catch (exception &ex) {
-            binary = pdexData;
-        }
-
-        // Relocations
-        for (int i = 0; i < relocationCount; i++) {
-            auto offset = *(uint32 *) (binary.data() + binary.size() - 4 * (i + 1));
-            *(uint32 *) &binary[offset] += CODE_ADDRESS;
-        }
-        binary.resize(binary.size() - 4 * relocationCount);
-        binarySize = binary.size();
-
-        eventHandlerAddress = CODE_ADDRESS + shimOffset;
-    }
-
     if (zip) {
         for (auto &entry : zip->getEntries()) { // Preload zip entry data, to avoid having to abstract into common file-type API
-            if (!entry.isFile()) continue;
-            vector<uint8> data(entry.getSize());
-            auto zipData = entry.readAsBinary();
-            memcpy(data.data(), zipData, data.size());
-            delete[] (char *) zipData;
+            vector<uint8> data;
+            if (entry.isFile()) {
+                data.resize(entry.getSize());
+                auto zipData = entry.readAsBinary();
+                memcpy(data.data(), zipData, data.size());
+                delete[] (char *) zipData;
+            }
             outerFiles.emplace_back(File{
-                    .name = entry.getName(),
+                    .name = normalizePath(entry.getName()),
                     .type = getFileType(data.data()),
                     .isDir = entry.isDirectory(),
                     .size = (uint32) entry.getSize(),
@@ -125,7 +140,7 @@ void Rom::load() {
                     type = getFileType((uint8 *) buffer);
                 } catch (exception &) {}
             outerFiles.emplace_back(File{
-                    .name = entry.path().lexically_relative(path),
+                    .name = normalizePath(entry.path().lexically_relative(path)),
                     .type = type,
                     .isDir = entry.is_directory(),
                     .size = entry.is_directory() ? 0 : (uint32) entry.file_size(),
@@ -134,6 +149,40 @@ void Rom::load() {
                     .modTime = to_time_t(entry.last_write_time()),
             });
         }
+    }
+
+    vector<uint8> pdexData;
+    try {
+        if (findRomFile("pdex.bin"))
+            pdexData = readRomFile("pdex.bin");
+    } catch (exception &) {}
+    if (!pdexData.empty()) {
+        // Format is 16 byte magic, 16 byte MD5, decompressed size, Code and data size, relative address of shim function, relocation count
+        // Last N 4-byte ints of compressed data are relocation offsets
+        const int HEADER_SIZE = 0x30; // Magic + 16 byte MD5 + 4 32-bit integers
+        if (strcmp((char *) pdexData.data(), PDX_MAGIC) != 0)
+            throw CrankedError("Invalid PDX magic");
+        auto decompressedSize = *(uint32 *) &pdexData[0x20];
+        combinedProgramSize = *(uint32 *) &pdexData[0x24];
+        auto shimOffset = *(uint32 *) &pdexData[0x28];
+        auto relocationCount = *(uint32 *) &pdexData[0x2C];
+
+        // Todo: Detect uncompressed binary gracefully (Test with older version of SDK or PDC command line arg)
+        try {
+            binary = decompressData(pdexData.data() + HEADER_SIZE, pdexData.size() - HEADER_SIZE, decompressedSize);
+        } catch (exception &ex) {
+            binary = pdexData;
+        }
+
+        // Relocations
+        for (int i = 0; i < relocationCount; i++) {
+            auto offset = *(uint32 *) (binary.data() + binary.size() - 4 * (i + 1));
+            *(uint32 *) &binary[offset] += CODE_ADDRESS;
+        }
+        binary.resize(binary.size() - 4 * relocationCount);
+        binarySize = binary.size();
+
+        eventHandlerAddress = CODE_ADDRESS + shimOffset;
     }
 
     loaded = true;
@@ -149,6 +198,7 @@ void Rom::unload() {
 }
 
 vector<uint8> Rom::readRomFile(string name, const string &extension, const vector<string> &replacedExtensions) {
+    name = normalizePath(name);
     for (auto &replaced : replacedExtensions) {
         if (name.ends_with(replaced)) {
             name = name.substr(0, name.size() - replaced.size());
@@ -157,12 +207,8 @@ vector<uint8> Rom::readRomFile(string name, const string &extension, const vecto
     }
     if (!extension.empty() and not name.ends_with(extension))
         name += extension;
-    if (name.starts_with("/System/")) {
-        auto file = findSystemFile(name.substr(8));
-        if (!file)
-            throw CrankedError("No such file: " + name);
+    if (auto file = findSystemFile(name))
         return file->data;
-    }
     for (auto &file : pdzFiles)
         if (file.name == name)
             return file.data;
@@ -176,29 +222,26 @@ vector<uint8> Rom::readRomFile(string name, const string &extension, const vecto
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(fs::path(path) / name);
+        data = readFileData(path + name);
     return data;
 }
 
-Rom::File *Rom::findRomFile(const string &name) {
-    if (name.starts_with("/System/"))
-        return findSystemFile(name.substr(8));
-    auto normalize = [](const fs::path &p){
-        return p; // p.lexically_normal(); // Todo: This surely doesn't work on Windows
-    };
+Rom::File *Rom::findRomFile(string name) {
+    name = normalizePath(name);
+    if (auto file = findSystemFile(name))
+        return file;
     for (auto &file : pdzFiles) // Todo: Should PDZ contents be included?
-        if (normalize(file.name) == normalize(name))
+        if (file.name == name)
             return &file;
     for (auto &file : outerFiles)
-        if (normalize(file.name) == normalize(name))
+        if (file.name == name)
             return &file;
     return nullptr;
 }
 
 vector<string> Rom::listRomFiles(string base, bool recursive) {
     vector<string> files;
-    if (base == "/" or base == ".") // Todo: Normalize paths better with fs::lexically_normal
-        base = "";
+    base = normalizePath(base);
     vector<string> collectedDirs;
     for (auto &file : outerFiles) {
         if (!file.name.starts_with(base))
@@ -359,7 +402,7 @@ Rom::Font Rom::readFontData(const uint8 *data, bool wide) {
             // Read long kerning table
             for (int j = 0; j < longKerningEntries; j++) {
                 auto entry = readUint32LE(glyphData);
-                glyph.kerningTable[int(entry >> 8)] = *(int8 *) &entry;
+                glyph.kerningTable[int(entry >> 8)] = bit_cast<int8>(*glyphData);
                 glyphData += 4;
             }
 
@@ -669,11 +712,11 @@ vector<uint8> Rom::writeImage(Bitmap image) {
     return buffer;
 }
 
-Rom::File *Rom::findSystemFile(const string &path) {
-    // Todo: Path should be normalized a bit
+Rom::File *Rom::findSystemFile(string path) {
+    path = fs::path(normalizePath(path)).replace_extension().string();
     if (auto it = systemFiles.find(path); it != systemFiles.end())
         return &it->second;
-    throw CrankedError("No such system file: " + path);
+    return nullptr;
 }
 
 void Rom::logMessage(LogLevel level, const char *fmt, ...) const {

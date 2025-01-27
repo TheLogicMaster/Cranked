@@ -16,7 +16,8 @@ SDFile_32::~SDFile_32() {
 Files::Files(Cranked &cranked) : cranked(cranked) {}
 
 void Files::init() {
-    romDataPath = appDataPath / cranked.rom->getBundleID();
+    auto id = cranked.rom->getBundleID();
+    romDataPath = appDataPath / (id ? id : "unknown");
     create_directory(appDataPath);
     create_directory(romDataPath);
 }
@@ -34,16 +35,12 @@ void Files::reset() {
     lastError = 0;
 }
 
-static string sanitizePath(const string &path) { // Todo: Should use lexically_normal
-    return regex_replace(path, regex("\\.\\."), ""); // This is pretty crude, but should hopefully protect against inadvertent directory traversal
-}
-
-int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
-    auto base = fs::path(path ? path : "").lexically_normal();
+int Files::listFiles(string path, bool showHidden, vector<string> &files) {
+    path = normalizePath(path);
 
     bool exists = false;
 
-    auto dataPath = base.empty() ? romDataPath : romDataPath / base;
+    auto dataPath = path.empty() ? romDataPath : romDataPath / path;
     if (fs::exists(dataPath) and is_directory(dataPath)) {
         try {
             for (auto &entry: fs::directory_iterator(dataPath))
@@ -56,8 +53,8 @@ int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
         exists = true;
     }
 
-    if (base.empty() or cranked.rom->findRomFile(base)) {
-        auto romFiles = cranked.rom->listRomFiles(base, false);
+    if (path.empty() or cranked.rom->findRomFile(path)) {
+        auto romFiles = cranked.rom->listRomFiles(path, false);
         for (auto &file : romFiles) {
             if (!showHidden and fs::path(file).filename().string().starts_with('.'))
                  continue;
@@ -69,16 +66,18 @@ int Files::listFiles(const char *path, bool showHidden, vector<string> &files) {
     return exists ? 0 : -1;
 }
 
-bool Files::exists(const string &path) {
+bool Files::exists(string path) {
+    path = normalizePath(path);
     if (fs::exists(romDataPath / path))
         return true;
     return cranked.rom->findRomFile(path) != nullptr;
 }
 
-int Files::mkdir(const string &path) {
+int Files::mkdir(string path) {
     // Documentation lies, both Lua and C API create intermediate directories
+    path = normalizePath(path);
     try {
-        create_directories(romDataPath / sanitizePath(path));
+        create_directories(romDataPath / normalizePath(path));
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -86,9 +85,11 @@ int Files::mkdir(const string &path) {
     return 0;
 }
 
-int Files::rename(const string &path, const string &newPath) {
+int Files::rename(string path, string newPath) {
+    path = normalizePath(path);
+    newPath = normalizePath(newPath);
     try {
-        fs::rename(romDataPath / sanitizePath(path), romDataPath / sanitizePath(newPath));
+        fs::rename(romDataPath / path, romDataPath / newPath);
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -96,13 +97,13 @@ int Files::rename(const string &path, const string &newPath) {
     return 0;
 }
 
-int Files::unlink(const string &path, bool recursive) {
-    auto sanitized = sanitizePath(path);
+int Files::unlink(string path, bool recursive) {
+    path = normalizePath(path);
     try {
         if (recursive)
-            remove_all(romDataPath / sanitized);
+            remove_all(romDataPath / path);
         else
-            fs::remove(romDataPath / sanitized);
+            fs::remove(romDataPath / path);
     } catch (exception &ex) {
         lastError = cranked.getEmulatedStringLiteral(ex.what());
         return -1;
@@ -110,13 +111,15 @@ int Files::unlink(const string &path, bool recursive) {
     return 0;
 }
 
-const char *Files::getType(const string &path) const {
+const char *Files::getType(string path) const {
+    path = normalizePath(path);
     auto romFile = cranked.rom->findRomFile(path);
     return romFile ? Rom::FILE_TYPE_NAMES[(int) romFile->type] : nullptr;
 }
 
-int Files::stat(const string &path, FileStat_32 &stat) {
-    auto dataPath = romDataPath / sanitizePath(path);
+int Files::stat(string path, FileStat_32 &stat) {
+    path = normalizePath(path);
+    auto dataPath = romDataPath / path;
     auto romFile = cranked.rom->findRomFile(path);
     auto setTime = [&](const time_t &modTime){
         // Todo: Respect timezone offsets
@@ -146,14 +149,10 @@ int Files::stat(const string &path, FileStat_32 &stat) {
     return -1;
 }
 
-File Files::open(const char *path, FileOptions mode) {
-    if (!path) {
-        lastError = cranked.getEmulatedStringLiteral("Invalid path");
-        return nullptr;
-    }
-    auto normalized = fs::path(path).lexically_normal();
+File Files::open(string path, FileOptions mode) {
+    path = normalizePath(path);
 
-    auto dataPath = romDataPath / normalized;
+    auto dataPath = romDataPath / path;
     if (mode == FileOptions::Write or mode == FileOptions::Append) {
         auto fd = fopen(dataPath.c_str(), mode == FileOptions::Append ? "ab" : "wb");
         if (!fd) {
@@ -184,11 +183,11 @@ File Files::open(const char *path, FileOptions mode) {
         }
     }
 
-    auto romFile = cranked.rom->findRomFile(normalized);
+    auto romFile = cranked.rom->findRomFile(path);
     if (romFile) {
         File file;
         if (romFile->data.empty()) {
-            auto fd = fopen((cranked.rom->path / romFile->name).c_str(), "rb");
+            auto fd = fopen((cranked.rom->path + romFile->name).c_str(), "rb");
             if (!fd) {
                 lastError = cranked.getEmulatedStringLiteral("Failed to open file");
                 return nullptr;
@@ -217,7 +216,6 @@ int Files::close(File file) {
         fclose(file->file);
     file->file = nullptr;
     eraseByEquivalentKey(openFiles, file);
-    cranked.heap.destruct(file);
     return 0;
 }
 

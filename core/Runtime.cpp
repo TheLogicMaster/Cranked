@@ -291,7 +291,7 @@ int32 cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_
 }
 
 int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void *text, uint32 len, int32 encoding, int32 tracking) {
-    return cranked->graphics.getTextWidth(font, { (char *)text, strlen((char *)text) }, (StringEncoding)encoding, tracking, (int)len);
+    return cranked->graphics.measureText(font, { (char *)text, strlen((char *)text) }, (StringEncoding)encoding, tracking, (int)len).x;
 }
 
 uint8 *cranked::playdate_graphics_getFrame(Cranked *cranked) {

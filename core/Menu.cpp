@@ -80,7 +80,6 @@ void Menu::removeItem(MenuItem item) {
         lua_seti(cranked.getLuaContext(), -2, index + 1);
         lua_pop(cranked.getLuaContext(), 1);
     }
-    item->dereference();
     items[index] = nullptr;
 }
 

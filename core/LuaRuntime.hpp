@@ -134,6 +134,8 @@ namespace cranked {
     auto getLuaNativeWrapperArg(lua_State *context) {
         if constexpr (is_same_v<T, LuaVal>)
             return LuaVal{context, I};
+        else if constexpr (is_type_listed<T, GraphicsFlip, BitmapDrawMode, FontVariant, PDLanguage, PDButtons, Bump::ResponseType>)
+            return LuaVal{context, I}.asNamedEnum<T>();
         else if constexpr (is_type_listed<T, int, uint8, int8, uint16, int16, uint32, int32> or is_enum_v<T>) {
             if (lua_isboolean(context, I))
                 return (T)lua_toboolean(context, I);
@@ -332,11 +334,11 @@ namespace cranked {
 
     inline LCDBitmapFlip bitmapFlipFromString(const string &name) {
         if (name == "flipX")
-            return LCDBitmapFlip::FlippedX;
+            return LCDBitmapFlip::FlipX;
         if (name == "flipY")
-            return LCDBitmapFlip::FlippedY;
+            return LCDBitmapFlip::FlipY;
         if (name == "flipXY")
-            return LCDBitmapFlip::FlippedXY;
+            return LCDBitmapFlip::FlipXY;
         return LCDBitmapFlip::Unflipped;
     }
 

@@ -443,7 +443,7 @@ namespace cranked {
 
         void drawText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int leadingAdjust = 0, int charCount = 0);
 
-        int getTextWidth(Font font, string_view text, StringEncoding encoding = PDStringEncoding::UFT8, int tracking = 0, int charCount = 0);
+        IntVec2 measureText(Font font, string_view text, StringEncoding encoding = PDStringEncoding::UFT8, int tracking = 0, int leadingAdjustment = 0, int charCount = 0);
 
         const char *getLocalizedText(const char *key, PDLanguage language);
 
@@ -488,8 +488,6 @@ namespace cranked {
         Bitmap vcrPauseFilteredBitmap(Bitmap bitmap);
 
         void drawTileMap(TileMap tilemap, int x, int y, bool ignoreOffset = false, optional<IntRect> sourceRect = {});
-
-        IntVec2 measureText(const char *text, const FontFamily &fonts, int leadingAdjustment = 0);
 
         static bool checkBitmapMaskCollision(Bitmap bitmap1, int x1, int y1, GraphicsFlip flip1, Bitmap bitmap2, int x2, int y2, GraphicsFlip flip2, IntRect rect);
 

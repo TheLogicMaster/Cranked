@@ -25,21 +25,21 @@ namespace cranked {
 
         void reset();
 
-        int listFiles(const char *path, bool showHidden, vector<string> &files);
+        int listFiles(string path, bool showHidden, vector<string> &files);
 
-        bool exists(const string &path);
+        bool exists(string path);
 
-        int mkdir(const string &path);
+        int mkdir(string path);
 
-        int rename(const string &path, const string &newPath);
+        int rename(string path, string newPath);
 
-        int unlink(const string &path, bool recursive);
+        int unlink(string path, bool recursive);
 
-        [[nodiscard]] const char *getType(const string &path) const;
+        [[nodiscard]] const char *getType(string path) const;
 
-        int stat(const string &path, FileStat_32 &stat);
+        int stat(string path, FileStat_32 &stat);
 
-        File open(const char *path, FileOptions mode);
+        File open(string path, FileOptions mode);
 
         int close(File file);
 

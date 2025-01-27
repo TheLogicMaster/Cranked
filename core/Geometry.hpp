@@ -73,6 +73,10 @@ namespace cranked {
             return x != T(0) or y != T(0);
         }
 
+        [[nodiscard]] bool isInvalid() const {
+            return isnanf((float)x) or isnanf((float)y);
+        }
+
         [[nodiscard]] CollisionPoint_32 asCollisionPoint() const {
             return { (float)x, (float)y };
         }
