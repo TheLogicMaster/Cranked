@@ -163,6 +163,14 @@ Run the Tracy Profiler server and the Cranked client should connect and start st
 All C++ functions which start with a `ZoneScoped` statement will be profiled. Lua code can also be
 profiled with `tracy.ZoneBegin()` and `tracy.ZoneEnd()` around code tp be profiled.
 
+## Intellij Plugin
+A CLion plugin was created to aid in debugging graphical issues. This ended up being a complete hack because the APIs are
+undocumented and there are no examples. Ended up using a member called `myDriverDoNotUse` just to get it working, so best
+practices are definitely being followed, but at least it can allow visualizing bitmaps while stepping through graphics code.
+Something like the [OpenImageDebugger](https://github.com/OpenImageDebugger/OpenImageDebugger) project which is based on GDB
+and a Python UI would be more robust, but would be a lot more work to implement. Not really recommended to use this plugin, but
+it is functional in CLion *2024.3.2*.
+
 ## Updating Submodules
 ```
 git submodule foreach git pull
