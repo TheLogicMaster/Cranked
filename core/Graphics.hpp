@@ -11,6 +11,8 @@ namespace cranked {
 
     class Cranked;
 
+    class FontFamily;
+
     union LCDColor {
         LCDColor(uint32 value) : pattern(value) {} // NOLINT(*-explicit-constructor)
         LCDColor(LCDSolidColor value) : color(value) {} // NOLINT(*-explicit-constructor)
@@ -104,6 +106,12 @@ namespace cranked {
         vector<vector<float>> data;
     };
 
+    struct GlyphInstance {
+        FontGlyph glyph;
+        IntRect bounds;
+        char32_t character;
+    };
+
     struct LCDVideoPlayer_32 final : NativeResource {
         explicit LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size);
 
@@ -115,9 +123,9 @@ namespace cranked {
         cref_t lastError{};
     };
 
-/**
- * The operations implemented here aren't affected by draw offsets or clipping rects (Except for display buffer writes, which are affected by display offsets)
- */
+    /**
+     * The operations implemented here aren't affected by draw offsets or clipping rects (Except for display buffer writes, which are affected by display offsets)
+     */
     struct LCDBitmap_32 final : NativeResource {
         LCDBitmap_32(Cranked &cranked, int width, int height);
 
@@ -137,7 +145,17 @@ namespace cranked {
 
         void clear(const Color &color);
 
-        void drawBitmap(Bitmap image, int x, int y, int w = -1, int h = -1, int sourceX = 0, int sourceY = 0); // Todo: Support more options
+        void drawVerticalLine(int x, int y1, int y2, const Color &color);
+
+        void drawHorizontalLine(int x1, int x2, int y, const Color &color);
+
+        void drawRect(int x, int y, int width, int height, const Color &color);
+
+        void fillRect(int x, int y, int width, int height, const Color &color);
+
+        void drawBitmap(Bitmap bitmap, int x, int y, BitmapDrawMode mode = {}, GraphicsFlip flip = {}, optional<IntRect> sourceRect = {});
+
+        IntRect drawText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, BitmapDrawMode mode = {}, int tracking = 0, int leadingAdjust = 0, int charCount = 0);
 
         [[nodiscard]] vector<uint8> toRGB() const;
 
@@ -441,9 +459,11 @@ namespace cranked {
 
         void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, const Color &color);
 
-        void drawText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int leadingAdjust = 0, int charCount = 0);
+        vector<GlyphInstance> layoutText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int tracking = 0, int leadingAdjust = 0, int charCount = 0);
 
-        IntVec2 measureText(Font font, string_view text, StringEncoding encoding = PDStringEncoding::UFT8, int tracking = 0, int leadingAdjustment = 0, int charCount = 0);
+        void drawText(int x, int y, string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int tracking = 0, int leadingAdjust = 0, int charCount = 0);
+
+        IntVec2 measureText(string_view text, const FontFamily &fonts, Font font = nullptr, StringEncoding encoding = PDStringEncoding::UFT8, IntVec2 size = {}, TextWrap wrap = {}, TextAlign align = {}, int tracking = 0, int leadingAdjust = 0, int charCount = 0);
 
         const char *getLocalizedText(const char *key, PDLanguage language);
 

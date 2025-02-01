@@ -150,7 +150,7 @@ namespace cranked {
 
         int32 invokeEventCallback(PDSystemEvent event, uint32 arg) {
             return invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t, ArgType::int32_t, ArgType::uint32_t>
-                    (nativeEventCallback, toVirtualAddress(apiMemory.data()), (int32) event, (uint32) arg);
+                    (nativeEventCallback, toVirtualAddress(apiMemory.data()), (int32) event, arg);
         }
 
         int32 invokeUpdateCallback() {

@@ -151,7 +151,7 @@ void cranked::playdate_graphics_drawScaledBitmap(Cranked *cranked, Bitmap bitmap
 }
 
 int32 cranked::playdate_graphics_drawText(Cranked *cranked, void *text, uint32 len, int32 encoding, int32 x, int32 y) {
-    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, cranked->graphics.getContext().fonts, nullptr, (PDStringEncoding)encoding, {}, {}, {}, 0, (int)len);
+    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, cranked->graphics.getContext().fonts, nullptr, (PDStringEncoding)encoding, {}, {}, {}, 0, 0, (int)len);
     return 0; // Todo: Return value?
 }
 
@@ -291,7 +291,8 @@ int32 cranked::playdate_graphics_getGlyphKerning(Cranked *cranked, LCDFontGlyph_
 }
 
 int32 cranked::playdate_graphics_getTextWidth(Cranked *cranked, Font font, void *text, uint32 len, int32 encoding, int32 tracking) {
-    return cranked->graphics.measureText(font, { (char *)text, strlen((char *)text) }, (StringEncoding)encoding, tracking, (int)len).x;
+    auto &ctx = cranked->graphics.getContext();
+    return cranked->graphics.measureText((char *)text, ctx.fonts, font, (StringEncoding)encoding, {}, {}, {}, tracking, 0, (int)len).x;
 }
 
 uint8 *cranked::playdate_graphics_getFrame(Cranked *cranked) {
@@ -390,7 +391,7 @@ void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable
 
 void cranked::playdate_graphics_drawTextInRect(Cranked *cranked, void *text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align) {
     auto &ctx = cranked->graphics.getContext();
-    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, ctx.fonts, nullptr, (StringEncoding)encoding, { width, height }, (TextWrap)wrap, (TextAlign)align, 0, (int)len);
+    cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, ctx.fonts, nullptr, (StringEncoding)encoding, { width, height }, (TextWrap)wrap, (TextAlign)align, 0, 0, (int)len);
 }
 
 void *cranked::playdate_sys_realloc(Cranked *cranked, void *ptr, uint32 size) {

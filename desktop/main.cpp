@@ -22,7 +22,7 @@ using namespace cranked;
 typedef variant<string, int, float, bool> setting_type;
 
 enum class Windows {
-    Debug, Registers, HeapMemory, CodeMemory, Disassembly, Buttons, Crank, Accelerometer
+    Debug, Registers, HeapMemory, CodeMemory, Disassembly, Buttons, Crank, Accelerometer, Menu
 };
 
 struct Userdata {
@@ -287,6 +287,7 @@ int main(int argc, const char *args[]) {
                 ImGui::MenuItem("Show Heap Memory", nullptr, &getWindowOpen(Windows::HeapMemory));
                 ImGui::MenuItem("Show Disassembly", nullptr, &getWindowOpen(Windows::Disassembly));
                 ImGui::MenuItem("Show Buttons", nullptr, &getWindowOpen(Windows::Buttons));
+                ImGui::MenuItem("Show Menu", nullptr, &getWindowOpen(Windows::Menu));
                 ImGui::MenuItem("Show Crank", nullptr, &getWindowOpen(Windows::Crank));
                 ImGui::MenuItem("Show Accelerometer", nullptr, &getWindowOpen(Windows::Accelerometer));
                 ImGui::EndMenu();
@@ -507,6 +508,13 @@ int main(int argc, const char *args[]) {
             buttonInputs |= (ImGui::Button("B", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::B);
             ImGui::SameLine();
             buttonInputs |= (ImGui::Button("A", { 40 * scale, 40 * scale }), ImGui::IsItemActive() * (int)PDButtons::A);
+            ImGui::End();
+        }
+
+        if (getWindowOpen(Windows::Menu)) {
+            ImGui::SetNextWindowSize(ImVec2(90 * scale, 25 * scale));
+            ImGui::Begin("Menu", &getWindowOpen(Windows::Menu), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+            buttonInputs |= (ImGui::Button("Menu", { 70 * scale, 16 * scale }), ImGui::IsItemActive() * (int)PDButtons::Menu);
             ImGui::End();
         }
 

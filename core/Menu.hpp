@@ -26,6 +26,7 @@ namespace cranked {
         int32 value{};
         cref_t emulatedCallback{};
         cref_t userdata{};
+        bool interactedWith{};
     };
 
     class Menu {
@@ -34,11 +35,17 @@ namespace cranked {
 
         explicit Menu(Cranked &cranked);
 
+        void init();
+
         void reset();
 
         void update();
 
         void render();
+
+        void showMenu();
+
+        void hideMenu();
 
         void setImage(Bitmap bitmap, int xOffset);
 
@@ -50,11 +57,16 @@ namespace cranked {
 
         int findItem(MenuItem item);
 
+        MenuItem getSelectedItem();
+
         Cranked &cranked;
         bool isOpen{};
         MenuItemRef items[MAX_ITEMS];
         BitmapRef image;
         int imageXOffset{};
+        BitmapRef buffer;
+        int itemCount{};
+        int selectedIndex{};
     };
 
 }

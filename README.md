@@ -73,6 +73,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Lua debugger functionality
 - Support Debug Adaptor Protocol like Simulator
 - Events/callbacks for pausing/stopping
+- Bitmap drawing performance improvements would make a large difference in overall performance
 
 ## Example Compatibility
 - [x] Hello World
@@ -130,7 +131,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
   - [x] Zorder
 
 # Game Compatibility
-- [x] [Bobby](https://github.com/yannicka/bobby-playdate) (Graphical differences with text measuring and round rect thickness, BG sprite not working)
+- [x] [Bobby](https://github.com/yannicka/bobby-playdate) (Graphical differences with text measuring and round rect thickness, level positioning is incorrect)
 
 ## Internals
 - Unicorn to provide Arm CPU emulation

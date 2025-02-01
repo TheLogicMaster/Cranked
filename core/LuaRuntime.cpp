@@ -367,7 +367,7 @@ static void playdate_datastore_write_lua(lua_State *context, LuaVal table, LuaVa
         isPretty = filename.asBool();
     name += ".json";
     auto cranked = Cranked::fromLuaContext(context);
-    auto file = cranked->files.open(name.c_str(), FileOptions::Write);
+    auto file = cranked->files.open(name, FileOptions::Write);
     playdate_file_write_lua(Cranked::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
     cranked->files.close(file);
 }
@@ -379,7 +379,7 @@ static LuaRet playdate_datastore_read_lua(Cranked *context, LuaVal filename) {
         lua_pushnil(context->getLuaContext());
         return 1;
     }
-    auto file = context->files.open(name.c_str(), FileOptions::ReadData);
+    auto file = context->files.open(name, FileOptions::ReadData);
     json_decodeFile_lua(context->getLuaContext(), file);
     context->files.close(file);
     return 1;
@@ -1434,7 +1434,7 @@ static void playdate_graphics_drawText_lua(Cranked *cranked, const char *text, L
     int leading = (arg2 + offset + 2).isInt() ? (arg2 + offset + 2).asInt() : 0;
     TextWrap wrap = (arg2 + offset + 3).isInt() ? (arg2 + offset + 3).asEnum<TextWrap>() : TextWrap::Clip;
     TextAlign align = (arg2 + offset + 4).isInt() ? (arg2 + offset + 4).asEnum<TextAlign>() : TextAlign::Left;
-    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, nullptr, PDStringEncoding::UFT8, size, wrap, align, leading);
+    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, nullptr, PDStringEncoding::UFT8, size, wrap, align, 0, leading);
 }
 
 static void playdate_graphics_drawLocalizedText_lua(Cranked *cranked, const char *key, LuaVal arg2) {
@@ -1462,7 +1462,7 @@ static void playdate_graphics_drawLocalizedText_lua(Cranked *cranked, const char
     TextWrap wrap = (arg2 + offset + 3).isInt() ? (arg2 + offset + 3).asEnum<TextWrap>() : TextWrap::Clip;
     TextAlign align = (arg2 + offset + 4).isInt() ? (arg2 + offset + 4).asEnum<TextAlign>() : TextAlign::Left;
     const char *text = cranked->graphics.getLocalizedText(key, language);
-    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, nullptr, PDStringEncoding::UFT8, size, wrap, align, leading);
+    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, nullptr, PDStringEncoding::UFT8, size, wrap, align, 0, leading);
 }
 
 static const char *playdate_graphics_getLocalizedText_lua(Cranked *cranked, const char *key, LuaVal language) {
@@ -1471,7 +1471,7 @@ static const char *playdate_graphics_getLocalizedText_lua(Cranked *cranked, cons
 
 static LuaRet playdate_graphics_getTextSize_lua(Cranked *cranked, const char *str, LuaVal fontFamily, int leadingAdjustment) {
     auto family = fontFamily.isTable() ? fontFamily.asFontFamily() : cranked->graphics.getContext().fonts;
-    return returnVecValues(cranked, cranked->graphics.measureText(family.regular, str)); // Todo: Fix
+    return returnVecValues(cranked, cranked->graphics.measureText(str, family));
 }
 
 static LuaValRet playdate_graphics_font_new_lua(Cranked *cranked, const char *path) {
@@ -1519,7 +1519,7 @@ static LuaRet playdate_graphics_font_drawText_lua(Cranked *cranked, Font font, c
     int leading = (arg2 + offset + 1).isInt() ? (arg2 + offset + 1).asInt() : 0;
     TextWrap wrap = (arg2 + offset + 2).isInt() ? (arg2 + offset + 2).asEnum<TextWrap>() : TextWrap::Clip;
     TextAlign align = (arg2 + offset + 3).isInt() ? (arg2 + offset + 3).asEnum<TextAlign>() : TextAlign::Left;
-    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, font, PDStringEncoding::UFT8, size, wrap, align, leading);
+    cranked->graphics.drawText(pos.x, pos.y, text, ctx.fonts, font, PDStringEncoding::UFT8, size, wrap, align, 0, leading);
     return returnVecValues(cranked, IntVec2{ 0, 0 }); // Todo: Return size
 }
 
@@ -1528,7 +1528,7 @@ static int playdate_graphics_font_getHeight_lua(Cranked *cranked, Font font) {
 }
 
 static int playdate_graphics_font_getTextWidth_lua(Cranked *cranked, Font font, const char *text) {
-    return cranked->graphics.measureText(font, {text, strlen(text)}).x;
+    return cranked->graphics.measureText(text, cranked->graphics.getContext().fonts, font).x;
 }
 
 static void playdate_graphics_font_setTracking_lua(Cranked *cranked, Font font, int pixels) {

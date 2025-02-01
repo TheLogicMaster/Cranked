@@ -12,6 +12,7 @@ Cranked::~Cranked() {
 
 void Cranked::init() {
     graphics.init();
+    menu.init();
     files.init();
     audio.init();
     nativeEngine.init();
@@ -164,7 +165,8 @@ void Cranked::update() {
                     graphics.flushDisplayBuffer();
                 }
             }
-        }
+        } else
+            graphics.flushDisplayBuffer();
 
         previousCrankDocked = crankDocked;
     }
@@ -173,6 +175,7 @@ void Cranked::update() {
 
     currentMillis += duration_cast<chrono::milliseconds>(chrono::system_clock::now() - currentMillisStart).count(); // Todo: Does this increase while locked/in-menu?
 
+    FrameImage(graphics.displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, false);
     FrameMark; // Todo: This isn't ideal since a single update call can span multiple frames at present
 }
 

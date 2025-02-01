@@ -192,7 +192,7 @@ LCDFontGlyph_32::LCDFontGlyph_32(Bitmap bitmap, int advance, const map<int, int8
 LCDFontPage_32::LCDFontPage_32(Cranked &cranked) : NativeResource(cranked, ResourceType::FontPage, this) {}
 
 LCDFont_32::LCDFont_32(Cranked &cranked, int tracking, int glyphWidth, int glyphHeight)
-        : NativeResource(cranked, ResourceType::Font, this), tracking(tracking), glyphWidth(glyphWidth), glyphHeight(glyphHeight) {}
+        : NativeResource(cranked, ResourceType::Font, this), tracking(tracking), leading(), glyphWidth(glyphWidth), glyphHeight(glyphHeight) {}
 
 LCDBitmapTable_32::LCDBitmapTable_32(Cranked &cranked, int cellsPerRow) : NativeResource(cranked, ResourceType::BitmapTable, this), cellsPerRow(cellsPerRow) {}
 
@@ -292,27 +292,95 @@ void LCDBitmap_32::clear(const Color &color) {
     if (auto c = get_if<LCDColor>(&color); c->color == LCDSolidColor::Clear) {
         if (!mask)
             mask = cranked.heap.construct<LCDBitmap_32>(cranked, width, height);
-        else if (mask != this) // Avoid infinite loop
-            mask->clear(color);
+        else {
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    mask->setBufferPixel(x, y, false);
+        }
     }
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
             drawPixel(x, y, color);
 }
 
+void LCDBitmap_32::drawVerticalLine(int x, int y1, int y2, const Color &color) {
+    for (int y = y1; y < y2; y++)
+        drawPixel(x, y, color);
+}
+
+void LCDBitmap_32::drawHorizontalLine(int x1, int x2, int y, const Color &color) {
+    for (int x = x1; x < x2; x++)
+        drawPixel(x, y, color);
+}
+
+void LCDBitmap_32::drawRect(int x, int y, int width, int height, const Color &color) {
+    drawVerticalLine(x, y, y + height - 1, color);
+    drawVerticalLine(x + width - 1, y, y + height - 1, color);
+    drawHorizontalLine(x + 1, x + width - 2, y, color);
+    drawHorizontalLine(x + 1, x + width - 2, y + height - 1, color);
+}
+
+void LCDBitmap_32::fillRect(int x, int y, int width, int height, const Color &color) {
+    for (int i = 0; i < height; i++)
+        for (int j = 0; j < width; j++)
+            drawPixel(x + j, y + i, color);
+}
+
 // Todo: Can be more efficient
-void LCDBitmap_32::drawBitmap(Bitmap image, int x, int y, int w, int h, int sourceX, int sourceY) {
-    if (w < 0)
-        w = image->width;
-    if (h < 0)
-        h = image->height;
-    w = min(min(w, width - x), image->width - sourceX);
-    h = min(min(h, height - y), image->height - sourceY);
-    for (int i = 0; i < h; i++) {
-        for (int j = 0; j < w; j++) {
-            drawPixel(j, i, image->getPixel(x, y));
+void LCDBitmap_32::drawBitmap(Bitmap bitmap, int x, int y, BitmapDrawMode mode, GraphicsFlip flip, optional<IntRect> sourceRect) {
+    if (!bitmap)
+        return;
+    bool flipY = flip == LCDBitmapFlip::FlipY or flip == LCDBitmapFlip::FlipXY;
+    bool flipX = flip == LCDBitmapFlip::FlipX or flip == LCDBitmapFlip::FlipXY;
+    IntRect bounds = sourceRect ? *sourceRect : IntRect{ {}, bitmap->width, bitmap->height };
+    int endX = bounds.pos.x + bounds.size.x;
+    int endY = bounds.pos.y + bounds.size.y;
+    for (int i = bounds.pos.y; i < endY; i++)
+        for (int j = bounds.pos.y; j < endX; j++) {
+            auto pixel = bitmap->getPixel(j, i);
+            int pixelX = x + (flipX ? bounds.size.x - 1 - j : j);
+            int pixelY = y + (flipY ? bounds.size.y - 1 - i : i);
+            if (pixel == LCDSolidColor::Clear)
+                continue;
+            switch (mode) {
+                case LCDBitmapDrawMode::Copy:
+                    drawPixel(pixelX, pixelY, pixel);
+                    break;
+                case LCDBitmapDrawMode::WhiteTransparent:
+                    if (pixel != LCDSolidColor::White)
+                        drawPixel(pixelX, pixelY, pixel);
+                    break;
+                case LCDBitmapDrawMode::BlackTransparent:
+                    if (pixel != LCDSolidColor::Black)
+                        drawPixel(pixelX, pixelY, pixel);
+                    break;
+                case LCDBitmapDrawMode::FillWhite:
+                    drawPixel(pixelX, pixelY, LCDSolidColor::White);
+                    break;
+                case LCDBitmapDrawMode::FillBlack:
+                    drawPixel(pixelX, pixelY, LCDSolidColor::Black);
+                    break;
+                case LCDBitmapDrawMode::XOR:
+                    drawPixel(pixelX, pixelY, getPixel(pixelX, pixelY) == pixel ? LCDSolidColor::Black : LCDSolidColor::White);
+                    break;
+                case LCDBitmapDrawMode::NXOR:
+                    drawPixel(pixelX, pixelY, getPixel(pixelX, pixelY) != pixel ? LCDSolidColor::Black : LCDSolidColor::White);
+                    break;
+                case LCDBitmapDrawMode::Inverted:
+                    drawPixel(pixelX, pixelY, pixel == LCDSolidColor::White ? LCDSolidColor::Black : LCDSolidColor::White);
+                    break;
+            }
         }
+}
+
+IntRect LCDBitmap_32::drawText(int x, int y, string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, BitmapDrawMode mode, int tracking, int leadingAdjust, int charCount) {
+    int maxX = x, maxY = y;
+    for (auto &[glyph, bounds, character] : cranked.graphics.layoutText(x, y, text, fonts, font, encoding, size, wrap, align, tracking, leadingAdjust, charCount)) {
+        drawBitmap(glyph->bitmap, bounds.pos.x, bounds.pos.y, mode);
+        maxX = max(maxX, bounds.pos.x + bounds.size.x);
+        maxY = max(maxY, bounds.pos.y + bounds.size.y);
     }
+    return { {x, y}, { maxX - x, maxY - y } };
 }
 
 [[nodiscard]] vector<uint8> LCDBitmap_32::toRGB() const {
@@ -478,8 +546,10 @@ DisplayContext::DisplayContext(Bitmap bitmap, FontFamily fonts) : bitmap(bitmap)
 DisplayContext &Graphics::pushContext(Bitmap target) {
     // Todo: Should this copy the existing context? Do fonts always default to system fonts?
     auto &ctx = displayContextStack.emplace_back(getContext());
-    if (target)
+    if (target) {
         ctx.bitmap = target;
+        ctx.clipRect = {0, 0, target->width, target->height };
+    }
     return ctx;
 }
 
@@ -492,7 +562,7 @@ void Graphics::popContext() {
 void Graphics::drawPixel(int x, int y, const Color &color, bool ignoreOffset) {
     ZoneScoped;
     auto &context = getContext();
-    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset + IntVec2{x, y};
     if (!context.clipRect.contains(pos))
         return;
     if (context.stencil) {
@@ -511,7 +581,7 @@ void Graphics::drawPixel(int x, int y, const Color &color, bool ignoreOffset) {
 
 LCDSolidColor Graphics::getPixel(int x, int y, bool ignoreOffset) {
     auto &context = getContext();
-    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset.as<int32>() + IntVec2{x, y};
+    auto pos = ignoreOffset ? IntVec2{x, y} : context.drawOffset + IntVec2{x, y};
     return context.getTargetBitmap()->getPixel(pos.x, pos.y);
 }
 
@@ -740,18 +810,11 @@ void Graphics::drawBitmapTiled(Bitmap bitmap, int x, int y, int width, int heigh
     }
 }
 
-void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, int leadingAdjust, int charCount) {
-    ZoneScoped;
-
-    // Todo: Support alignment
-    // Todo: Respect newline characters
-
+vector<GlyphInstance> Graphics::layoutText(int x, int y, string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, int tracking, int leadingAdjust, int charCount) {
     auto &ctx = getContext();
     const bool useStyling = !font;
-
-    char32_t prevChar{};
-    FontVariant variant{};
-    Font currentFont = font ? font : fonts.regular.get();
+    const int wrapX = size.x ? x + size.x : 0; // Todo: Wrap at screen if bounds not set?
+    const int clipY = size.y ? y + size.y : 0; // Todo: Set clip rect for bitmap drawing rather than chopping off text which doesn't fit?
 
     u32string characters;
     characters.reserve(text.size());
@@ -763,28 +826,41 @@ void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts,
             unicode::utf16::decode((char16_t *)text.data(), text.size() / 2, characters);
             break;
         case PDStringEncoding::ASCII:
-        default:
-            for (char c : text)
-                characters.push_back(c);
+            default:
+                for (char c : text)
+                    characters.push_back(c);
             break;
     }
     if (charCount > 0 and (int)characters.size() > charCount)
         characters.resize(charCount);
 
-    int wrapX = size.x ? x + size.x : 0; // Todo: Wrap at screen if bounds not set?
-    int clipY = size.y ? y + size.y : 0; // Todo: Set clip rect for bitmap drawing rather than chopping off text which doesn't fit?
-
-    struct WordChar {
-        FontGlyph glyph;
-        int kerning;
-    };
+    vector<GlyphInstance> glyphs;
 
     int currentX = x;
     int currentY = y;
-    vector<WordChar> currentWord;
+    char32_t prevChar{};
+    FontVariant variant{};
+    Font currentFont = font ? font : fonts.regular.get();
+    vector<GlyphInstance> line;
 
-    for (int i = 0; i < (int)characters.size(); i++) {
-        char32 c = characters[i];
+    auto dumpLine = [&] {
+        if (!line.empty()) {
+            for (int i = (int)line.size() - 1; i >= 0; i--) {
+                if (auto &[glyph, bounds, character] = line[i]; wrapX > 0 and bounds.pos.x + glyph->advance > wrapX)
+                    line.erase(line.begin() + i);
+                else
+                    break;
+            }
+            int adjust = align == TextAlign::Left ? 0 : align == TextAlign::Center ? line.back().bounds.pos.x - x : wrapX <= 0 ? 0 : wrapX - line.back().bounds.pos.x;
+            for (auto &[glyph, position, character] : line)
+                glyphs.emplace_back(glyph, position + IntVec2{ adjust, 0 }, character);
+        }
+        currentX = x;
+        currentY += currentFont->leading + ctx.textLeading + leadingAdjust;
+        line.clear();
+    };
+
+    for (char32_t c : characters) {
         char32 lastChar = prevChar;
         prevChar = c;
 
@@ -793,6 +869,11 @@ void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts,
             currentFont = fonts.getFont(variant);
             if (lastChar != c)
                 continue;
+        }
+
+        if (c == '\n') {
+            dumpLine();
+            continue;
         }
 
         if (!currentFont)
@@ -809,78 +890,50 @@ void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts,
         if (auto it = glyph->kerningTable.find((int)lastChar); it != glyph->kerningTable.end()) // Todo: Is this correct or backwards?
             kerning = (short)it->second;
 
-        bool clips = wrapX > 0 and currentX + kerning + glyph->advance + currentFont->tracking + ctx.textTracking > wrapX;
-        if (wrap == TextWrap::Word) {
-            currentWord.emplace_back(glyph, kerning);
-            if (i == (int)characters.size() - 1 or unicode::is_white_space(characters[i]) or unicode::is_white_space(characters[i + 1])) {
-                bool atStart = currentX == x;
-                if (clips and not atStart) {
-                    currentY += currentFont->leading + ctx.textLeading + leadingAdjust;
-                    currentX = x;
-                    currentWord[0].kerning = 0;
+        IntVec2 pos{ currentX + kerning, currentY };
+        int finalX = pos.x + glyph->advance + currentFont->tracking + tracking + ctx.textTracking; // Todo: Tracking from C API may be meant to replace font tracking
+        if (wrapX > 0 and pos.x > x and finalX > wrapX) {
+            if (wrap == TextWrap::Character) {
+                dumpLine();
+            } else if (wrap == TextWrap::Word) {
+                vector<GlyphInstance> wrapped;
+                if (!unicode::is_white_space(c)) {
+                    for (int i = (int)line.size() - 1; i > 0; i--) {
+                        if (unicode::is_white_space(line[i].character))
+                            break;
+                        line.push_back(line[i]);
+                        line.pop_back();
+                    }
                 }
-                if (clipY > 0 and currentY + currentFont->leading + ctx.textLeading + leadingAdjust > clipY)
-                    return;
-                for (auto &[glyph, kern] : currentWord) {
-                    drawBitmap(glyph->bitmap, currentX + kern, currentY, LCDBitmapFlip::Unflipped);
-                    currentX += kern + glyph->advance + currentFont->tracking + ctx.textTracking;
-                }
-                currentWord.clear();
+                dumpLine();
+                line.insert(line.end(), wrapped.begin(), wrapped.end());
             }
-        } else {
-            if (wrap == TextWrap::Character and clips) {
-                currentX = x;
-                currentY += currentFont->leading + ctx.textLeading + leadingAdjust;
-                kerning = 0;
-            }
-            if (clipY > 0 and currentY + currentFont->leading + ctx.textLeading + leadingAdjust > clipY)
-                return;
-            drawBitmap(glyph->bitmap, currentX + kerning, currentY, LCDBitmapFlip::Unflipped);
-            currentX += kerning + glyph->advance + currentFont->tracking + ctx.textTracking;
         }
+
+        if (clipY > 0 and currentY > clipY)
+            break;
+
+        line.emplace_back(glyph, IntRect{ pos, { currentFont->glyphWidth, currentFont->glyphHeight } }, c);
+        currentX = finalX;
     }
+
+    dumpLine();
+
+    return glyphs;
 }
 
-IntVec2 Graphics::measureText(Font font, string_view text, StringEncoding encoding, int tracking, int leadingAdjustment, int charCount) {
-    // Todo: This needs to behave the same as drawText, so the logic to layout the text into lines without drawing needs to be pulled out
+void Graphics::drawText(int x, int y, string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, int tracking, int leadingAdjust, int charCount) {
+    for (auto &[glyph, bounds, character] : layoutText(x, y, text, fonts, font, encoding, size, wrap, align, tracking, leadingAdjust, charCount))
+        drawBitmap(glyph->bitmap, bounds.pos.x, bounds.pos.y, LCDBitmapFlip::Unflipped);
+}
 
-    auto &ctx = getContext();
-
-    u32string characters;
-    characters.reserve(text.size());
-    switch (encoding) {
-        case PDStringEncoding::UFT8:
-            unicode::utf8::decode(text.data(), text.size(), characters);
-        break;
-        case PDStringEncoding::LE16Bit:
-            unicode::utf16::decode((char16_t *)text.data(), text.size() / 2, characters);
-        break;
-        case PDStringEncoding::ASCII:
-        default:
-            for (char c : text)
-                characters.push_back(c);
-        break;
+IntVec2 Graphics::measureText(string_view text, const FontFamily &fonts, Font font, StringEncoding encoding, IntVec2 size, TextWrap wrap, TextAlign align, int tracking, int leadingAdjust, int charCount) {
+    int maxX{}, maxY{};
+    for (auto &[glyph, bounds, character] : layoutText(0, 0, text, fonts, font, encoding, size, wrap, align, tracking, leadingAdjust, charCount)) {
+        maxX = max(bounds.pos.x + bounds.size.x, maxX);
+        maxY = max(bounds.pos.y + bounds.size.y, maxY);
     }
-    if (charCount > 0 and (int)characters.size() > charCount)
-        characters.resize(charCount);
-
-    int width = 0;
-    char32 prev{};
-    for (char32 c : characters) {
-        FontGlyph glyph;
-        try {
-            glyph = font->pages.at((int)(c / 256))->glyphs.at((int)(c % 256));
-        } catch (out_of_range &) {
-            continue;
-        }
-
-        int kerning = 0;
-        if (auto it = glyph->kerningTable.find((int)prev); it != glyph->kerningTable.end()) // Todo: Is this correct or backwards?
-            kerning = (short)it->second;
-
-        width += kerning + glyph->advance + font->tracking + ctx.textTracking + tracking;
-    }
-    return { width, font->glyphHeight }; // Todo: Actual height
+    return { maxX, maxY };
 }
 
 const char *Graphics::getLocalizedText(const char *key, PDLanguage language) {
@@ -1451,6 +1504,7 @@ void Graphics::update() {
 }
 
 void Graphics::flushDisplayBuffer() {
+    ZoneScoped;
     // Todo: Mosaic (Could it be implemented as a box blur? Compare to blur effect)
 
     for (int i = 0; i < DISPLAY_HEIGHT; i++) {
@@ -1471,9 +1525,8 @@ void Graphics::flushDisplayBuffer() {
         }
     }
 
-    memcpy(previousFrameBuffer->data.data(), frameBuffer->data.data(), frameBuffer->data.size());
+    // Todo: This shouldn't swap for menu
+    memcpy(previousFrameBuffer->data.data(), frameBuffer->data.data(), frameBuffer->data.size()); // Todo: A swap would be more efficient
 
     cranked.menu.render();
-
-    FrameImage(displayBufferRGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, false);
 }
