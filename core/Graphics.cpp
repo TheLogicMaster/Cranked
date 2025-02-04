@@ -314,6 +314,7 @@ void LCDBitmap_32::drawHorizontalLine(int x1, int x2, int y, const Color &color)
 }
 
 void LCDBitmap_32::drawRect(int x, int y, int width, int height, const Color &color) {
+    // Todo: A bit off with line thickness, needs to extend to meet perpendicular lines
     drawVerticalLine(x, y, y + height - 1, color);
     drawVerticalLine(x + width - 1, y, y + height - 1, color);
     drawHorizontalLine(x + 1, x + width - 2, y, color);
@@ -450,7 +451,7 @@ void LCDSprite_32::draw() {
     auto &context = cranked.graphics.getContext();
     auto drawOffset = context.drawOffset;
     ScopeExitHelper cleanupDrawOffset{ [=, &context]{ context.drawOffset = drawOffset; } };
-    context.drawOffset = drawPos.as<int32>();
+    context.drawOffset += drawPos.as<int32>();
 
     if (image) {
         // Todo: Respect scaling, rotation, clip rect (Probably adding clip rect support to drawing function in addition to context clip rect, or like drawOffset)
@@ -1498,9 +1499,10 @@ void Graphics::reset() {
 
 void Graphics::update() {
     ZoneScoped;
-    frameBufferContext.clipRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
     displayContextStack.clear();
-    frameBufferContext = DisplayContext(frameBuffer, systemFonts);
+    frameBufferContext.focusedImage = nullptr;
+    frameBufferContext.clipRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
+    frameBufferContext.stencil = nullptr;
 }
 
 void Graphics::flushDisplayBuffer() {

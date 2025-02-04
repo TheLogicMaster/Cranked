@@ -187,7 +187,7 @@ File Files::open(string path, FileOptions mode) {
     if (romFile) {
         File file;
         if (romFile->data.empty()) {
-            auto fd = fopen((cranked.rom->path + romFile->name).c_str(), "rb");
+            auto fd = fopen((cranked.rom->path / romFile->name).c_str(), "rb");
             if (!fd) {
                 lastError = cranked.getEmulatedStringLiteral("Failed to open file");
                 return nullptr;

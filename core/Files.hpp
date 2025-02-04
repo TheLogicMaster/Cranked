@@ -62,7 +62,7 @@ namespace cranked {
         Cranked &cranked;
 
         unordered_resource_set<File> openFiles{};
-        fs::path appDataPath = "./appData/";
+        fs::path appDataPath = "./appData/"; // Todo: Make configurable
         cref_t lastError{};
 
     private:

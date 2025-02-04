@@ -22,17 +22,11 @@
 
 using namespace cranked;
 
+// Todo: Fix Zip file loading (Path normalization needs to accommodate Zip entries)
+
 Rom::Rom(const string &path, Cranked *cranked) : cranked(cranked), path(path) {
-    if (!fs::is_directory(path)) {
+    if (!fs::is_directory(path))
         zip = make_unique<libzippp::ZipArchive>(path);
-        zip->open(libzippp::ZipArchive::ReadOnly);
-    }
-    try {
-        loadManifest();
-    } catch (exception &) {}
-    sdkVersion = getPdxVersion();
-    if (!sdkVersion.isValid())
-        logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
 }
 
 unordered_map<string, Rom::File> Rom::systemFiles {
@@ -98,7 +92,7 @@ void Rom::load() {
 
     vector<uint8> pdzData;
     try {
-        if (zip and zip->hasEntry("main.pdz") or !zip and fs::exists(path + "/main.pdz"))
+        if (zip and zip->hasEntry("main.pdz") or !zip and exists(path / "main.pdz"))
             pdzData = readRomFile("main.pdz");
     } catch (exception &) {}
     if (!pdzData.empty())
@@ -150,6 +144,13 @@ void Rom::load() {
             });
         }
     }
+
+    try {
+        loadManifest();
+    } catch (exception &) {}
+    sdkVersion = getPdxVersion();
+    if (!sdkVersion.isValid())
+        logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
 
     vector<uint8> pdexData;
     try {
@@ -222,7 +223,7 @@ vector<uint8> Rom::readRomFile(string name, const string &extension, const vecto
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(path + name);
+        data = readFileData(path / name);
     return data;
 }
 

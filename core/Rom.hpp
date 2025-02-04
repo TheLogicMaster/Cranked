@@ -264,7 +264,7 @@ namespace cranked {
         Cranked *cranked; // Only present for logging, so optional
         bool loaded{};
         unique_ptr<libzippp::ZipArchive> zip;
-        string path;
+        fs::path path;
         map<string, string> manifest{};
         vector<File> outerFiles;
         vector<File> pdzFiles; // Todo: Do later loaded PDZ files get added?

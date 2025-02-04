@@ -127,6 +127,7 @@ namespace cranked {
     };
 
     struct Config {
+        // Todo: Exception handler rather than full crash
         LoggingCallback loggingCallback;
         InternalUpdateCallback updateCallback;
         void *userdata;
@@ -262,8 +263,8 @@ namespace cranked {
     inline string normalizePath(string path) {
         path = regex_replace(path, regex("\\.\\."), ""); // Prevent directory traversal
         replace(path.begin(), path.end(), '\\', '/'); // Unix separators
-        if (!path.starts_with('/')) // Always start with a slash
-            path = '/' + path;
+        if (path.starts_with('/')) // Never start with a slash
+            path = path.substr(1);
         if (path.ends_with('/')) // Always end without a slash
             path = path.substr(0, path.size() - 1);
         return path;

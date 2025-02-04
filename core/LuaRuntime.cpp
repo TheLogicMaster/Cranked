@@ -301,6 +301,7 @@ static LuaRet json_decodeFile_lua(lua_State *context, File file) {
 }
 
 static string jsonEncodeTable(lua_State *context, LuaVal table, bool pretty) {
+    // Todo: This should be improved to properly support non-array tables
     function<void(nlohmann::json *)> encodeTable;
     encodeTable = [&](nlohmann::json *jsonValue){
         lua_pushnil(context);
@@ -308,7 +309,7 @@ static string jsonEncodeTable(lua_State *context, LuaVal table, bool pretty) {
             lua_pushvalue(context, -2);
             nlohmann::json *newValue;
             if (lua_isinteger(context, -1))
-                newValue = &(*jsonValue)[lua_tointeger(context, -1)];
+                newValue = &(*jsonValue)[max(lua_tointeger(context, -1) - 1, 0)]; // Todo: This only works for array styles tables
             else
                 newValue = &(*jsonValue)[lua_tostring(context, -1)];
             if (lua_isinteger(context, -2)) // Todo: lua_is functions return whether a value is convertible, not the exact type, use LuaVal checks

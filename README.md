@@ -131,7 +131,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
   - [x] Zorder
 
 # Game Compatibility
-- [x] [Bobby](https://github.com/yannicka/bobby-playdate) (Graphical differences with text measuring and round rect thickness, level positioning is incorrect)
+- [x] [Bobby](https://github.com/yannicka/bobby-playdate) (Graphical differences with text measuring and round rect thickness)
 
 ## Internals
 - Unicorn to provide Arm CPU emulation
@@ -140,7 +140,7 @@ There is currently no support for running encrypted ROMs from the Catalog.
 - Auto-generated 64-bit safe equivalent Playdate API and data structures by parsing the official headers
 - Lua objects represented by tables with userdata field and metatables
 - Reference counting for all native resources (Higher memory usage when using many resources such as with fonts)
-- Inheritance of audio classes is actually done use C++ virtual inheritance, which means that all parent class types addresses need to be mapped to account for class layouts
+- Inheritance of audio classes is actually done using C++ virtual inheritance, which means that all parent class types addresses need to be mapped to account for class layouts
 
 ## GDB Debugging
 Requires gdb-multiarch and is run from the project directory with `gdb-multiarch -x gdb_setup`.
