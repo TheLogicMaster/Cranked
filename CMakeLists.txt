@@ -8,6 +8,10 @@ include(FindPkgConfig)
 
 add_subdirectory(core)
 
+if (NOT SKIP_TESTING)
+    add_subdirectory(testing)
+endif ()
+
 if (NOT SKIP_JAVA)
     add_subdirectory(java)
 endif ()

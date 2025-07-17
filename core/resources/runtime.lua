@@ -328,9 +328,9 @@ function playdate.geometry.rect:__index(key)
 end
 
 function playdate.geometry.point.new(x, y)
-    local rect = {x = x + .0, y = y + .0}
-    setmetatable(rect, geometry.point)
-    return rect
+    local point = {x = x + .0, y = y + .0}
+    setmetatable(point, geometry.point)
+    return point
 end
 
 function playdate.geometry.point:copy()
@@ -383,9 +383,9 @@ function playdate.geometry.point:__concat(p)
 end
 
 function playdate.geometry.size.new(width, height)
-    local rect = {width = width + .0, height = height + .0}
-    setmetatable(rect, geometry.size)
-    return rect
+    local size = {width = width + .0, height = height + .0}
+    setmetatable(size, geometry.size)
+    return size
 end
 
 function playdate.geometry.size:copy()

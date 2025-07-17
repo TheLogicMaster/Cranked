@@ -234,6 +234,7 @@ namespace cranked {
      */
     template<auto Func>
     int luaNativeWrapper(lua_State *luaContext) {
+        // Todo: Could this instead work by having a Lua function which immediately yields and goes back to the Lua entry point?
         using F = FunctionTypeHelper<decltype(Func)>;
         constexpr int ArgCount = F::ArgCount != 0 and is_type_listed<typename F::template NthArg<0>, Cranked *, lua_State *> ? F::ArgCount - 1 : F::ArgCount;
         using Wrapper = LuaNativeWrapperHelper<Func, typename F::ArgTypes, make_integer_sequence<int, ArgCount>>;

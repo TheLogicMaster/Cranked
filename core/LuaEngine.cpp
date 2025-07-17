@@ -118,8 +118,9 @@ void LuaEngine::luaHook(lua_State *luaState, lua_Debug *luaDebug) {
     // Todo: This hook may slow things down, so potentially set the hook with a count of 1 from a different thread (sethook is the only thread-safe Lua function)
     // Todo: Yielding is destructive if there's a native function in the call stack, so probably only do so if emulator is forcefully stopped
     // Todo: Nested hooks are disabled, so a Lua->Hook->...->Lua chain could block the entire program, but probably not a real concern
-    // Todo: Could nested hooks be hacked in?
-    // Todo: Exceptions thrown in here are likely an issue
+
+    // Todo: Yielding is not sufficient if program uses other coroutines, so instead throw an error and replace pcall functions (pcall, xpcall, coroutine.resume) with ones that check if exiting on return.
+    // Todo: Native exceptions are caught by pcall, so longjmp is the only option other than intercepting pcall.
     auto cranked = Cranked::fromLuaContext(luaState);
     if (cranked->state == Cranked::State::Stopped)
         lua_yield(luaState, 0);

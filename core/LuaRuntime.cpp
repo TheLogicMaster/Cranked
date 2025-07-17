@@ -304,6 +304,8 @@ static string jsonEncodeTable(lua_State *context, LuaVal table, bool pretty) {
     // Todo: This should be improved to properly support non-array tables
     function<void(nlohmann::json *)> encodeTable;
     encodeTable = [&](nlohmann::json *jsonValue){
+        if (!lua_istable(context, -1))
+            throw CrankedError("Invalid table to encode");
         lua_pushnil(context);
         while (lua_next(context, -2)) {
             lua_pushvalue(context, -2);
@@ -312,20 +314,23 @@ static string jsonEncodeTable(lua_State *context, LuaVal table, bool pretty) {
                 newValue = &(*jsonValue)[max(lua_tointeger(context, -1) - 1, 0)]; // Todo: This only works for array styles tables
             else
                 newValue = &(*jsonValue)[lua_tostring(context, -1)];
-            if (lua_isinteger(context, -2)) // Todo: lua_is functions return whether a value is convertible, not the exact type, use LuaVal checks
-                *newValue = lua_tointeger(context, -2);
-            else if (lua_isboolean(context, -2))
-                *newValue = (bool) lua_toboolean(context, -2);
-            else if (lua_isnumber(context, -2))
-                *newValue = lua_tonumber(context, -2);
-            else if (lua_isstring(context, -2))
-                *newValue = lua_tostring(context, -2);
-            else if (lua_isnoneornil(context, -2))
+            LuaVal value{ context, -2 };
+            if (value.isInt())
+                *newValue = value.asInt();
+            else if (value.isBool())
+                *newValue = value.asBool();
+            else if (value.isNumeric()) {
+                auto val = value.asFloat();
+                *newValue = rintf(val) == val ? (nlohmann::json)value.asInt() : (nlohmann::json)val;
+            } else if (value.isString())
+                *newValue = value.asString();
+            else if (value.isNil())
                 *newValue = nullptr;
-            else {
-                lua_pushvalue(context, -2);
+            else if (value.isTable()) {
+                lua_pushvalue(context, value);
                 encodeTable(newValue);
-            }
+            } else
+                throw CrankedError("Invalid value to encode");
             lua_pop(context, 2);
         }
         lua_pop(context, 1);
@@ -344,13 +349,18 @@ static string *json_encodePretty_lua(lua_State *context, LuaVal table) {
     return new string(jsonEncodeTable(context, table, true));
 }
 
-static void json_encodeToFile_lua(lua_State *context, File file, LuaVal pretty, LuaVal table) {
+static void json_encodeToFile_lua(lua_State *context, LuaVal file, LuaVal pretty, LuaVal table) {
     bool isPretty = false;
-    if (!pretty.isTable())
+    if (pretty.isTable())
         table = pretty;
     else
         isPretty = pretty.asBool();
-    playdate_file_write_lua(Cranked::fromLuaContext(context), file, jsonEncodeTable(context, table, isPretty).c_str());
+    bool isFile = !file.isString();
+    auto cranked = Cranked::fromLuaContext(context);
+    File target = isFile ? file.asUserdataObject<File>() : cranked->files.open(file.asString(), FileOptions::Write);
+    playdate_file_write_lua(Cranked::fromLuaContext(context), target, jsonEncodeTable(context, table, isPretty).c_str());
+    if (!isFile)
+        cranked->files.close(target); // Todo: Surely should use RAII here
 }
 
 static LuaRet json_null_tostring_lua(lua_State *context) {

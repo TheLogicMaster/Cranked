@@ -13,8 +13,8 @@
 
 namespace cranked {
 
-    // Todo: A wrapper class to hide internals
-    // Todo: Extract Lua functionality to some LuaEngine class
+    // Todo: Multi-threaded execution with locking to prevent deadlocks? This avoids callbacks from Lua hooks but requires the UI to lock and process audio.
+    // Todo: To enforce thread-safety, a wrapper object which requires you to lock before exposing internals via dereferencing operator could help.
     // Todo: A safe way to either call control functions (reset) within updateInternals callbacks, or assertions to prevent doing so, or deferring until unwinding stack
     // Todo: Serial callbacks
     class Cranked {

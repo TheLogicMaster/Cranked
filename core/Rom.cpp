@@ -152,6 +152,7 @@ void Rom::load() {
     if (!sdkVersion.isValid())
         logMessage(LogLevel::Warning, "ROM SDK version missing, using latest");
 
+    // Todo: Extract to function, support legacy format as well as alternative magic
     vector<uint8> pdexData;
     try {
         if (findRomFile("pdex.bin"))
@@ -168,7 +169,6 @@ void Rom::load() {
         auto shimOffset = *(uint32 *) &pdexData[0x28];
         auto relocationCount = *(uint32 *) &pdexData[0x2C];
 
-        // Todo: Detect uncompressed binary gracefully (Test with older version of SDK or PDC command line arg)
         try {
             binary = decompressData(pdexData.data() + HEADER_SIZE, pdexData.size() - HEADER_SIZE, decompressedSize);
         } catch (exception &ex) {

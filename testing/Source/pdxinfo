@@ -1,0 +1,8 @@
+name=Cranked Testing
+author=TheLogicMaster
+description=Cranked Emulator Testing Program
+bundleID=com.thelogicmaster.testing
+version=1.0
+buildNumber=1
+imagePath=system
+launchSoundPath=

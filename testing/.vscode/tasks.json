@@ -1,0 +1,27 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "pdc",
+      "problemMatcher": ["$pdc-lua", "$pdc-external"],
+      "label": "Playdate: Build"
+    },
+    {
+      "type": "playdate-simulator",
+      "problemMatcher": ["$pdc-external"],
+      "label": "Playdate: Run"
+    },
+    {
+      "label": "Playdate: Build and Run",
+      "dependsOn": ["Playdate: Build", "Playdate: Run"],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

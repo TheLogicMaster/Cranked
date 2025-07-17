@@ -1,0 +1,27 @@
+{
+  // Point to the root PlaydateSDK so that auto-complete recommends paths prefixed with "CoreLibs/"
+  "Lua.workspace.library": ["$PLAYDATE_SDK_PATH"],
+  // Prevent the language server from indexing the Examples directories in the PlaydateSDK folder
+  "Lua.workspace.ignoreDir": ["Examples"],
+  "Lua.workspace.preloadFileSize": 1000,
+  "Lua.runtime.special": {
+    // Configure the language server to treat an import statement as a require statement
+    "import": "require"
+  },
+  // The language server uses "." separators for require auto-completion, but the import statement only supports slashes
+  "Lua.completion.requireSeparator": "/",
+  "Lua.runtime.version": "Lua 5.4",
+  // The language server can sort of parse these, but the formatter cannot
+  // "Lua.runtime.nonstandardSymbol": ["+=", "-=", "*=", "/="],
+  "Lua.diagnostics.disable": [
+    "lowercase-global",
+    "undefined-global",
+    "undefined-field",
+    "unknown-symbol"
+  ],
+  // Prevent the language server from linting the PlaydateSDK files
+  "Lua.diagnostics.libraryFiles": "Disable",
+
+  "playdate-debug.sourcePath": "Source",
+  "playdate-debug.productName": "Testing"
+}

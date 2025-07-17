@@ -1,0 +1,4 @@
+pillow
+PyQt6
+diff_match_patch
+deep_diff
