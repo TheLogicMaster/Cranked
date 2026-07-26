@@ -3,6 +3,7 @@
 // NOLINTBEGIN(*-non-const-parameter)
 
 #include "Cranked.hpp"
+#include "Networking.hpp"
 #include "gen/PlaydateAPI.hpp"
 
 using namespace cranked;
@@ -389,9 +390,128 @@ void cranked::playdate_graphics_getBitmapTableInfo(Cranked *cranked, BitmapTable
         *width = table->bitmaps.empty() ? 0 : table->bitmaps[0]->width;
 }
 
-void cranked::playdate_graphics_drawTextInRect(Cranked *cranked, void *text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align) {
+void cranked::playdate_graphics_drawTextInRect(Cranked *cranked, void *text, uint32 len, int32 encoding, int32 x, int32 y, int32 width, int32 height, int32 wrap, int32 align) {
     auto &ctx = cranked->graphics.getContext();
     cranked->graphics.drawText(x, y, { (char *)text, strlen((char *)text) }, ctx.fonts, nullptr, (StringEncoding)encoding, { width, height }, (TextWrap)wrap, (TextAlign)align, 0, 0, (int)len);
+}
+
+int32_t cranked::playdate_graphics_getTextHeightForMaxWidth(Cranked *cranked, Font font, void *text, uint32 len, int32 maxwidth, int32 encoding, int32 wrap, int32 tracking, int32 extraLeading) {
+    return font->glyphHeight; // Todo
+}
+
+void cranked::playdate_graphics_drawRoundRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, int32 radius, int32 lineWidth, uint32 color) {
+    return cranked->graphics.drawRoundRect(x, y, width, height, radius, color); // Todo: Support lineWidth
+}
+
+void cranked::playdate_graphics_fillRoundRect(Cranked *cranked, int32 x, int32 y, int32 width, int32 height, int32 radius, uint32 color) {
+    return cranked->graphics.fillRoundRect(x, y, width, height, radius, color);
+}
+
+TileMap cranked::playdate_tilemap_newTilemap(Cranked *cranked) {
+    auto tilemap = cranked->heap.construct<LCDTileMap_32>(*cranked);
+    tilemap->reference();
+    return tilemap;
+}
+
+void cranked::playdate_tilemap_freeTilemap(Cranked *cranked, TileMap tilemap) {
+    tilemap->dereference();
+}
+
+void cranked::playdate_tilemap_setImageTable(Cranked *cranked, TileMap tilemap, BitmapTable table) {
+    tilemap->table = table;
+}
+
+BitmapTable cranked::playdate_tilemap_getImageTable(Cranked *cranked, TileMap tilemap) {
+    return tilemap->table;
+}
+
+void cranked::playdate_tilemap_setSize(Cranked *cranked, TileMap tilemap, int32 tilesWide, int32 tilesHigh) {
+    tilemap->tiles.resize(tilesWide * tilesHigh);
+    tilemap->width = tilesWide;
+}
+
+void cranked::playdate_tilemap_getSize(Cranked *cranked, TileMap tilemap, int32 *tilesWide, int32 *tilesHigh) {
+    if (tilesWide)
+        *tilesWide = tilemap->width;
+    if (tilesHigh)
+        *tilesHigh = tilemap->getHeight();
+}
+
+void cranked::playdate_tilemap_getPixelSize(Cranked *cranked, TileMap tilemap, uint32 *outWidth, uint32 *outHeight) {
+    auto [width, height] = tilemap->getCellSize();
+    if (outWidth)
+        *outWidth = width;
+    if (outHeight)
+        *outHeight = height;
+}
+
+void cranked::playdate_tilemap_setTiles(Cranked *cranked, TileMap tilemap, uint16_t *indices, int32 count, int32 width) {
+    tilemap->width = width;
+    tilemap->tiles.clear();
+    for (int i = 0; i < count; i++)
+        tilemap->tiles.push_back(indices[i]);
+    int height = (int)ceil((float)tilemap->tiles.size() / (float)width);
+    tilemap->tiles.resize(width * height); // Round up last row if needed
+}
+
+void cranked::playdate_tilemap_setTileAtPosition(Cranked *cranked, TileMap tilemap, int32 x, int32 y, uint16_t index) {
+    if (int i = (y - 1) * tilemap->width + x - 1; i < tilemap->tiles.size())
+        tilemap->tiles[i] = index;
+}
+
+int32_t cranked::playdate_tilemap_getTileAtPosition(Cranked *cranked, TileMap tilemap, int32 x, int32 y) {
+    int i = (y - 1) * tilemap->width + x - 1;
+    return i < tilemap->tiles.size() ? tilemap->tiles[i] : -1;
+}
+
+void cranked::playdate_tilemap_drawAtPoint(Cranked *cranked, TileMap tilemap, float x, float y) {
+    cranked->graphics.drawTileMap(tilemap, (int)x, (int)y);
+}
+
+StreamPlayer cranked::playdate_videostream_newPlayer(Cranked *cranked) {
+    auto player = cranked->heap.construct<LCDStreamPlayer_32>(*cranked);
+    player->reference();
+    return player;
+}
+
+void cranked::playdate_videostream_freePlayer(Cranked *cranked, StreamPlayer player) {
+    player->dereference();
+}
+
+void cranked::playdate_videostream_setBufferSize(Cranked *cranked, StreamPlayer player, int32 video, int32 audio) {
+    // Todo
+}
+
+void cranked::playdate_videostream_setFile(Cranked *cranked, StreamPlayer player, File file) {
+    // Todo
+}
+
+void cranked::playdate_videostream_setHTTPConnection(Cranked *cranked, StreamPlayer player, HttpConnection conn) {
+    // Todo
+}
+
+FilePlayer cranked::playdate_videostream_getFilePlayer(Cranked *cranked, StreamPlayer player) {
+    return nullptr; // Todo
+}
+
+VideoPlayer cranked::playdate_videostream_getVideoPlayer(Cranked *cranked, StreamPlayer player) {
+    return nullptr; // Todo
+}
+
+uint8_t cranked::playdate_videostream_update(Cranked *cranked, StreamPlayer player) {
+    return 0; // Todo
+}
+
+int32_t cranked::playdate_videostream_getBufferedFrameCount(Cranked *cranked, StreamPlayer player) {
+    return 0; // Todo
+}
+
+uint32_t cranked::playdate_videostream_getBytesRead(Cranked *cranked, StreamPlayer player) {
+    return 0; // Todo
+}
+
+void cranked::playdate_videostream_setTCPConnection(Cranked *cranked, StreamPlayer player, TcpConnection conn) {
+    // Todo
 }
 
 void *cranked::playdate_sys_realloc(Cranked *cranked, void *ptr, uint32 size) {
@@ -957,6 +1077,26 @@ int32 cranked::playdate_sys_parseString(Cranked *cranked, uint8 *str, uint8 *fmt
     va_end(list);
 
     return matches;
+}
+
+void cranked::playdate_sys_delay(Cranked *cranked, uint32 milliseconds) {
+    cranked->graphics.sleep(milliseconds);
+}
+
+void cranked::playdate_sys_getServerTime(Cranked *cranked, cref_t callback) {
+    // Todo
+}
+
+void cranked::playdate_sys_restartGame(Cranked *cranked, uint8_t *launchargs) {
+    // Todo
+}
+
+uint8_t *cranked::playdate_sys_getLaunchArgs(Cranked *cranked, cref_t *outpath) {
+    return nullptr; // Todo
+}
+
+uint8_t cranked::playdate_sys_sendMirrorData(Cranked *cranked, uint8_t command, void *data, int32 len) {
+    return 0; // Todo
 }
 
 int32 cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8 *name, cref_t *outErr) {
@@ -1944,6 +2084,14 @@ void cranked::playdate_sprite_getCenter(Cranked *cranked, Sprite s, float *x, fl
         *x = s->getCenter().x;
     if (y)
         *y = s->getCenter().y;
+}
+
+void cranked::playdate_sprite_setTilemap(Cranked *cranked, Sprite s, TileMap tilemap) {
+    s->setTileMap(tilemap);
+}
+
+TileMap cranked::playdate_sprite_getTilemap(Cranked *cranked, Sprite s) {
+    return s->tileMap;
 }
 
 void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource sourceDerived, float lvol, float rvol) {
@@ -2974,12 +3122,12 @@ SoundSource cranked::playdate_sound_channel_addCallbackSource(Cranked *cranked, 
     return nullptr;
 }
 
-void cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
-    channel->effects.emplace(cranked->audio.effectFromDerived(effectDerived));
+int32_t cranked::playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
+    return channel->effects.emplace(cranked->audio.effectFromDerived(effectDerived)).second;
 }
 
-void cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
-    eraseByEquivalentKey(channel->effects, cranked->audio.effectFromDerived(effectDerived));
+int32_t cranked::playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel channel, SoundEffect effectDerived) {
+    return eraseByEquivalentKey(channel->effects, cranked->audio.effectFromDerived(effectDerived));
 }
 
 void cranked::playdate_sound_channel_setVolume(Cranked *cranked, SoundChannel channel, float volume) {
@@ -3111,6 +3259,14 @@ void cranked::playdate_display_setOffset(Cranked *cranked, int32 x, int32 y) {
     cranked->graphics.displayOffset = {x, y};
 }
 
+float cranked::playdate_display_getRefreshRate(Cranked *cranked) {
+    return cranked->graphics.framerate;
+}
+
+float cranked::playdate_display_getFPS(Cranked *cranked) {
+    return round(1000.0f / cranked->getFrameDelta());
+}
+
 int32 cranked::playdate_scoreboards_addScore(Cranked *cranked, uint8 *boardId, uint32 value, cref_t callback) {
     // Todo
     return 0;
@@ -3140,6 +3296,202 @@ int32 cranked::playdate_scoreboards_getScores(Cranked *cranked, uint8 *boardId, 
 }
 
 void cranked::playdate_scoreboards_freeScoresList(Cranked *cranked, PDScoresList_32 *scoresList) {
+    // Todo
+}
+
+int32_t cranked::playdate_http_requestAccess(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl, uint8_t *purpose, cref_t requestCallback, void *userdata) {
+    if (requestCallback)
+        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8_t)true, userdata);
+    return (int)AccessReply::Ask; // Todo: Safe to call immediately? Return value?
+}
+
+HttpConnection cranked::playdate_http_newConnection(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl) {
+    auto conn = cranked->heap.construct<HTTPConnection_32>(*cranked);
+    conn->server = (char *)server;
+    conn->port = port > 0 ? port : useSsl ? 443 : 80;
+    conn->reference();
+    return conn;
+}
+
+HttpConnection cranked::playdate_http_retain(Cranked *cranked, HttpConnection conn) {
+    conn->reference();
+    return conn;
+}
+
+void cranked::playdate_http_release(Cranked *cranked, HttpConnection conn) {
+    conn->dereference();
+}
+
+void cranked::playdate_http_setConnectTimeout(Cranked *cranked, HttpConnection conn, int32 ms) {
+    conn->connectTimeout = ms;
+}
+
+void cranked::playdate_http_setKeepAlive(Cranked *cranked, HttpConnection conn, uint8_t keepAlive) {
+    conn->keepAlive = keepAlive;
+}
+
+void cranked::playdate_http_setByteRange(Cranked *cranked, HttpConnection conn, int32 start, int32 end) {
+    conn->byteRangeStart = start;
+    conn->byteRangeEnd = end;
+}
+
+void cranked::playdate_http_setUserdata(Cranked *cranked, HttpConnection conn, void *userdata) {
+    conn->userdata = userdata;
+}
+
+void *cranked::playdate_http_getUserdata(Cranked *cranked, HttpConnection conn) {
+    return conn->userdata;
+}
+
+int32 cranked::playdate_http_get(Cranked *cranked, HttpConnection conn, uint8_t *path, uint8_t *headers, uint32 headerLen) {
+    return (int)conn->sendRequest("GET", (char *)path, { (char *)headers, headerLen }, {});
+}
+
+int32 cranked::playdate_http_post(Cranked *cranked, HttpConnection conn, uint8_t *path, uint8_t *headers, uint32 headerLen, uint8_t *body, uint32 bodyLen) {
+    return (int)conn->sendRequest("POST", (char *)path, { (char *)headers, headerLen }, { (char *)body, bodyLen });
+}
+
+int32 cranked::playdate_http_query(Cranked *cranked, HttpConnection conn, uint8_t *method, uint8_t *path, uint8_t *headers, uint32 headerLen, uint8_t *body, uint32 bodyLen) {
+    return (int)conn->sendRequest((char *)method, (char *)path, { (char *)headers, headerLen }, { (char *)body, bodyLen });
+}
+
+int32 cranked::playdate_http_getError(Cranked *cranked, HttpConnection conn) {
+    return (int)conn->lastError;
+}
+
+void cranked::playdate_http_getProgress(Cranked *cranked, HttpConnection conn, int32 *read, int32 *total) {
+    if (read)
+        *read = conn->readBuffer.size();
+    if (total)
+        *total = 0;
+}
+
+int32 cranked::playdate_http_getResponseStatus(Cranked *cranked, HttpConnection conn) {
+    return conn->lastStatusCode;
+}
+
+uint32 cranked::playdate_http_getBytesAvailable(Cranked *cranked, HttpConnection conn) {
+    return (uint32)conn->readBuffer.size();
+}
+
+void cranked::playdate_http_setReadTimeout(Cranked *cranked, HttpConnection conn, int32 ms) {
+    conn->readTimeout = ms;
+}
+
+void cranked::playdate_http_setReadBufferSize(Cranked *cranked, HttpConnection conn, int32 bytes) {
+    conn->setReadBufferSize(bytes);
+}
+
+int32 cranked::playdate_http_read(Cranked *cranked, HttpConnection conn, void *buf, uint32 bufLen) {
+    return conn->readData({(uint8 *)buf, bufLen});
+}
+
+void cranked::playdate_http_close(Cranked *cranked, HttpConnection conn) {
+    conn->close();
+}
+
+void cranked::playdate_http_setHeaderReceivedCallback(Cranked *cranked, HttpConnection conn, cref_t headerCallback) {
+    conn->headerReceivedCallback = headerCallback;
+}
+
+void cranked::playdate_http_setHeadersReadCallback(Cranked *cranked, HttpConnection conn, cref_t callback) {
+    conn->headersReadCallback = callback;
+}
+
+void cranked::playdate_http_setResponseCallback(Cranked *cranked, HttpConnection conn, cref_t callback) {
+    conn->responseCallback = callback;
+}
+
+void cranked::playdate_http_setRequestCompleteCallback(Cranked *cranked, HttpConnection conn, cref_t callback) {
+    conn->completeCallback = callback;
+}
+
+void cranked::playdate_http_setConnectionClosedCallback(Cranked *cranked, HttpConnection conn, cref_t callback) {
+    conn->closedCallback = callback;
+}
+
+int32 cranked::playdate_tcp_requestAccess(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl, uint8_t *purpose, cref_t requestCallback, void *userdata) {
+    if (requestCallback)
+        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8_t)true, userdata);
+    return (int)AccessReply::Ask; // Todo: Safe to call immediately? Return value?
+}
+
+TcpConnection cranked::playdate_tcp_newConnection(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl) {
+    auto conn = cranked->heap.construct<TCPConnection_32>(*cranked);
+    conn->server = (char *)server;
+    conn->port = port > 0 ? port : useSsl ? 443 : 80;
+    conn->reference();
+    return conn;
+}
+
+TcpConnection cranked::playdate_tcp_retain(Cranked *cranked, TcpConnection conn) {
+    conn->reference();
+    return conn;
+}
+
+void cranked::playdate_tcp_release(Cranked *cranked, TcpConnection conn) {
+    conn->dereference();
+}
+
+int32 cranked::playdate_tcp_getError(Cranked *cranked, TcpConnection conn) {
+    return (int)conn->lastError;
+}
+
+void cranked::playdate_tcp_setConnectTimeout(Cranked *cranked, TcpConnection conn, int32 ms) {
+    conn->connectTimeout = ms;
+}
+
+void cranked::playdate_tcp_setUserdata(Cranked *cranked, TcpConnection conn, void *userdata) {
+    conn->userdata = userdata;
+}
+
+void *cranked::playdate_tcp_getUserdata(Cranked *cranked, TcpConnection conn) {
+    return conn->userdata;
+}
+
+int32 cranked::playdate_tcp_open(Cranked *cranked, TcpConnection conn, cref_t callback, void *userdata) {
+    conn->openCallback = callback;
+    conn->openUserdata = userdata;
+    return (int)conn->open();
+}
+
+int32 cranked::playdate_tcp_close(Cranked *cranked, TcpConnection conn) {
+    return (int)conn->close();
+}
+
+void cranked::playdate_tcp_setConnectionClosedCallback(Cranked *cranked, TcpConnection conn, cref_t callback) {
+    conn->closedCallback = callback;
+}
+
+void cranked::playdate_tcp_setReadTimeout(Cranked *cranked, TcpConnection conn, int32 ms) {
+    conn->readTimeout = ms;
+}
+
+void cranked::playdate_tcp_setReadBufferSize(Cranked *cranked, TcpConnection conn, int32 bytes) {
+    conn->setReadBufferSize(bytes);
+}
+
+uint32 cranked::playdate_tcp_getBytesAvailable(Cranked *cranked, TcpConnection conn) {
+    return (uint32)conn->readBuffer.size();
+}
+
+int32 cranked::playdate_tcp_read(Cranked *cranked, TcpConnection conn, void *buffer, uint32 length) {
+    // Todo: Error handling
+    size_t len = std::min(conn->readBuffer.size(), (size_t)length);
+    memcpy(buffer, conn->readBuffer.data(), len);
+    conn->readBuffer.erase(conn->readBuffer.begin(), conn->readBuffer.begin() + len);
+    return (int32)len;
+}
+
+int32 cranked::playdate_tcp_write(Cranked *cranked, TcpConnection conn, void *buffer, uint32 length) {
+    return (int32)conn->send({ (const uint8 *)buffer, length });
+}
+
+int32 cranked::playdate_network_getStatus(Cranked *cranked) {
+    return (int)WifiStatus::Connected; // Todo
+}
+
+void cranked::playdate_network_setEnabled(Cranked *cranked, uint8_t flag, cref_t callback) {
     // Todo
 }
 

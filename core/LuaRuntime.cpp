@@ -1340,8 +1340,7 @@ static void playdate_graphics_tilemap_drawIgnoringOffset_lua(Cranked *cranked, T
 }
 
 static void playdate_graphics_tilemap_setTileAtPosition_lua(Cranked *cranked, TileMap tilemap, int x, int y, int index) {
-    int i = (y - 1) * tilemap->width + x - 1;
-    if (i < tilemap->tiles.size())
+    if (int i = (y - 1) * tilemap->width + x - 1; i < tilemap->tiles.size())
         tilemap->tiles[i] = index;
 }
 

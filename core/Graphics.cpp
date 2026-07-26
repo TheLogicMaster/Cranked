@@ -170,6 +170,8 @@ void GrayscaleImage::dither(Bitmap bitmap, DitherType type, int xPhase = 0, int 
 
 LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size) : NativeResource(cranked, ResourceType::VideoPlayer, this), frameRate(frameRate), size(size) {}
 
+LCDStreamPlayer_32::LCDStreamPlayer_32(Cranked &cranked) : NativeResource(cranked, ResourceType::StreamPlayer, this) {}
+
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
         : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(ceilDiv(width, 8) * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 

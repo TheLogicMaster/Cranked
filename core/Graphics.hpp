@@ -113,7 +113,7 @@ namespace cranked {
     };
 
     struct LCDVideoPlayer_32 final : NativeResource {
-        explicit LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size);
+        LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 size);
 
         float frameRate;
         IntVec2 size;
@@ -121,6 +121,10 @@ namespace cranked {
         BitmapRef target;
         int currentFrame{}; // Todo: Is this meant to be the previously rendered frame?
         cref_t lastError{};
+    };
+
+    struct LCDStreamPlayer_32 final : NativeResource {
+        explicit LCDStreamPlayer_32(Cranked &cranked);
     };
 
     /**
@@ -309,7 +313,7 @@ namespace cranked {
         explicit LCDTileMap_32(Cranked &cranked);
 
         [[nodiscard]] int getHeight() const {
-            return (int)tiles.size() / width;
+            return width > 0 ? (int)tiles.size() / width : 0;
         }
 
         [[nodiscard]] IntVec2 getCellSize() const;
@@ -564,6 +568,11 @@ namespace cranked {
         Font getFont(const uint8 *data, bool wide);
 
         Font getSystemFont(PDFontVariant variant = PDFontVariant::Normal);
+
+        void sleep(uint32 millis) {
+            // Todo: Make smarter with a signalling variable or something to allow updating the UI or interrupting
+            this_thread::sleep_for(chrono::milliseconds(millis));
+        }
 
         Cranked &cranked;
         HeapAllocator &heap;

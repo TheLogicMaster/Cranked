@@ -17,6 +17,7 @@ void Cranked::init() {
     audio.init();
     nativeEngine.init();
     luaEngine.init();
+    networking.init();
     debugger.init();
     startTime = elapsedTimeStart = chrono::system_clock::now();
     initialized = true;
@@ -47,6 +48,7 @@ void Cranked::reset() {
     statsInterval = 0;
 
     debugger.reset();
+    networking.reset();
     graphics.reset();
     audio.reset();
     menu.reset();
@@ -93,6 +95,7 @@ void Cranked::update() {
         bool menuOpen = menu.isOpen; // Delay a frame when closing menu to prevent duplicate button inputs
 
         menu.update();
+        networking.update();
         graphics.update();
 
         if (!menuOpen) {

@@ -10,6 +10,7 @@
 #include "Debugger.hpp"
 #include "Bump.hpp"
 #include "PathFinding.hpp"
+#include "Networking.hpp"
 
 namespace cranked {
 
@@ -123,6 +124,7 @@ namespace cranked {
         Menu menu{ *this };
         LuaEngine luaEngine{ *this };
         Bump bump { *this };
+        Networking networking { *this };
         Debugger debugger { *this };
         unique_ptr<Rom> rom;
 

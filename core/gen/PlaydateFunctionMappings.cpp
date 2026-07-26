@@ -50,6 +50,11 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_sys_setSerialMessageCallback", (void *) playdate_sys_setSerialMessageCallback, { ArgType::uint32_t }, ArgType::void_t },
 	{ "playdate_sys_vaFormatString", (void *) playdate_sys_vaFormatString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::va_list_t }, ArgType::int32_t },
 	{ "playdate_sys_parseString", (void *) playdate_sys_parseString, { ArgType::ptr_t, ArgType::ptr_t, ArgType::varargs_t }, ArgType::int32_t },
+	{ "playdate_sys_delay", (void *) playdate_sys_delay, { ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_sys_getServerTime", (void *) playdate_sys_getServerTime, { ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_sys_restartGame", (void *) playdate_sys_restartGame, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_sys_getLaunchArgs", (void *) playdate_sys_getLaunchArgs, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_sys_sendMirrorData", (void *) playdate_sys_sendMirrorData, { ArgType::uint8_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::uint8_t },
 	{ "playdate_file_geterr", (void *) playdate_file_geterr, {  }, ArgType::ptr_t },
 	{ "playdate_file_listfiles", (void *) playdate_file_listfiles, { ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::int32_t },
 	{ "playdate_file_stat", (void *) playdate_file_stat, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::int32_t },
@@ -133,6 +138,31 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_graphics_getBitmapPixel", (void *) playdate_graphics_getBitmapPixel, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::int32_t },
 	{ "playdate_graphics_getBitmapTableInfo", (void *) playdate_graphics_getBitmapTableInfo, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_graphics_drawTextInRect", (void *) playdate_graphics_drawTextInRect, { ArgType::ptr_t, ArgType::uint32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_graphics_getTextHeightForMaxWidth", (void *) playdate_graphics_getTextHeightForMaxWidth, { ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t }, ArgType::int32_t },
+	{ "playdate_graphics_drawRoundRect", (void *) playdate_graphics_drawRoundRect, { ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_graphics_fillRoundRect", (void *) playdate_graphics_fillRoundRect, { ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::int32_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_tilemap_newTilemap", (void *) playdate_tilemap_newTilemap, {  }, ArgType::ptr_t },
+	{ "playdate_tilemap_freeTilemap", (void *) playdate_tilemap_freeTilemap, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tilemap_setImageTable", (void *) playdate_tilemap_setImageTable, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tilemap_getImageTable", (void *) playdate_tilemap_getImageTable, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_tilemap_setSize", (void *) playdate_tilemap_setSize, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_tilemap_getSize", (void *) playdate_tilemap_getSize, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tilemap_getPixelSize", (void *) playdate_tilemap_getPixelSize, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tilemap_setTiles", (void *) playdate_tilemap_setTiles, { ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_tilemap_setTileAtPosition", (void *) playdate_tilemap_setTileAtPosition, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t, ArgType::uint16_t }, ArgType::void_t },
+	{ "playdate_tilemap_getTileAtPosition", (void *) playdate_tilemap_getTileAtPosition, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::int32_t },
+	{ "playdate_tilemap_drawAtPoint", (void *) playdate_tilemap_drawAtPoint, { ArgType::ptr_t, ArgType::float_t, ArgType::float_t }, ArgType::void_t },
+	{ "playdate_videostream_newPlayer", (void *) playdate_videostream_newPlayer, {  }, ArgType::ptr_t },
+	{ "playdate_videostream_freePlayer", (void *) playdate_videostream_freePlayer, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_videostream_setBufferSize", (void *) playdate_videostream_setBufferSize, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_videostream_setFile", (void *) playdate_videostream_setFile, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_videostream_setHTTPConnection", (void *) playdate_videostream_setHTTPConnection, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_videostream_getFilePlayer", (void *) playdate_videostream_getFilePlayer, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_videostream_getVideoPlayer", (void *) playdate_videostream_getVideoPlayer, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_videostream_update", (void *) playdate_videostream_update, { ArgType::ptr_t }, ArgType::uint8_t },
+	{ "playdate_videostream_getBufferedFrameCount", (void *) playdate_videostream_getBufferedFrameCount, { ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_videostream_getBytesRead", (void *) playdate_videostream_getBytesRead, { ArgType::ptr_t }, ArgType::uint32_t },
+	{ "playdate_videostream_setTCPConnection", (void *) playdate_videostream_setTCPConnection, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_sprite_setAlwaysRedraw", (void *) playdate_sprite_setAlwaysRedraw, { ArgType::int32_t }, ArgType::void_t },
 	{ "playdate_sprite_addDirtyRect", (void *) playdate_sprite_addDirtyRect, { ArgType::struct4_t }, ArgType::void_t },
 	{ "playdate_sprite_drawSprites", (void *) playdate_sprite_drawSprites, {  }, ArgType::void_t },
@@ -196,6 +226,8 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_sprite_setStencilImage", (void *) playdate_sprite_setStencilImage, { ArgType::ptr_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
 	{ "playdate_sprite_setCenter", (void *) playdate_sprite_setCenter, { ArgType::ptr_t, ArgType::float_t, ArgType::float_t }, ArgType::void_t },
 	{ "playdate_sprite_getCenter", (void *) playdate_sprite_getCenter, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_sprite_setTilemap", (void *) playdate_sprite_setTilemap, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_sprite_getTilemap", (void *) playdate_sprite_getTilemap, { ArgType::ptr_t }, ArgType::ptr_t },
 	{ "playdate_display_getWidth", (void *) playdate_display_getWidth, {  }, ArgType::int32_t },
 	{ "playdate_display_getHeight", (void *) playdate_display_getHeight, {  }, ArgType::int32_t },
 	{ "playdate_display_setRefreshRate", (void *) playdate_display_setRefreshRate, { ArgType::float_t }, ArgType::void_t },
@@ -204,13 +236,15 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_display_setMosaic", (void *) playdate_display_setMosaic, { ArgType::uint32_t, ArgType::uint32_t }, ArgType::void_t },
 	{ "playdate_display_setFlipped", (void *) playdate_display_setFlipped, { ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
 	{ "playdate_display_setOffset", (void *) playdate_display_setOffset, { ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_display_getRefreshRate", (void *) playdate_display_getRefreshRate, {  }, ArgType::float_t },
+	{ "playdate_display_getFPS", (void *) playdate_display_getFPS, {  }, ArgType::float_t },
 	{ "playdate_sound_channel_newChannel", (void *) playdate_sound_channel_newChannel, {  }, ArgType::ptr_t },
 	{ "playdate_sound_channel_freeChannel", (void *) playdate_sound_channel_freeChannel, { ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_sound_channel_addSource", (void *) playdate_sound_channel_addSource, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::int32_t },
 	{ "playdate_sound_channel_removeSource", (void *) playdate_sound_channel_removeSource, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::int32_t },
 	{ "playdate_sound_channel_addCallbackSource", (void *) playdate_sound_channel_addCallbackSource, { ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t }, ArgType::ptr_t },
-	{ "playdate_sound_channel_addEffect", (void *) playdate_sound_channel_addEffect, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
-	{ "playdate_sound_channel_removeEffect", (void *) playdate_sound_channel_removeEffect, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_sound_channel_addEffect", (void *) playdate_sound_channel_addEffect, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_sound_channel_removeEffect", (void *) playdate_sound_channel_removeEffect, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::int32_t },
 	{ "playdate_sound_channel_setVolume", (void *) playdate_sound_channel_setVolume, { ArgType::ptr_t, ArgType::float_t }, ArgType::void_t },
 	{ "playdate_sound_channel_getVolume", (void *) playdate_sound_channel_getVolume, { ArgType::ptr_t }, ArgType::float_t },
 	{ "playdate_sound_channel_setVolumeModulator", (void *) playdate_sound_channel_setVolumeModulator, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
@@ -496,6 +530,49 @@ NativeFunctionMetadata cranked::playdateFunctionTable[FUNCTION_TABLE_SIZE] {
 	{ "playdate_scoreboards_freeBoardsList", (void *) playdate_scoreboards_freeBoardsList, { ArgType::ptr_t }, ArgType::void_t },
 	{ "playdate_scoreboards_getScores", (void *) playdate_scoreboards_getScores, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
 	{ "playdate_scoreboards_freeScoresList", (void *) playdate_scoreboards_freeScoresList, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_http_requestAccess", (void *) playdate_http_requestAccess, { ArgType::ptr_t, ArgType::int32_t, ArgType::uint8_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_http_newConnection", (void *) playdate_http_newConnection, { ArgType::ptr_t, ArgType::int32_t, ArgType::uint8_t }, ArgType::ptr_t },
+	{ "playdate_http_retain", (void *) playdate_http_retain, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_http_release", (void *) playdate_http_release, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_http_setConnectTimeout", (void *) playdate_http_setConnectTimeout, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_http_setKeepAlive", (void *) playdate_http_setKeepAlive, { ArgType::ptr_t, ArgType::uint8_t }, ArgType::void_t },
+	{ "playdate_http_setByteRange", (void *) playdate_http_setByteRange, { ArgType::ptr_t, ArgType::int32_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_http_setUserdata", (void *) playdate_http_setUserdata, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_http_getUserdata", (void *) playdate_http_getUserdata, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_http_get", (void *) playdate_http_get, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_http_post", (void *) playdate_http_post, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_http_query", (void *) playdate_http_query, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_http_getError", (void *) playdate_http_getError, { ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_http_getProgress", (void *) playdate_http_getProgress, { ArgType::ptr_t, ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_http_getResponseStatus", (void *) playdate_http_getResponseStatus, { ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_http_getBytesAvailable", (void *) playdate_http_getBytesAvailable, { ArgType::ptr_t }, ArgType::uint32_t },
+	{ "playdate_http_setReadTimeout", (void *) playdate_http_setReadTimeout, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_http_setReadBufferSize", (void *) playdate_http_setReadBufferSize, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_http_read", (void *) playdate_http_read, { ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_http_close", (void *) playdate_http_close, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_http_setHeaderReceivedCallback", (void *) playdate_http_setHeaderReceivedCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_http_setHeadersReadCallback", (void *) playdate_http_setHeadersReadCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_http_setResponseCallback", (void *) playdate_http_setResponseCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_http_setRequestCompleteCallback", (void *) playdate_http_setRequestCompleteCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_http_setConnectionClosedCallback", (void *) playdate_http_setConnectionClosedCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_tcp_requestAccess", (void *) playdate_tcp_requestAccess, { ArgType::ptr_t, ArgType::int32_t, ArgType::uint8_t, ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_tcp_newConnection", (void *) playdate_tcp_newConnection, { ArgType::ptr_t, ArgType::int32_t, ArgType::uint8_t }, ArgType::ptr_t },
+	{ "playdate_tcp_retain", (void *) playdate_tcp_retain, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_tcp_release", (void *) playdate_tcp_release, { ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tcp_getError", (void *) playdate_tcp_getError, { ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_tcp_setConnectTimeout", (void *) playdate_tcp_setConnectTimeout, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_tcp_setUserdata", (void *) playdate_tcp_setUserdata, { ArgType::ptr_t, ArgType::ptr_t }, ArgType::void_t },
+	{ "playdate_tcp_getUserdata", (void *) playdate_tcp_getUserdata, { ArgType::ptr_t }, ArgType::ptr_t },
+	{ "playdate_tcp_open", (void *) playdate_tcp_open, { ArgType::ptr_t, ArgType::uint32_t, ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_tcp_close", (void *) playdate_tcp_close, { ArgType::ptr_t }, ArgType::int32_t },
+	{ "playdate_tcp_setConnectionClosedCallback", (void *) playdate_tcp_setConnectionClosedCallback, { ArgType::ptr_t, ArgType::uint32_t }, ArgType::void_t },
+	{ "playdate_tcp_setReadTimeout", (void *) playdate_tcp_setReadTimeout, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_tcp_setReadBufferSize", (void *) playdate_tcp_setReadBufferSize, { ArgType::ptr_t, ArgType::int32_t }, ArgType::void_t },
+	{ "playdate_tcp_getBytesAvailable", (void *) playdate_tcp_getBytesAvailable, { ArgType::ptr_t }, ArgType::uint32_t },
+	{ "playdate_tcp_read", (void *) playdate_tcp_read, { ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_tcp_write", (void *) playdate_tcp_write, { ArgType::ptr_t, ArgType::ptr_t, ArgType::uint32_t }, ArgType::int32_t },
+	{ "playdate_network_getStatus", (void *) playdate_network_getStatus, {  }, ArgType::int32_t },
+	{ "playdate_network_setEnabled", (void *) playdate_network_setEnabled, { ArgType::uint8_t, ArgType::uint32_t }, ArgType::void_t },
 	{ "json_encoder_startArray", (void *) json_encoder_startArray, { ArgType::ptr_t }, ArgType::void_t },
 	{ "json_encoder_addArrayMember", (void *) json_encoder_addArrayMember, { ArgType::ptr_t }, ArgType::void_t },
 	{ "json_encoder_endArray", (void *) json_encoder_endArray, { ArgType::ptr_t }, ArgType::void_t },
@@ -561,553 +638,645 @@ int cranked::populatePlaydateApiStruct(void *api, Version version) {
 	playdate_sys->setSerialMessageCallback = FUNC_TABLE_ADDRESS + 41 * 2 + 1;
 	playdate_sys->vaFormatString = FUNC_TABLE_ADDRESS + 42 * 2 + 1;
 	playdate_sys->parseString = FUNC_TABLE_ADDRESS + 43 * 2 + 1;
+	playdate_sys->delay = FUNC_TABLE_ADDRESS + 44 * 2 + 1;
+	playdate_sys->getServerTime = FUNC_TABLE_ADDRESS + 45 * 2 + 1;
+	playdate_sys->restartGame = FUNC_TABLE_ADDRESS + 46 * 2 + 1;
+	playdate_sys->getLaunchArgs = FUNC_TABLE_ADDRESS + 47 * 2 + 1;
+	playdate_sys->sendMirrorData = FUNC_TABLE_ADDRESS + 48 * 2 + 1;
 	auto playdate_file = (playdate_file_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->file = API_ADDRESS + offset;
 	offset += sizeof(playdate_file_32);
-	playdate_file->geterr = FUNC_TABLE_ADDRESS + 44 * 2 + 1;
-	playdate_file->listfiles = FUNC_TABLE_ADDRESS + 45 * 2 + 1;
-	playdate_file->stat = FUNC_TABLE_ADDRESS + 46 * 2 + 1;
-	playdate_file->mkdir = FUNC_TABLE_ADDRESS + 47 * 2 + 1;
-	playdate_file->unlink = FUNC_TABLE_ADDRESS + 48 * 2 + 1;
-	playdate_file->rename = FUNC_TABLE_ADDRESS + 49 * 2 + 1;
-	playdate_file->open = FUNC_TABLE_ADDRESS + 50 * 2 + 1;
-	playdate_file->close = FUNC_TABLE_ADDRESS + 51 * 2 + 1;
-	playdate_file->read = FUNC_TABLE_ADDRESS + 52 * 2 + 1;
-	playdate_file->write = FUNC_TABLE_ADDRESS + 53 * 2 + 1;
-	playdate_file->flush = FUNC_TABLE_ADDRESS + 54 * 2 + 1;
-	playdate_file->tell = FUNC_TABLE_ADDRESS + 55 * 2 + 1;
-	playdate_file->seek = FUNC_TABLE_ADDRESS + 56 * 2 + 1;
+	playdate_file->geterr = FUNC_TABLE_ADDRESS + 49 * 2 + 1;
+	playdate_file->listfiles = FUNC_TABLE_ADDRESS + 50 * 2 + 1;
+	playdate_file->stat = FUNC_TABLE_ADDRESS + 51 * 2 + 1;
+	playdate_file->mkdir = FUNC_TABLE_ADDRESS + 52 * 2 + 1;
+	playdate_file->unlink = FUNC_TABLE_ADDRESS + 53 * 2 + 1;
+	playdate_file->rename = FUNC_TABLE_ADDRESS + 54 * 2 + 1;
+	playdate_file->open = FUNC_TABLE_ADDRESS + 55 * 2 + 1;
+	playdate_file->close = FUNC_TABLE_ADDRESS + 56 * 2 + 1;
+	playdate_file->read = FUNC_TABLE_ADDRESS + 57 * 2 + 1;
+	playdate_file->write = FUNC_TABLE_ADDRESS + 58 * 2 + 1;
+	playdate_file->flush = FUNC_TABLE_ADDRESS + 59 * 2 + 1;
+	playdate_file->tell = FUNC_TABLE_ADDRESS + 60 * 2 + 1;
+	playdate_file->seek = FUNC_TABLE_ADDRESS + 61 * 2 + 1;
 	auto playdate_graphics = (playdate_graphics_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->graphics = API_ADDRESS + offset;
 	offset += sizeof(playdate_graphics_32);
-	playdate_graphics->clear = FUNC_TABLE_ADDRESS + 65 * 2 + 1;
-	playdate_graphics->setBackgroundColor = FUNC_TABLE_ADDRESS + 66 * 2 + 1;
-	playdate_graphics->setStencil = FUNC_TABLE_ADDRESS + 67 * 2 + 1;
-	playdate_graphics->setDrawMode = FUNC_TABLE_ADDRESS + 68 * 2 + 1;
-	playdate_graphics->setDrawOffset = FUNC_TABLE_ADDRESS + 69 * 2 + 1;
-	playdate_graphics->setClipRect = FUNC_TABLE_ADDRESS + 70 * 2 + 1;
-	playdate_graphics->clearClipRect = FUNC_TABLE_ADDRESS + 71 * 2 + 1;
-	playdate_graphics->setLineCapStyle = FUNC_TABLE_ADDRESS + 72 * 2 + 1;
-	playdate_graphics->setFont = FUNC_TABLE_ADDRESS + 73 * 2 + 1;
-	playdate_graphics->setTextTracking = FUNC_TABLE_ADDRESS + 74 * 2 + 1;
-	playdate_graphics->pushContext = FUNC_TABLE_ADDRESS + 75 * 2 + 1;
-	playdate_graphics->popContext = FUNC_TABLE_ADDRESS + 76 * 2 + 1;
-	playdate_graphics->drawBitmap = FUNC_TABLE_ADDRESS + 77 * 2 + 1;
-	playdate_graphics->tileBitmap = FUNC_TABLE_ADDRESS + 78 * 2 + 1;
-	playdate_graphics->drawLine = FUNC_TABLE_ADDRESS + 79 * 2 + 1;
-	playdate_graphics->fillTriangle = FUNC_TABLE_ADDRESS + 80 * 2 + 1;
-	playdate_graphics->drawRect = FUNC_TABLE_ADDRESS + 81 * 2 + 1;
-	playdate_graphics->fillRect = FUNC_TABLE_ADDRESS + 82 * 2 + 1;
-	playdate_graphics->drawEllipse = FUNC_TABLE_ADDRESS + 83 * 2 + 1;
-	playdate_graphics->fillEllipse = FUNC_TABLE_ADDRESS + 84 * 2 + 1;
-	playdate_graphics->drawScaledBitmap = FUNC_TABLE_ADDRESS + 85 * 2 + 1;
-	playdate_graphics->drawText = FUNC_TABLE_ADDRESS + 86 * 2 + 1;
-	playdate_graphics->newBitmap = FUNC_TABLE_ADDRESS + 87 * 2 + 1;
-	playdate_graphics->freeBitmap = FUNC_TABLE_ADDRESS + 88 * 2 + 1;
-	playdate_graphics->loadBitmap = FUNC_TABLE_ADDRESS + 89 * 2 + 1;
-	playdate_graphics->copyBitmap = FUNC_TABLE_ADDRESS + 90 * 2 + 1;
-	playdate_graphics->loadIntoBitmap = FUNC_TABLE_ADDRESS + 91 * 2 + 1;
-	playdate_graphics->getBitmapData = FUNC_TABLE_ADDRESS + 92 * 2 + 1;
-	playdate_graphics->clearBitmap = FUNC_TABLE_ADDRESS + 93 * 2 + 1;
-	playdate_graphics->rotatedBitmap = FUNC_TABLE_ADDRESS + 94 * 2 + 1;
-	playdate_graphics->newBitmapTable = FUNC_TABLE_ADDRESS + 95 * 2 + 1;
-	playdate_graphics->freeBitmapTable = FUNC_TABLE_ADDRESS + 96 * 2 + 1;
-	playdate_graphics->loadBitmapTable = FUNC_TABLE_ADDRESS + 97 * 2 + 1;
-	playdate_graphics->loadIntoBitmapTable = FUNC_TABLE_ADDRESS + 98 * 2 + 1;
-	playdate_graphics->getTableBitmap = FUNC_TABLE_ADDRESS + 99 * 2 + 1;
-	playdate_graphics->loadFont = FUNC_TABLE_ADDRESS + 100 * 2 + 1;
-	playdate_graphics->getFontPage = FUNC_TABLE_ADDRESS + 101 * 2 + 1;
-	playdate_graphics->getPageGlyph = FUNC_TABLE_ADDRESS + 102 * 2 + 1;
-	playdate_graphics->getGlyphKerning = FUNC_TABLE_ADDRESS + 103 * 2 + 1;
-	playdate_graphics->getTextWidth = FUNC_TABLE_ADDRESS + 104 * 2 + 1;
-	playdate_graphics->getFrame = FUNC_TABLE_ADDRESS + 105 * 2 + 1;
-	playdate_graphics->getDisplayFrame = FUNC_TABLE_ADDRESS + 106 * 2 + 1;
-	playdate_graphics->copyFrameBufferBitmap = FUNC_TABLE_ADDRESS + 107 * 2 + 1;
-	playdate_graphics->markUpdatedRows = FUNC_TABLE_ADDRESS + 108 * 2 + 1;
-	playdate_graphics->display = FUNC_TABLE_ADDRESS + 109 * 2 + 1;
-	playdate_graphics->setColorToPattern = FUNC_TABLE_ADDRESS + 110 * 2 + 1;
-	playdate_graphics->checkMaskCollision = FUNC_TABLE_ADDRESS + 111 * 2 + 1;
-	playdate_graphics->setScreenClipRect = FUNC_TABLE_ADDRESS + 112 * 2 + 1;
-	playdate_graphics->fillPolygon = FUNC_TABLE_ADDRESS + 113 * 2 + 1;
-	playdate_graphics->getFontHeight = FUNC_TABLE_ADDRESS + 114 * 2 + 1;
-	playdate_graphics->getDisplayBufferBitmap = FUNC_TABLE_ADDRESS + 115 * 2 + 1;
-	playdate_graphics->drawRotatedBitmap = FUNC_TABLE_ADDRESS + 116 * 2 + 1;
-	playdate_graphics->setTextLeading = FUNC_TABLE_ADDRESS + 117 * 2 + 1;
-	playdate_graphics->setBitmapMask = FUNC_TABLE_ADDRESS + 118 * 2 + 1;
-	playdate_graphics->getBitmapMask = FUNC_TABLE_ADDRESS + 119 * 2 + 1;
-	playdate_graphics->setStencilImage = FUNC_TABLE_ADDRESS + 120 * 2 + 1;
-	playdate_graphics->makeFontFromData = FUNC_TABLE_ADDRESS + 121 * 2 + 1;
-	playdate_graphics->getTextTracking = FUNC_TABLE_ADDRESS + 122 * 2 + 1;
-	playdate_graphics->setPixel = FUNC_TABLE_ADDRESS + 123 * 2 + 1;
-	playdate_graphics->getBitmapPixel = FUNC_TABLE_ADDRESS + 124 * 2 + 1;
-	playdate_graphics->getBitmapTableInfo = FUNC_TABLE_ADDRESS + 125 * 2 + 1;
-	playdate_graphics->drawTextInRect = FUNC_TABLE_ADDRESS + 126 * 2 + 1;
+	playdate_graphics->clear = FUNC_TABLE_ADDRESS + 70 * 2 + 1;
+	playdate_graphics->setBackgroundColor = FUNC_TABLE_ADDRESS + 71 * 2 + 1;
+	playdate_graphics->setStencil = FUNC_TABLE_ADDRESS + 72 * 2 + 1;
+	playdate_graphics->setDrawMode = FUNC_TABLE_ADDRESS + 73 * 2 + 1;
+	playdate_graphics->setDrawOffset = FUNC_TABLE_ADDRESS + 74 * 2 + 1;
+	playdate_graphics->setClipRect = FUNC_TABLE_ADDRESS + 75 * 2 + 1;
+	playdate_graphics->clearClipRect = FUNC_TABLE_ADDRESS + 76 * 2 + 1;
+	playdate_graphics->setLineCapStyle = FUNC_TABLE_ADDRESS + 77 * 2 + 1;
+	playdate_graphics->setFont = FUNC_TABLE_ADDRESS + 78 * 2 + 1;
+	playdate_graphics->setTextTracking = FUNC_TABLE_ADDRESS + 79 * 2 + 1;
+	playdate_graphics->pushContext = FUNC_TABLE_ADDRESS + 80 * 2 + 1;
+	playdate_graphics->popContext = FUNC_TABLE_ADDRESS + 81 * 2 + 1;
+	playdate_graphics->drawBitmap = FUNC_TABLE_ADDRESS + 82 * 2 + 1;
+	playdate_graphics->tileBitmap = FUNC_TABLE_ADDRESS + 83 * 2 + 1;
+	playdate_graphics->drawLine = FUNC_TABLE_ADDRESS + 84 * 2 + 1;
+	playdate_graphics->fillTriangle = FUNC_TABLE_ADDRESS + 85 * 2 + 1;
+	playdate_graphics->drawRect = FUNC_TABLE_ADDRESS + 86 * 2 + 1;
+	playdate_graphics->fillRect = FUNC_TABLE_ADDRESS + 87 * 2 + 1;
+	playdate_graphics->drawEllipse = FUNC_TABLE_ADDRESS + 88 * 2 + 1;
+	playdate_graphics->fillEllipse = FUNC_TABLE_ADDRESS + 89 * 2 + 1;
+	playdate_graphics->drawScaledBitmap = FUNC_TABLE_ADDRESS + 90 * 2 + 1;
+	playdate_graphics->drawText = FUNC_TABLE_ADDRESS + 91 * 2 + 1;
+	playdate_graphics->newBitmap = FUNC_TABLE_ADDRESS + 92 * 2 + 1;
+	playdate_graphics->freeBitmap = FUNC_TABLE_ADDRESS + 93 * 2 + 1;
+	playdate_graphics->loadBitmap = FUNC_TABLE_ADDRESS + 94 * 2 + 1;
+	playdate_graphics->copyBitmap = FUNC_TABLE_ADDRESS + 95 * 2 + 1;
+	playdate_graphics->loadIntoBitmap = FUNC_TABLE_ADDRESS + 96 * 2 + 1;
+	playdate_graphics->getBitmapData = FUNC_TABLE_ADDRESS + 97 * 2 + 1;
+	playdate_graphics->clearBitmap = FUNC_TABLE_ADDRESS + 98 * 2 + 1;
+	playdate_graphics->rotatedBitmap = FUNC_TABLE_ADDRESS + 99 * 2 + 1;
+	playdate_graphics->newBitmapTable = FUNC_TABLE_ADDRESS + 100 * 2 + 1;
+	playdate_graphics->freeBitmapTable = FUNC_TABLE_ADDRESS + 101 * 2 + 1;
+	playdate_graphics->loadBitmapTable = FUNC_TABLE_ADDRESS + 102 * 2 + 1;
+	playdate_graphics->loadIntoBitmapTable = FUNC_TABLE_ADDRESS + 103 * 2 + 1;
+	playdate_graphics->getTableBitmap = FUNC_TABLE_ADDRESS + 104 * 2 + 1;
+	playdate_graphics->loadFont = FUNC_TABLE_ADDRESS + 105 * 2 + 1;
+	playdate_graphics->getFontPage = FUNC_TABLE_ADDRESS + 106 * 2 + 1;
+	playdate_graphics->getPageGlyph = FUNC_TABLE_ADDRESS + 107 * 2 + 1;
+	playdate_graphics->getGlyphKerning = FUNC_TABLE_ADDRESS + 108 * 2 + 1;
+	playdate_graphics->getTextWidth = FUNC_TABLE_ADDRESS + 109 * 2 + 1;
+	playdate_graphics->getFrame = FUNC_TABLE_ADDRESS + 110 * 2 + 1;
+	playdate_graphics->getDisplayFrame = FUNC_TABLE_ADDRESS + 111 * 2 + 1;
+	playdate_graphics->copyFrameBufferBitmap = FUNC_TABLE_ADDRESS + 112 * 2 + 1;
+	playdate_graphics->markUpdatedRows = FUNC_TABLE_ADDRESS + 113 * 2 + 1;
+	playdate_graphics->display = FUNC_TABLE_ADDRESS + 114 * 2 + 1;
+	playdate_graphics->setColorToPattern = FUNC_TABLE_ADDRESS + 115 * 2 + 1;
+	playdate_graphics->checkMaskCollision = FUNC_TABLE_ADDRESS + 116 * 2 + 1;
+	playdate_graphics->setScreenClipRect = FUNC_TABLE_ADDRESS + 117 * 2 + 1;
+	playdate_graphics->fillPolygon = FUNC_TABLE_ADDRESS + 118 * 2 + 1;
+	playdate_graphics->getFontHeight = FUNC_TABLE_ADDRESS + 119 * 2 + 1;
+	playdate_graphics->getDisplayBufferBitmap = FUNC_TABLE_ADDRESS + 120 * 2 + 1;
+	playdate_graphics->drawRotatedBitmap = FUNC_TABLE_ADDRESS + 121 * 2 + 1;
+	playdate_graphics->setTextLeading = FUNC_TABLE_ADDRESS + 122 * 2 + 1;
+	playdate_graphics->setBitmapMask = FUNC_TABLE_ADDRESS + 123 * 2 + 1;
+	playdate_graphics->getBitmapMask = FUNC_TABLE_ADDRESS + 124 * 2 + 1;
+	playdate_graphics->setStencilImage = FUNC_TABLE_ADDRESS + 125 * 2 + 1;
+	playdate_graphics->makeFontFromData = FUNC_TABLE_ADDRESS + 126 * 2 + 1;
+	playdate_graphics->getTextTracking = FUNC_TABLE_ADDRESS + 127 * 2 + 1;
+	playdate_graphics->setPixel = FUNC_TABLE_ADDRESS + 128 * 2 + 1;
+	playdate_graphics->getBitmapPixel = FUNC_TABLE_ADDRESS + 129 * 2 + 1;
+	playdate_graphics->getBitmapTableInfo = FUNC_TABLE_ADDRESS + 130 * 2 + 1;
+	playdate_graphics->drawTextInRect = FUNC_TABLE_ADDRESS + 131 * 2 + 1;
+	playdate_graphics->getTextHeightForMaxWidth = FUNC_TABLE_ADDRESS + 132 * 2 + 1;
+	playdate_graphics->drawRoundRect = FUNC_TABLE_ADDRESS + 133 * 2 + 1;
+	playdate_graphics->fillRoundRect = FUNC_TABLE_ADDRESS + 134 * 2 + 1;
 	auto playdate_video = (playdate_video_32 *) ((uintptr_t) api + offset);
 	playdate_graphics->video = API_ADDRESS + offset;
 	offset += sizeof(playdate_video_32);
-	playdate_video->loadVideo = FUNC_TABLE_ADDRESS + 57 * 2 + 1;
-	playdate_video->freePlayer = FUNC_TABLE_ADDRESS + 58 * 2 + 1;
-	playdate_video->setContext = FUNC_TABLE_ADDRESS + 59 * 2 + 1;
-	playdate_video->useScreenContext = FUNC_TABLE_ADDRESS + 60 * 2 + 1;
-	playdate_video->renderFrame = FUNC_TABLE_ADDRESS + 61 * 2 + 1;
-	playdate_video->getError = FUNC_TABLE_ADDRESS + 62 * 2 + 1;
-	playdate_video->getInfo = FUNC_TABLE_ADDRESS + 63 * 2 + 1;
-	playdate_video->getContext = FUNC_TABLE_ADDRESS + 64 * 2 + 1;
+	playdate_video->loadVideo = FUNC_TABLE_ADDRESS + 62 * 2 + 1;
+	playdate_video->freePlayer = FUNC_TABLE_ADDRESS + 63 * 2 + 1;
+	playdate_video->setContext = FUNC_TABLE_ADDRESS + 64 * 2 + 1;
+	playdate_video->useScreenContext = FUNC_TABLE_ADDRESS + 65 * 2 + 1;
+	playdate_video->renderFrame = FUNC_TABLE_ADDRESS + 66 * 2 + 1;
+	playdate_video->getError = FUNC_TABLE_ADDRESS + 67 * 2 + 1;
+	playdate_video->getInfo = FUNC_TABLE_ADDRESS + 68 * 2 + 1;
+	playdate_video->getContext = FUNC_TABLE_ADDRESS + 69 * 2 + 1;
+	auto playdate_tilemap = (playdate_tilemap_32 *) ((uintptr_t) api + offset);
+	playdate_graphics->tilemap = API_ADDRESS + offset;
+	offset += sizeof(playdate_tilemap_32);
+	playdate_tilemap->newTilemap = FUNC_TABLE_ADDRESS + 135 * 2 + 1;
+	playdate_tilemap->freeTilemap = FUNC_TABLE_ADDRESS + 136 * 2 + 1;
+	playdate_tilemap->setImageTable = FUNC_TABLE_ADDRESS + 137 * 2 + 1;
+	playdate_tilemap->getImageTable = FUNC_TABLE_ADDRESS + 138 * 2 + 1;
+	playdate_tilemap->setSize = FUNC_TABLE_ADDRESS + 139 * 2 + 1;
+	playdate_tilemap->getSize = FUNC_TABLE_ADDRESS + 140 * 2 + 1;
+	playdate_tilemap->getPixelSize = FUNC_TABLE_ADDRESS + 141 * 2 + 1;
+	playdate_tilemap->setTiles = FUNC_TABLE_ADDRESS + 142 * 2 + 1;
+	playdate_tilemap->setTileAtPosition = FUNC_TABLE_ADDRESS + 143 * 2 + 1;
+	playdate_tilemap->getTileAtPosition = FUNC_TABLE_ADDRESS + 144 * 2 + 1;
+	playdate_tilemap->drawAtPoint = FUNC_TABLE_ADDRESS + 145 * 2 + 1;
+	auto playdate_videostream = (playdate_videostream_32 *) ((uintptr_t) api + offset);
+	playdate_graphics->videostream = API_ADDRESS + offset;
+	offset += sizeof(playdate_videostream_32);
+	playdate_videostream->newPlayer = FUNC_TABLE_ADDRESS + 146 * 2 + 1;
+	playdate_videostream->freePlayer = FUNC_TABLE_ADDRESS + 147 * 2 + 1;
+	playdate_videostream->setBufferSize = FUNC_TABLE_ADDRESS + 148 * 2 + 1;
+	playdate_videostream->setFile = FUNC_TABLE_ADDRESS + 149 * 2 + 1;
+	playdate_videostream->setHTTPConnection = FUNC_TABLE_ADDRESS + 150 * 2 + 1;
+	playdate_videostream->getFilePlayer = FUNC_TABLE_ADDRESS + 151 * 2 + 1;
+	playdate_videostream->getVideoPlayer = FUNC_TABLE_ADDRESS + 152 * 2 + 1;
+	playdate_videostream->update = FUNC_TABLE_ADDRESS + 153 * 2 + 1;
+	playdate_videostream->getBufferedFrameCount = FUNC_TABLE_ADDRESS + 154 * 2 + 1;
+	playdate_videostream->getBytesRead = FUNC_TABLE_ADDRESS + 155 * 2 + 1;
+	playdate_videostream->setTCPConnection = FUNC_TABLE_ADDRESS + 156 * 2 + 1;
 	auto playdate_sprite = (playdate_sprite_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->sprite = API_ADDRESS + offset;
 	offset += sizeof(playdate_sprite_32);
-	playdate_sprite->setAlwaysRedraw = FUNC_TABLE_ADDRESS + 127 * 2 + 1;
-	playdate_sprite->addDirtyRect = FUNC_TABLE_ADDRESS + 128 * 2 + 1;
-	playdate_sprite->drawSprites = FUNC_TABLE_ADDRESS + 129 * 2 + 1;
-	playdate_sprite->updateAndDrawSprites = FUNC_TABLE_ADDRESS + 130 * 2 + 1;
-	playdate_sprite->newSprite = FUNC_TABLE_ADDRESS + 131 * 2 + 1;
-	playdate_sprite->freeSprite = FUNC_TABLE_ADDRESS + 132 * 2 + 1;
-	playdate_sprite->copy = FUNC_TABLE_ADDRESS + 133 * 2 + 1;
-	playdate_sprite->addSprite = FUNC_TABLE_ADDRESS + 134 * 2 + 1;
-	playdate_sprite->removeSprite = FUNC_TABLE_ADDRESS + 135 * 2 + 1;
-	playdate_sprite->removeSprites = FUNC_TABLE_ADDRESS + 136 * 2 + 1;
-	playdate_sprite->removeAllSprites = FUNC_TABLE_ADDRESS + 137 * 2 + 1;
-	playdate_sprite->getSpriteCount = FUNC_TABLE_ADDRESS + 138 * 2 + 1;
-	playdate_sprite->setBounds = FUNC_TABLE_ADDRESS + 139 * 2 + 1;
-	playdate_sprite->getBounds = FUNC_TABLE_ADDRESS + 140 * 2 + 1;
-	playdate_sprite->moveTo = FUNC_TABLE_ADDRESS + 141 * 2 + 1;
-	playdate_sprite->moveBy = FUNC_TABLE_ADDRESS + 142 * 2 + 1;
-	playdate_sprite->setImage = FUNC_TABLE_ADDRESS + 143 * 2 + 1;
-	playdate_sprite->getImage = FUNC_TABLE_ADDRESS + 144 * 2 + 1;
-	playdate_sprite->setSize = FUNC_TABLE_ADDRESS + 145 * 2 + 1;
-	playdate_sprite->setZIndex = FUNC_TABLE_ADDRESS + 146 * 2 + 1;
-	playdate_sprite->getZIndex = FUNC_TABLE_ADDRESS + 147 * 2 + 1;
-	playdate_sprite->setDrawMode = FUNC_TABLE_ADDRESS + 148 * 2 + 1;
-	playdate_sprite->setImageFlip = FUNC_TABLE_ADDRESS + 149 * 2 + 1;
-	playdate_sprite->getImageFlip = FUNC_TABLE_ADDRESS + 150 * 2 + 1;
-	playdate_sprite->setStencil = FUNC_TABLE_ADDRESS + 151 * 2 + 1;
-	playdate_sprite->setClipRect = FUNC_TABLE_ADDRESS + 152 * 2 + 1;
-	playdate_sprite->clearClipRect = FUNC_TABLE_ADDRESS + 153 * 2 + 1;
-	playdate_sprite->setClipRectsInRange = FUNC_TABLE_ADDRESS + 154 * 2 + 1;
-	playdate_sprite->clearClipRectsInRange = FUNC_TABLE_ADDRESS + 155 * 2 + 1;
-	playdate_sprite->setUpdatesEnabled = FUNC_TABLE_ADDRESS + 156 * 2 + 1;
-	playdate_sprite->updatesEnabled = FUNC_TABLE_ADDRESS + 157 * 2 + 1;
-	playdate_sprite->setCollisionsEnabled = FUNC_TABLE_ADDRESS + 158 * 2 + 1;
-	playdate_sprite->collisionsEnabled = FUNC_TABLE_ADDRESS + 159 * 2 + 1;
-	playdate_sprite->setVisible = FUNC_TABLE_ADDRESS + 160 * 2 + 1;
-	playdate_sprite->isVisible = FUNC_TABLE_ADDRESS + 161 * 2 + 1;
-	playdate_sprite->setOpaque = FUNC_TABLE_ADDRESS + 162 * 2 + 1;
-	playdate_sprite->markDirty = FUNC_TABLE_ADDRESS + 163 * 2 + 1;
-	playdate_sprite->setTag = FUNC_TABLE_ADDRESS + 164 * 2 + 1;
-	playdate_sprite->getTag = FUNC_TABLE_ADDRESS + 165 * 2 + 1;
-	playdate_sprite->setIgnoresDrawOffset = FUNC_TABLE_ADDRESS + 166 * 2 + 1;
-	playdate_sprite->setUpdateFunction = FUNC_TABLE_ADDRESS + 167 * 2 + 1;
-	playdate_sprite->setDrawFunction = FUNC_TABLE_ADDRESS + 168 * 2 + 1;
-	playdate_sprite->getPosition = FUNC_TABLE_ADDRESS + 169 * 2 + 1;
-	playdate_sprite->resetCollisionWorld = FUNC_TABLE_ADDRESS + 170 * 2 + 1;
-	playdate_sprite->setCollideRect = FUNC_TABLE_ADDRESS + 171 * 2 + 1;
-	playdate_sprite->getCollideRect = FUNC_TABLE_ADDRESS + 172 * 2 + 1;
-	playdate_sprite->clearCollideRect = FUNC_TABLE_ADDRESS + 173 * 2 + 1;
-	playdate_sprite->setCollisionResponseFunction = FUNC_TABLE_ADDRESS + 174 * 2 + 1;
-	playdate_sprite->checkCollisions = FUNC_TABLE_ADDRESS + 175 * 2 + 1;
-	playdate_sprite->moveWithCollisions = FUNC_TABLE_ADDRESS + 176 * 2 + 1;
-	playdate_sprite->querySpritesAtPoint = FUNC_TABLE_ADDRESS + 177 * 2 + 1;
-	playdate_sprite->querySpritesInRect = FUNC_TABLE_ADDRESS + 178 * 2 + 1;
-	playdate_sprite->querySpritesAlongLine = FUNC_TABLE_ADDRESS + 179 * 2 + 1;
-	playdate_sprite->querySpriteInfoAlongLine = FUNC_TABLE_ADDRESS + 180 * 2 + 1;
-	playdate_sprite->overlappingSprites = FUNC_TABLE_ADDRESS + 181 * 2 + 1;
-	playdate_sprite->allOverlappingSprites = FUNC_TABLE_ADDRESS + 182 * 2 + 1;
-	playdate_sprite->setStencilPattern = FUNC_TABLE_ADDRESS + 183 * 2 + 1;
-	playdate_sprite->clearStencil = FUNC_TABLE_ADDRESS + 184 * 2 + 1;
-	playdate_sprite->setUserdata = FUNC_TABLE_ADDRESS + 185 * 2 + 1;
-	playdate_sprite->getUserdata = FUNC_TABLE_ADDRESS + 186 * 2 + 1;
-	playdate_sprite->setStencilImage = FUNC_TABLE_ADDRESS + 187 * 2 + 1;
-	playdate_sprite->setCenter = FUNC_TABLE_ADDRESS + 188 * 2 + 1;
-	playdate_sprite->getCenter = FUNC_TABLE_ADDRESS + 189 * 2 + 1;
+	playdate_sprite->setAlwaysRedraw = FUNC_TABLE_ADDRESS + 157 * 2 + 1;
+	playdate_sprite->addDirtyRect = FUNC_TABLE_ADDRESS + 158 * 2 + 1;
+	playdate_sprite->drawSprites = FUNC_TABLE_ADDRESS + 159 * 2 + 1;
+	playdate_sprite->updateAndDrawSprites = FUNC_TABLE_ADDRESS + 160 * 2 + 1;
+	playdate_sprite->newSprite = FUNC_TABLE_ADDRESS + 161 * 2 + 1;
+	playdate_sprite->freeSprite = FUNC_TABLE_ADDRESS + 162 * 2 + 1;
+	playdate_sprite->copy = FUNC_TABLE_ADDRESS + 163 * 2 + 1;
+	playdate_sprite->addSprite = FUNC_TABLE_ADDRESS + 164 * 2 + 1;
+	playdate_sprite->removeSprite = FUNC_TABLE_ADDRESS + 165 * 2 + 1;
+	playdate_sprite->removeSprites = FUNC_TABLE_ADDRESS + 166 * 2 + 1;
+	playdate_sprite->removeAllSprites = FUNC_TABLE_ADDRESS + 167 * 2 + 1;
+	playdate_sprite->getSpriteCount = FUNC_TABLE_ADDRESS + 168 * 2 + 1;
+	playdate_sprite->setBounds = FUNC_TABLE_ADDRESS + 169 * 2 + 1;
+	playdate_sprite->getBounds = FUNC_TABLE_ADDRESS + 170 * 2 + 1;
+	playdate_sprite->moveTo = FUNC_TABLE_ADDRESS + 171 * 2 + 1;
+	playdate_sprite->moveBy = FUNC_TABLE_ADDRESS + 172 * 2 + 1;
+	playdate_sprite->setImage = FUNC_TABLE_ADDRESS + 173 * 2 + 1;
+	playdate_sprite->getImage = FUNC_TABLE_ADDRESS + 174 * 2 + 1;
+	playdate_sprite->setSize = FUNC_TABLE_ADDRESS + 175 * 2 + 1;
+	playdate_sprite->setZIndex = FUNC_TABLE_ADDRESS + 176 * 2 + 1;
+	playdate_sprite->getZIndex = FUNC_TABLE_ADDRESS + 177 * 2 + 1;
+	playdate_sprite->setDrawMode = FUNC_TABLE_ADDRESS + 178 * 2 + 1;
+	playdate_sprite->setImageFlip = FUNC_TABLE_ADDRESS + 179 * 2 + 1;
+	playdate_sprite->getImageFlip = FUNC_TABLE_ADDRESS + 180 * 2 + 1;
+	playdate_sprite->setStencil = FUNC_TABLE_ADDRESS + 181 * 2 + 1;
+	playdate_sprite->setClipRect = FUNC_TABLE_ADDRESS + 182 * 2 + 1;
+	playdate_sprite->clearClipRect = FUNC_TABLE_ADDRESS + 183 * 2 + 1;
+	playdate_sprite->setClipRectsInRange = FUNC_TABLE_ADDRESS + 184 * 2 + 1;
+	playdate_sprite->clearClipRectsInRange = FUNC_TABLE_ADDRESS + 185 * 2 + 1;
+	playdate_sprite->setUpdatesEnabled = FUNC_TABLE_ADDRESS + 186 * 2 + 1;
+	playdate_sprite->updatesEnabled = FUNC_TABLE_ADDRESS + 187 * 2 + 1;
+	playdate_sprite->setCollisionsEnabled = FUNC_TABLE_ADDRESS + 188 * 2 + 1;
+	playdate_sprite->collisionsEnabled = FUNC_TABLE_ADDRESS + 189 * 2 + 1;
+	playdate_sprite->setVisible = FUNC_TABLE_ADDRESS + 190 * 2 + 1;
+	playdate_sprite->isVisible = FUNC_TABLE_ADDRESS + 191 * 2 + 1;
+	playdate_sprite->setOpaque = FUNC_TABLE_ADDRESS + 192 * 2 + 1;
+	playdate_sprite->markDirty = FUNC_TABLE_ADDRESS + 193 * 2 + 1;
+	playdate_sprite->setTag = FUNC_TABLE_ADDRESS + 194 * 2 + 1;
+	playdate_sprite->getTag = FUNC_TABLE_ADDRESS + 195 * 2 + 1;
+	playdate_sprite->setIgnoresDrawOffset = FUNC_TABLE_ADDRESS + 196 * 2 + 1;
+	playdate_sprite->setUpdateFunction = FUNC_TABLE_ADDRESS + 197 * 2 + 1;
+	playdate_sprite->setDrawFunction = FUNC_TABLE_ADDRESS + 198 * 2 + 1;
+	playdate_sprite->getPosition = FUNC_TABLE_ADDRESS + 199 * 2 + 1;
+	playdate_sprite->resetCollisionWorld = FUNC_TABLE_ADDRESS + 200 * 2 + 1;
+	playdate_sprite->setCollideRect = FUNC_TABLE_ADDRESS + 201 * 2 + 1;
+	playdate_sprite->getCollideRect = FUNC_TABLE_ADDRESS + 202 * 2 + 1;
+	playdate_sprite->clearCollideRect = FUNC_TABLE_ADDRESS + 203 * 2 + 1;
+	playdate_sprite->setCollisionResponseFunction = FUNC_TABLE_ADDRESS + 204 * 2 + 1;
+	playdate_sprite->checkCollisions = FUNC_TABLE_ADDRESS + 205 * 2 + 1;
+	playdate_sprite->moveWithCollisions = FUNC_TABLE_ADDRESS + 206 * 2 + 1;
+	playdate_sprite->querySpritesAtPoint = FUNC_TABLE_ADDRESS + 207 * 2 + 1;
+	playdate_sprite->querySpritesInRect = FUNC_TABLE_ADDRESS + 208 * 2 + 1;
+	playdate_sprite->querySpritesAlongLine = FUNC_TABLE_ADDRESS + 209 * 2 + 1;
+	playdate_sprite->querySpriteInfoAlongLine = FUNC_TABLE_ADDRESS + 210 * 2 + 1;
+	playdate_sprite->overlappingSprites = FUNC_TABLE_ADDRESS + 211 * 2 + 1;
+	playdate_sprite->allOverlappingSprites = FUNC_TABLE_ADDRESS + 212 * 2 + 1;
+	playdate_sprite->setStencilPattern = FUNC_TABLE_ADDRESS + 213 * 2 + 1;
+	playdate_sprite->clearStencil = FUNC_TABLE_ADDRESS + 214 * 2 + 1;
+	playdate_sprite->setUserdata = FUNC_TABLE_ADDRESS + 215 * 2 + 1;
+	playdate_sprite->getUserdata = FUNC_TABLE_ADDRESS + 216 * 2 + 1;
+	playdate_sprite->setStencilImage = FUNC_TABLE_ADDRESS + 217 * 2 + 1;
+	playdate_sprite->setCenter = FUNC_TABLE_ADDRESS + 218 * 2 + 1;
+	playdate_sprite->getCenter = FUNC_TABLE_ADDRESS + 219 * 2 + 1;
+	playdate_sprite->setTilemap = FUNC_TABLE_ADDRESS + 220 * 2 + 1;
+	playdate_sprite->getTilemap = FUNC_TABLE_ADDRESS + 221 * 2 + 1;
 	auto playdate_display = (playdate_display_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->display = API_ADDRESS + offset;
 	offset += sizeof(playdate_display_32);
-	playdate_display->getWidth = FUNC_TABLE_ADDRESS + 190 * 2 + 1;
-	playdate_display->getHeight = FUNC_TABLE_ADDRESS + 191 * 2 + 1;
-	playdate_display->setRefreshRate = FUNC_TABLE_ADDRESS + 192 * 2 + 1;
-	playdate_display->setInverted = FUNC_TABLE_ADDRESS + 193 * 2 + 1;
-	playdate_display->setScale = FUNC_TABLE_ADDRESS + 194 * 2 + 1;
-	playdate_display->setMosaic = FUNC_TABLE_ADDRESS + 195 * 2 + 1;
-	playdate_display->setFlipped = FUNC_TABLE_ADDRESS + 196 * 2 + 1;
-	playdate_display->setOffset = FUNC_TABLE_ADDRESS + 197 * 2 + 1;
+	playdate_display->getWidth = FUNC_TABLE_ADDRESS + 222 * 2 + 1;
+	playdate_display->getHeight = FUNC_TABLE_ADDRESS + 223 * 2 + 1;
+	playdate_display->setRefreshRate = FUNC_TABLE_ADDRESS + 224 * 2 + 1;
+	playdate_display->setInverted = FUNC_TABLE_ADDRESS + 225 * 2 + 1;
+	playdate_display->setScale = FUNC_TABLE_ADDRESS + 226 * 2 + 1;
+	playdate_display->setMosaic = FUNC_TABLE_ADDRESS + 227 * 2 + 1;
+	playdate_display->setFlipped = FUNC_TABLE_ADDRESS + 228 * 2 + 1;
+	playdate_display->setOffset = FUNC_TABLE_ADDRESS + 229 * 2 + 1;
+	playdate_display->getRefreshRate = FUNC_TABLE_ADDRESS + 230 * 2 + 1;
+	playdate_display->getFPS = FUNC_TABLE_ADDRESS + 231 * 2 + 1;
 	auto playdate_sound = (playdate_sound_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->sound = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_32);
-	playdate_sound->getCurrentTime = FUNC_TABLE_ADDRESS + 432 * 2 + 1;
-	playdate_sound->addSource = FUNC_TABLE_ADDRESS + 433 * 2 + 1;
-	playdate_sound->getDefaultChannel = FUNC_TABLE_ADDRESS + 434 * 2 + 1;
-	playdate_sound->addChannel = FUNC_TABLE_ADDRESS + 435 * 2 + 1;
-	playdate_sound->removeChannel = FUNC_TABLE_ADDRESS + 436 * 2 + 1;
-	playdate_sound->setMicCallback = FUNC_TABLE_ADDRESS + 437 * 2 + 1;
-	playdate_sound->getHeadphoneState = FUNC_TABLE_ADDRESS + 438 * 2 + 1;
-	playdate_sound->setOutputsActive = FUNC_TABLE_ADDRESS + 439 * 2 + 1;
-	playdate_sound->removeSource = FUNC_TABLE_ADDRESS + 440 * 2 + 1;
-	playdate_sound->getError = FUNC_TABLE_ADDRESS + 447 * 2 + 1;
+	playdate_sound->getCurrentTime = FUNC_TABLE_ADDRESS + 466 * 2 + 1;
+	playdate_sound->addSource = FUNC_TABLE_ADDRESS + 467 * 2 + 1;
+	playdate_sound->getDefaultChannel = FUNC_TABLE_ADDRESS + 468 * 2 + 1;
+	playdate_sound->addChannel = FUNC_TABLE_ADDRESS + 469 * 2 + 1;
+	playdate_sound->removeChannel = FUNC_TABLE_ADDRESS + 470 * 2 + 1;
+	playdate_sound->setMicCallback = FUNC_TABLE_ADDRESS + 471 * 2 + 1;
+	playdate_sound->getHeadphoneState = FUNC_TABLE_ADDRESS + 472 * 2 + 1;
+	playdate_sound->setOutputsActive = FUNC_TABLE_ADDRESS + 473 * 2 + 1;
+	playdate_sound->removeSource = FUNC_TABLE_ADDRESS + 474 * 2 + 1;
+	playdate_sound->getError = FUNC_TABLE_ADDRESS + 481 * 2 + 1;
 	auto playdate_sound_channel = (playdate_sound_channel_32 *) ((uintptr_t) api + offset);
 	playdate_sound->channel = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_channel_32);
-	playdate_sound_channel->newChannel = FUNC_TABLE_ADDRESS + 198 * 2 + 1;
-	playdate_sound_channel->freeChannel = FUNC_TABLE_ADDRESS + 199 * 2 + 1;
-	playdate_sound_channel->addSource = FUNC_TABLE_ADDRESS + 200 * 2 + 1;
-	playdate_sound_channel->removeSource = FUNC_TABLE_ADDRESS + 201 * 2 + 1;
-	playdate_sound_channel->addCallbackSource = FUNC_TABLE_ADDRESS + 202 * 2 + 1;
-	playdate_sound_channel->addEffect = FUNC_TABLE_ADDRESS + 203 * 2 + 1;
-	playdate_sound_channel->removeEffect = FUNC_TABLE_ADDRESS + 204 * 2 + 1;
-	playdate_sound_channel->setVolume = FUNC_TABLE_ADDRESS + 205 * 2 + 1;
-	playdate_sound_channel->getVolume = FUNC_TABLE_ADDRESS + 206 * 2 + 1;
-	playdate_sound_channel->setVolumeModulator = FUNC_TABLE_ADDRESS + 207 * 2 + 1;
-	playdate_sound_channel->getVolumeModulator = FUNC_TABLE_ADDRESS + 208 * 2 + 1;
-	playdate_sound_channel->setPan = FUNC_TABLE_ADDRESS + 209 * 2 + 1;
-	playdate_sound_channel->setPanModulator = FUNC_TABLE_ADDRESS + 210 * 2 + 1;
-	playdate_sound_channel->getPanModulator = FUNC_TABLE_ADDRESS + 211 * 2 + 1;
-	playdate_sound_channel->getDryLevelSignal = FUNC_TABLE_ADDRESS + 212 * 2 + 1;
-	playdate_sound_channel->getWetLevelSignal = FUNC_TABLE_ADDRESS + 213 * 2 + 1;
+	playdate_sound_channel->newChannel = FUNC_TABLE_ADDRESS + 232 * 2 + 1;
+	playdate_sound_channel->freeChannel = FUNC_TABLE_ADDRESS + 233 * 2 + 1;
+	playdate_sound_channel->addSource = FUNC_TABLE_ADDRESS + 234 * 2 + 1;
+	playdate_sound_channel->removeSource = FUNC_TABLE_ADDRESS + 235 * 2 + 1;
+	playdate_sound_channel->addCallbackSource = FUNC_TABLE_ADDRESS + 236 * 2 + 1;
+	playdate_sound_channel->addEffect = FUNC_TABLE_ADDRESS + 237 * 2 + 1;
+	playdate_sound_channel->removeEffect = FUNC_TABLE_ADDRESS + 238 * 2 + 1;
+	playdate_sound_channel->setVolume = FUNC_TABLE_ADDRESS + 239 * 2 + 1;
+	playdate_sound_channel->getVolume = FUNC_TABLE_ADDRESS + 240 * 2 + 1;
+	playdate_sound_channel->setVolumeModulator = FUNC_TABLE_ADDRESS + 241 * 2 + 1;
+	playdate_sound_channel->getVolumeModulator = FUNC_TABLE_ADDRESS + 242 * 2 + 1;
+	playdate_sound_channel->setPan = FUNC_TABLE_ADDRESS + 243 * 2 + 1;
+	playdate_sound_channel->setPanModulator = FUNC_TABLE_ADDRESS + 244 * 2 + 1;
+	playdate_sound_channel->getPanModulator = FUNC_TABLE_ADDRESS + 245 * 2 + 1;
+	playdate_sound_channel->getDryLevelSignal = FUNC_TABLE_ADDRESS + 246 * 2 + 1;
+	playdate_sound_channel->getWetLevelSignal = FUNC_TABLE_ADDRESS + 247 * 2 + 1;
 	auto playdate_sound_fileplayer = (playdate_sound_fileplayer_32 *) ((uintptr_t) api + offset);
 	playdate_sound->fileplayer = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_fileplayer_32);
-	playdate_sound_fileplayer->newPlayer = FUNC_TABLE_ADDRESS + 214 * 2 + 1;
-	playdate_sound_fileplayer->freePlayer = FUNC_TABLE_ADDRESS + 215 * 2 + 1;
-	playdate_sound_fileplayer->loadIntoPlayer = FUNC_TABLE_ADDRESS + 216 * 2 + 1;
-	playdate_sound_fileplayer->setBufferLength = FUNC_TABLE_ADDRESS + 217 * 2 + 1;
-	playdate_sound_fileplayer->play = FUNC_TABLE_ADDRESS + 218 * 2 + 1;
-	playdate_sound_fileplayer->isPlaying = FUNC_TABLE_ADDRESS + 219 * 2 + 1;
-	playdate_sound_fileplayer->pause = FUNC_TABLE_ADDRESS + 220 * 2 + 1;
-	playdate_sound_fileplayer->stop = FUNC_TABLE_ADDRESS + 221 * 2 + 1;
-	playdate_sound_fileplayer->setVolume = FUNC_TABLE_ADDRESS + 222 * 2 + 1;
-	playdate_sound_fileplayer->getVolume = FUNC_TABLE_ADDRESS + 223 * 2 + 1;
-	playdate_sound_fileplayer->getLength = FUNC_TABLE_ADDRESS + 224 * 2 + 1;
-	playdate_sound_fileplayer->setOffset = FUNC_TABLE_ADDRESS + 225 * 2 + 1;
-	playdate_sound_fileplayer->setRate = FUNC_TABLE_ADDRESS + 226 * 2 + 1;
-	playdate_sound_fileplayer->setLoopRange = FUNC_TABLE_ADDRESS + 227 * 2 + 1;
-	playdate_sound_fileplayer->didUnderrun = FUNC_TABLE_ADDRESS + 228 * 2 + 1;
-	playdate_sound_fileplayer->setFinishCallback = FUNC_TABLE_ADDRESS + 229 * 2 + 1;
-	playdate_sound_fileplayer->setLoopCallback = FUNC_TABLE_ADDRESS + 230 * 2 + 1;
-	playdate_sound_fileplayer->getOffset = FUNC_TABLE_ADDRESS + 231 * 2 + 1;
-	playdate_sound_fileplayer->getRate = FUNC_TABLE_ADDRESS + 232 * 2 + 1;
-	playdate_sound_fileplayer->setStopOnUnderrun = FUNC_TABLE_ADDRESS + 233 * 2 + 1;
-	playdate_sound_fileplayer->fadeVolume = FUNC_TABLE_ADDRESS + 234 * 2 + 1;
-	playdate_sound_fileplayer->setMP3StreamSource = FUNC_TABLE_ADDRESS + 235 * 2 + 1;
+	playdate_sound_fileplayer->newPlayer = FUNC_TABLE_ADDRESS + 248 * 2 + 1;
+	playdate_sound_fileplayer->freePlayer = FUNC_TABLE_ADDRESS + 249 * 2 + 1;
+	playdate_sound_fileplayer->loadIntoPlayer = FUNC_TABLE_ADDRESS + 250 * 2 + 1;
+	playdate_sound_fileplayer->setBufferLength = FUNC_TABLE_ADDRESS + 251 * 2 + 1;
+	playdate_sound_fileplayer->play = FUNC_TABLE_ADDRESS + 252 * 2 + 1;
+	playdate_sound_fileplayer->isPlaying = FUNC_TABLE_ADDRESS + 253 * 2 + 1;
+	playdate_sound_fileplayer->pause = FUNC_TABLE_ADDRESS + 254 * 2 + 1;
+	playdate_sound_fileplayer->stop = FUNC_TABLE_ADDRESS + 255 * 2 + 1;
+	playdate_sound_fileplayer->setVolume = FUNC_TABLE_ADDRESS + 256 * 2 + 1;
+	playdate_sound_fileplayer->getVolume = FUNC_TABLE_ADDRESS + 257 * 2 + 1;
+	playdate_sound_fileplayer->getLength = FUNC_TABLE_ADDRESS + 258 * 2 + 1;
+	playdate_sound_fileplayer->setOffset = FUNC_TABLE_ADDRESS + 259 * 2 + 1;
+	playdate_sound_fileplayer->setRate = FUNC_TABLE_ADDRESS + 260 * 2 + 1;
+	playdate_sound_fileplayer->setLoopRange = FUNC_TABLE_ADDRESS + 261 * 2 + 1;
+	playdate_sound_fileplayer->didUnderrun = FUNC_TABLE_ADDRESS + 262 * 2 + 1;
+	playdate_sound_fileplayer->setFinishCallback = FUNC_TABLE_ADDRESS + 263 * 2 + 1;
+	playdate_sound_fileplayer->setLoopCallback = FUNC_TABLE_ADDRESS + 264 * 2 + 1;
+	playdate_sound_fileplayer->getOffset = FUNC_TABLE_ADDRESS + 265 * 2 + 1;
+	playdate_sound_fileplayer->getRate = FUNC_TABLE_ADDRESS + 266 * 2 + 1;
+	playdate_sound_fileplayer->setStopOnUnderrun = FUNC_TABLE_ADDRESS + 267 * 2 + 1;
+	playdate_sound_fileplayer->fadeVolume = FUNC_TABLE_ADDRESS + 268 * 2 + 1;
+	playdate_sound_fileplayer->setMP3StreamSource = FUNC_TABLE_ADDRESS + 269 * 2 + 1;
 	auto playdate_sound_sample = (playdate_sound_sample_32 *) ((uintptr_t) api + offset);
 	playdate_sound->sample = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_sample_32);
-	playdate_sound_sample->newSampleBuffer = FUNC_TABLE_ADDRESS + 236 * 2 + 1;
-	playdate_sound_sample->loadIntoSample = FUNC_TABLE_ADDRESS + 237 * 2 + 1;
-	playdate_sound_sample->load = FUNC_TABLE_ADDRESS + 238 * 2 + 1;
-	playdate_sound_sample->newSampleFromData = FUNC_TABLE_ADDRESS + 239 * 2 + 1;
-	playdate_sound_sample->getData = FUNC_TABLE_ADDRESS + 240 * 2 + 1;
-	playdate_sound_sample->freeSample = FUNC_TABLE_ADDRESS + 241 * 2 + 1;
-	playdate_sound_sample->getLength = FUNC_TABLE_ADDRESS + 242 * 2 + 1;
-	playdate_sound_sample->decompress = FUNC_TABLE_ADDRESS + 243 * 2 + 1;
+	playdate_sound_sample->newSampleBuffer = FUNC_TABLE_ADDRESS + 270 * 2 + 1;
+	playdate_sound_sample->loadIntoSample = FUNC_TABLE_ADDRESS + 271 * 2 + 1;
+	playdate_sound_sample->load = FUNC_TABLE_ADDRESS + 272 * 2 + 1;
+	playdate_sound_sample->newSampleFromData = FUNC_TABLE_ADDRESS + 273 * 2 + 1;
+	playdate_sound_sample->getData = FUNC_TABLE_ADDRESS + 274 * 2 + 1;
+	playdate_sound_sample->freeSample = FUNC_TABLE_ADDRESS + 275 * 2 + 1;
+	playdate_sound_sample->getLength = FUNC_TABLE_ADDRESS + 276 * 2 + 1;
+	playdate_sound_sample->decompress = FUNC_TABLE_ADDRESS + 277 * 2 + 1;
 	auto playdate_sound_sampleplayer = (playdate_sound_sampleplayer_32 *) ((uintptr_t) api + offset);
 	playdate_sound->sampleplayer = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_sampleplayer_32);
-	playdate_sound_sampleplayer->newPlayer = FUNC_TABLE_ADDRESS + 244 * 2 + 1;
-	playdate_sound_sampleplayer->freePlayer = FUNC_TABLE_ADDRESS + 245 * 2 + 1;
-	playdate_sound_sampleplayer->setSample = FUNC_TABLE_ADDRESS + 246 * 2 + 1;
-	playdate_sound_sampleplayer->play = FUNC_TABLE_ADDRESS + 247 * 2 + 1;
-	playdate_sound_sampleplayer->isPlaying = FUNC_TABLE_ADDRESS + 248 * 2 + 1;
-	playdate_sound_sampleplayer->stop = FUNC_TABLE_ADDRESS + 249 * 2 + 1;
-	playdate_sound_sampleplayer->setVolume = FUNC_TABLE_ADDRESS + 250 * 2 + 1;
-	playdate_sound_sampleplayer->getVolume = FUNC_TABLE_ADDRESS + 251 * 2 + 1;
-	playdate_sound_sampleplayer->getLength = FUNC_TABLE_ADDRESS + 252 * 2 + 1;
-	playdate_sound_sampleplayer->setOffset = FUNC_TABLE_ADDRESS + 253 * 2 + 1;
-	playdate_sound_sampleplayer->setRate = FUNC_TABLE_ADDRESS + 254 * 2 + 1;
-	playdate_sound_sampleplayer->setPlayRange = FUNC_TABLE_ADDRESS + 255 * 2 + 1;
-	playdate_sound_sampleplayer->setFinishCallback = FUNC_TABLE_ADDRESS + 256 * 2 + 1;
-	playdate_sound_sampleplayer->setLoopCallback = FUNC_TABLE_ADDRESS + 257 * 2 + 1;
-	playdate_sound_sampleplayer->getOffset = FUNC_TABLE_ADDRESS + 258 * 2 + 1;
-	playdate_sound_sampleplayer->getRate = FUNC_TABLE_ADDRESS + 259 * 2 + 1;
-	playdate_sound_sampleplayer->setPaused = FUNC_TABLE_ADDRESS + 260 * 2 + 1;
+	playdate_sound_sampleplayer->newPlayer = FUNC_TABLE_ADDRESS + 278 * 2 + 1;
+	playdate_sound_sampleplayer->freePlayer = FUNC_TABLE_ADDRESS + 279 * 2 + 1;
+	playdate_sound_sampleplayer->setSample = FUNC_TABLE_ADDRESS + 280 * 2 + 1;
+	playdate_sound_sampleplayer->play = FUNC_TABLE_ADDRESS + 281 * 2 + 1;
+	playdate_sound_sampleplayer->isPlaying = FUNC_TABLE_ADDRESS + 282 * 2 + 1;
+	playdate_sound_sampleplayer->stop = FUNC_TABLE_ADDRESS + 283 * 2 + 1;
+	playdate_sound_sampleplayer->setVolume = FUNC_TABLE_ADDRESS + 284 * 2 + 1;
+	playdate_sound_sampleplayer->getVolume = FUNC_TABLE_ADDRESS + 285 * 2 + 1;
+	playdate_sound_sampleplayer->getLength = FUNC_TABLE_ADDRESS + 286 * 2 + 1;
+	playdate_sound_sampleplayer->setOffset = FUNC_TABLE_ADDRESS + 287 * 2 + 1;
+	playdate_sound_sampleplayer->setRate = FUNC_TABLE_ADDRESS + 288 * 2 + 1;
+	playdate_sound_sampleplayer->setPlayRange = FUNC_TABLE_ADDRESS + 289 * 2 + 1;
+	playdate_sound_sampleplayer->setFinishCallback = FUNC_TABLE_ADDRESS + 290 * 2 + 1;
+	playdate_sound_sampleplayer->setLoopCallback = FUNC_TABLE_ADDRESS + 291 * 2 + 1;
+	playdate_sound_sampleplayer->getOffset = FUNC_TABLE_ADDRESS + 292 * 2 + 1;
+	playdate_sound_sampleplayer->getRate = FUNC_TABLE_ADDRESS + 293 * 2 + 1;
+	playdate_sound_sampleplayer->setPaused = FUNC_TABLE_ADDRESS + 294 * 2 + 1;
 	auto playdate_sound_synth = (playdate_sound_synth_32 *) ((uintptr_t) api + offset);
 	playdate_sound->synth = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_synth_32);
-	playdate_sound_synth->newSynth = FUNC_TABLE_ADDRESS + 261 * 2 + 1;
-	playdate_sound_synth->freeSynth = FUNC_TABLE_ADDRESS + 262 * 2 + 1;
-	playdate_sound_synth->setWaveform = FUNC_TABLE_ADDRESS + 263 * 2 + 1;
-	playdate_sound_synth->setGenerator_deprecated = FUNC_TABLE_ADDRESS + 264 * 2 + 1;
-	playdate_sound_synth->setSample = FUNC_TABLE_ADDRESS + 265 * 2 + 1;
-	playdate_sound_synth->setAttackTime = FUNC_TABLE_ADDRESS + 266 * 2 + 1;
-	playdate_sound_synth->setDecayTime = FUNC_TABLE_ADDRESS + 267 * 2 + 1;
-	playdate_sound_synth->setSustainLevel = FUNC_TABLE_ADDRESS + 268 * 2 + 1;
-	playdate_sound_synth->setReleaseTime = FUNC_TABLE_ADDRESS + 269 * 2 + 1;
-	playdate_sound_synth->setTranspose = FUNC_TABLE_ADDRESS + 270 * 2 + 1;
-	playdate_sound_synth->setFrequencyModulator = FUNC_TABLE_ADDRESS + 271 * 2 + 1;
-	playdate_sound_synth->getFrequencyModulator = FUNC_TABLE_ADDRESS + 272 * 2 + 1;
-	playdate_sound_synth->setAmplitudeModulator = FUNC_TABLE_ADDRESS + 273 * 2 + 1;
-	playdate_sound_synth->getAmplitudeModulator = FUNC_TABLE_ADDRESS + 274 * 2 + 1;
-	playdate_sound_synth->getParameterCount = FUNC_TABLE_ADDRESS + 275 * 2 + 1;
-	playdate_sound_synth->setParameter = FUNC_TABLE_ADDRESS + 276 * 2 + 1;
-	playdate_sound_synth->setParameterModulator = FUNC_TABLE_ADDRESS + 277 * 2 + 1;
-	playdate_sound_synth->getParameterModulator = FUNC_TABLE_ADDRESS + 278 * 2 + 1;
-	playdate_sound_synth->playNote = FUNC_TABLE_ADDRESS + 279 * 2 + 1;
-	playdate_sound_synth->playMIDINote = FUNC_TABLE_ADDRESS + 280 * 2 + 1;
-	playdate_sound_synth->noteOff = FUNC_TABLE_ADDRESS + 281 * 2 + 1;
-	playdate_sound_synth->stop = FUNC_TABLE_ADDRESS + 282 * 2 + 1;
-	playdate_sound_synth->setVolume = FUNC_TABLE_ADDRESS + 283 * 2 + 1;
-	playdate_sound_synth->getVolume = FUNC_TABLE_ADDRESS + 284 * 2 + 1;
-	playdate_sound_synth->isPlaying = FUNC_TABLE_ADDRESS + 285 * 2 + 1;
-	playdate_sound_synth->getEnvelope = FUNC_TABLE_ADDRESS + 286 * 2 + 1;
-	playdate_sound_synth->setWavetable = FUNC_TABLE_ADDRESS + 287 * 2 + 1;
-	playdate_sound_synth->setGenerator = FUNC_TABLE_ADDRESS + 288 * 2 + 1;
-	playdate_sound_synth->copy = FUNC_TABLE_ADDRESS + 289 * 2 + 1;
-	playdate_sound_synth->clearEnvelope = FUNC_TABLE_ADDRESS + 290 * 2 + 1;
+	playdate_sound_synth->newSynth = FUNC_TABLE_ADDRESS + 295 * 2 + 1;
+	playdate_sound_synth->freeSynth = FUNC_TABLE_ADDRESS + 296 * 2 + 1;
+	playdate_sound_synth->setWaveform = FUNC_TABLE_ADDRESS + 297 * 2 + 1;
+	playdate_sound_synth->setGenerator_deprecated = FUNC_TABLE_ADDRESS + 298 * 2 + 1;
+	playdate_sound_synth->setSample = FUNC_TABLE_ADDRESS + 299 * 2 + 1;
+	playdate_sound_synth->setAttackTime = FUNC_TABLE_ADDRESS + 300 * 2 + 1;
+	playdate_sound_synth->setDecayTime = FUNC_TABLE_ADDRESS + 301 * 2 + 1;
+	playdate_sound_synth->setSustainLevel = FUNC_TABLE_ADDRESS + 302 * 2 + 1;
+	playdate_sound_synth->setReleaseTime = FUNC_TABLE_ADDRESS + 303 * 2 + 1;
+	playdate_sound_synth->setTranspose = FUNC_TABLE_ADDRESS + 304 * 2 + 1;
+	playdate_sound_synth->setFrequencyModulator = FUNC_TABLE_ADDRESS + 305 * 2 + 1;
+	playdate_sound_synth->getFrequencyModulator = FUNC_TABLE_ADDRESS + 306 * 2 + 1;
+	playdate_sound_synth->setAmplitudeModulator = FUNC_TABLE_ADDRESS + 307 * 2 + 1;
+	playdate_sound_synth->getAmplitudeModulator = FUNC_TABLE_ADDRESS + 308 * 2 + 1;
+	playdate_sound_synth->getParameterCount = FUNC_TABLE_ADDRESS + 309 * 2 + 1;
+	playdate_sound_synth->setParameter = FUNC_TABLE_ADDRESS + 310 * 2 + 1;
+	playdate_sound_synth->setParameterModulator = FUNC_TABLE_ADDRESS + 311 * 2 + 1;
+	playdate_sound_synth->getParameterModulator = FUNC_TABLE_ADDRESS + 312 * 2 + 1;
+	playdate_sound_synth->playNote = FUNC_TABLE_ADDRESS + 313 * 2 + 1;
+	playdate_sound_synth->playMIDINote = FUNC_TABLE_ADDRESS + 314 * 2 + 1;
+	playdate_sound_synth->noteOff = FUNC_TABLE_ADDRESS + 315 * 2 + 1;
+	playdate_sound_synth->stop = FUNC_TABLE_ADDRESS + 316 * 2 + 1;
+	playdate_sound_synth->setVolume = FUNC_TABLE_ADDRESS + 317 * 2 + 1;
+	playdate_sound_synth->getVolume = FUNC_TABLE_ADDRESS + 318 * 2 + 1;
+	playdate_sound_synth->isPlaying = FUNC_TABLE_ADDRESS + 319 * 2 + 1;
+	playdate_sound_synth->getEnvelope = FUNC_TABLE_ADDRESS + 320 * 2 + 1;
+	playdate_sound_synth->setWavetable = FUNC_TABLE_ADDRESS + 321 * 2 + 1;
+	playdate_sound_synth->setGenerator = FUNC_TABLE_ADDRESS + 322 * 2 + 1;
+	playdate_sound_synth->copy = FUNC_TABLE_ADDRESS + 323 * 2 + 1;
+	playdate_sound_synth->clearEnvelope = FUNC_TABLE_ADDRESS + 324 * 2 + 1;
 	auto playdate_sound_sequence = (playdate_sound_sequence_32 *) ((uintptr_t) api + offset);
 	playdate_sound->sequence = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_sequence_32);
-	playdate_sound_sequence->newSequence = FUNC_TABLE_ADDRESS + 291 * 2 + 1;
-	playdate_sound_sequence->freeSequence = FUNC_TABLE_ADDRESS + 292 * 2 + 1;
-	playdate_sound_sequence->loadMIDIFile = FUNC_TABLE_ADDRESS + 293 * 2 + 1;
-	playdate_sound_sequence->getTime = FUNC_TABLE_ADDRESS + 294 * 2 + 1;
-	playdate_sound_sequence->setTime = FUNC_TABLE_ADDRESS + 295 * 2 + 1;
-	playdate_sound_sequence->setLoops = FUNC_TABLE_ADDRESS + 296 * 2 + 1;
-	playdate_sound_sequence->getTempo_deprecated = FUNC_TABLE_ADDRESS + 297 * 2 + 1;
-	playdate_sound_sequence->setTempo = FUNC_TABLE_ADDRESS + 298 * 2 + 1;
+	playdate_sound_sequence->newSequence = FUNC_TABLE_ADDRESS + 325 * 2 + 1;
+	playdate_sound_sequence->freeSequence = FUNC_TABLE_ADDRESS + 326 * 2 + 1;
+	playdate_sound_sequence->loadMIDIFile = FUNC_TABLE_ADDRESS + 327 * 2 + 1;
+	playdate_sound_sequence->getTime = FUNC_TABLE_ADDRESS + 328 * 2 + 1;
+	playdate_sound_sequence->setTime = FUNC_TABLE_ADDRESS + 329 * 2 + 1;
+	playdate_sound_sequence->setLoops = FUNC_TABLE_ADDRESS + 330 * 2 + 1;
+	playdate_sound_sequence->getTempo_deprecated = FUNC_TABLE_ADDRESS + 331 * 2 + 1;
+	playdate_sound_sequence->setTempo = FUNC_TABLE_ADDRESS + 332 * 2 + 1;
 	if (version < Version("2.1.0"))
-		playdate_sound_sequence->setTempo = FUNC_TABLE_ADDRESS + 299 * 2 + 1;
-	playdate_sound_sequence->getTrackCount = FUNC_TABLE_ADDRESS + 300 * 2 + 1;
-	playdate_sound_sequence->addTrack = FUNC_TABLE_ADDRESS + 301 * 2 + 1;
-	playdate_sound_sequence->getTrackAtIndex = FUNC_TABLE_ADDRESS + 302 * 2 + 1;
-	playdate_sound_sequence->setTrackAtIndex = FUNC_TABLE_ADDRESS + 303 * 2 + 1;
-	playdate_sound_sequence->allNotesOff = FUNC_TABLE_ADDRESS + 304 * 2 + 1;
-	playdate_sound_sequence->isPlaying = FUNC_TABLE_ADDRESS + 305 * 2 + 1;
-	playdate_sound_sequence->getLength = FUNC_TABLE_ADDRESS + 306 * 2 + 1;
-	playdate_sound_sequence->play = FUNC_TABLE_ADDRESS + 307 * 2 + 1;
-	playdate_sound_sequence->stop = FUNC_TABLE_ADDRESS + 308 * 2 + 1;
-	playdate_sound_sequence->getCurrentStep = FUNC_TABLE_ADDRESS + 309 * 2 + 1;
-	playdate_sound_sequence->setCurrentStep = FUNC_TABLE_ADDRESS + 310 * 2 + 1;
-	playdate_sound_sequence->getTempo = FUNC_TABLE_ADDRESS + 311 * 2 + 1;
+		playdate_sound_sequence->setTempo = FUNC_TABLE_ADDRESS + 333 * 2 + 1;
+	playdate_sound_sequence->getTrackCount = FUNC_TABLE_ADDRESS + 334 * 2 + 1;
+	playdate_sound_sequence->addTrack = FUNC_TABLE_ADDRESS + 335 * 2 + 1;
+	playdate_sound_sequence->getTrackAtIndex = FUNC_TABLE_ADDRESS + 336 * 2 + 1;
+	playdate_sound_sequence->setTrackAtIndex = FUNC_TABLE_ADDRESS + 337 * 2 + 1;
+	playdate_sound_sequence->allNotesOff = FUNC_TABLE_ADDRESS + 338 * 2 + 1;
+	playdate_sound_sequence->isPlaying = FUNC_TABLE_ADDRESS + 339 * 2 + 1;
+	playdate_sound_sequence->getLength = FUNC_TABLE_ADDRESS + 340 * 2 + 1;
+	playdate_sound_sequence->play = FUNC_TABLE_ADDRESS + 341 * 2 + 1;
+	playdate_sound_sequence->stop = FUNC_TABLE_ADDRESS + 342 * 2 + 1;
+	playdate_sound_sequence->getCurrentStep = FUNC_TABLE_ADDRESS + 343 * 2 + 1;
+	playdate_sound_sequence->setCurrentStep = FUNC_TABLE_ADDRESS + 344 * 2 + 1;
+	playdate_sound_sequence->getTempo = FUNC_TABLE_ADDRESS + 345 * 2 + 1;
 	auto playdate_sound_effect = (playdate_sound_effect_32 *) ((uintptr_t) api + offset);
 	playdate_sound->effect = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_32);
-	playdate_sound_effect->newEffect = FUNC_TABLE_ADDRESS + 312 * 2 + 1;
-	playdate_sound_effect->freeEffect = FUNC_TABLE_ADDRESS + 313 * 2 + 1;
-	playdate_sound_effect->setMix = FUNC_TABLE_ADDRESS + 314 * 2 + 1;
-	playdate_sound_effect->setMixModulator = FUNC_TABLE_ADDRESS + 315 * 2 + 1;
-	playdate_sound_effect->getMixModulator = FUNC_TABLE_ADDRESS + 316 * 2 + 1;
-	playdate_sound_effect->setUserdata = FUNC_TABLE_ADDRESS + 317 * 2 + 1;
-	playdate_sound_effect->getUserdata = FUNC_TABLE_ADDRESS + 318 * 2 + 1;
+	playdate_sound_effect->newEffect = FUNC_TABLE_ADDRESS + 346 * 2 + 1;
+	playdate_sound_effect->freeEffect = FUNC_TABLE_ADDRESS + 347 * 2 + 1;
+	playdate_sound_effect->setMix = FUNC_TABLE_ADDRESS + 348 * 2 + 1;
+	playdate_sound_effect->setMixModulator = FUNC_TABLE_ADDRESS + 349 * 2 + 1;
+	playdate_sound_effect->getMixModulator = FUNC_TABLE_ADDRESS + 350 * 2 + 1;
+	playdate_sound_effect->setUserdata = FUNC_TABLE_ADDRESS + 351 * 2 + 1;
+	playdate_sound_effect->getUserdata = FUNC_TABLE_ADDRESS + 352 * 2 + 1;
 	auto playdate_sound_effect_twopolefilter = (playdate_sound_effect_twopolefilter_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->twopolefilter = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_twopolefilter_32);
-	playdate_sound_effect_twopolefilter->newFilter = FUNC_TABLE_ADDRESS + 319 * 2 + 1;
-	playdate_sound_effect_twopolefilter->freeFilter = FUNC_TABLE_ADDRESS + 320 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setType = FUNC_TABLE_ADDRESS + 321 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setFrequency = FUNC_TABLE_ADDRESS + 322 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setFrequencyModulator = FUNC_TABLE_ADDRESS + 323 * 2 + 1;
-	playdate_sound_effect_twopolefilter->getFrequencyModulator = FUNC_TABLE_ADDRESS + 324 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setGain = FUNC_TABLE_ADDRESS + 325 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setResonance = FUNC_TABLE_ADDRESS + 326 * 2 + 1;
-	playdate_sound_effect_twopolefilter->setResonanceModulator = FUNC_TABLE_ADDRESS + 327 * 2 + 1;
-	playdate_sound_effect_twopolefilter->getResonanceModulator = FUNC_TABLE_ADDRESS + 328 * 2 + 1;
+	playdate_sound_effect_twopolefilter->newFilter = FUNC_TABLE_ADDRESS + 353 * 2 + 1;
+	playdate_sound_effect_twopolefilter->freeFilter = FUNC_TABLE_ADDRESS + 354 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setType = FUNC_TABLE_ADDRESS + 355 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setFrequency = FUNC_TABLE_ADDRESS + 356 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setFrequencyModulator = FUNC_TABLE_ADDRESS + 357 * 2 + 1;
+	playdate_sound_effect_twopolefilter->getFrequencyModulator = FUNC_TABLE_ADDRESS + 358 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setGain = FUNC_TABLE_ADDRESS + 359 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setResonance = FUNC_TABLE_ADDRESS + 360 * 2 + 1;
+	playdate_sound_effect_twopolefilter->setResonanceModulator = FUNC_TABLE_ADDRESS + 361 * 2 + 1;
+	playdate_sound_effect_twopolefilter->getResonanceModulator = FUNC_TABLE_ADDRESS + 362 * 2 + 1;
 	auto playdate_sound_effect_onepolefilter = (playdate_sound_effect_onepolefilter_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->onepolefilter = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_onepolefilter_32);
-	playdate_sound_effect_onepolefilter->newFilter = FUNC_TABLE_ADDRESS + 329 * 2 + 1;
-	playdate_sound_effect_onepolefilter->freeFilter = FUNC_TABLE_ADDRESS + 330 * 2 + 1;
-	playdate_sound_effect_onepolefilter->setParameter = FUNC_TABLE_ADDRESS + 331 * 2 + 1;
-	playdate_sound_effect_onepolefilter->setParameterModulator = FUNC_TABLE_ADDRESS + 332 * 2 + 1;
-	playdate_sound_effect_onepolefilter->getParameterModulator = FUNC_TABLE_ADDRESS + 333 * 2 + 1;
+	playdate_sound_effect_onepolefilter->newFilter = FUNC_TABLE_ADDRESS + 363 * 2 + 1;
+	playdate_sound_effect_onepolefilter->freeFilter = FUNC_TABLE_ADDRESS + 364 * 2 + 1;
+	playdate_sound_effect_onepolefilter->setParameter = FUNC_TABLE_ADDRESS + 365 * 2 + 1;
+	playdate_sound_effect_onepolefilter->setParameterModulator = FUNC_TABLE_ADDRESS + 366 * 2 + 1;
+	playdate_sound_effect_onepolefilter->getParameterModulator = FUNC_TABLE_ADDRESS + 367 * 2 + 1;
 	auto playdate_sound_effect_bitcrusher = (playdate_sound_effect_bitcrusher_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->bitcrusher = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_bitcrusher_32);
-	playdate_sound_effect_bitcrusher->newBitCrusher = FUNC_TABLE_ADDRESS + 334 * 2 + 1;
-	playdate_sound_effect_bitcrusher->freeBitCrusher = FUNC_TABLE_ADDRESS + 335 * 2 + 1;
-	playdate_sound_effect_bitcrusher->setAmount = FUNC_TABLE_ADDRESS + 336 * 2 + 1;
-	playdate_sound_effect_bitcrusher->setAmountModulator = FUNC_TABLE_ADDRESS + 337 * 2 + 1;
-	playdate_sound_effect_bitcrusher->getAmountModulator = FUNC_TABLE_ADDRESS + 338 * 2 + 1;
-	playdate_sound_effect_bitcrusher->setUndersampling = FUNC_TABLE_ADDRESS + 339 * 2 + 1;
-	playdate_sound_effect_bitcrusher->setUndersampleModulator = FUNC_TABLE_ADDRESS + 340 * 2 + 1;
-	playdate_sound_effect_bitcrusher->getUndersampleModulator = FUNC_TABLE_ADDRESS + 341 * 2 + 1;
+	playdate_sound_effect_bitcrusher->newBitCrusher = FUNC_TABLE_ADDRESS + 368 * 2 + 1;
+	playdate_sound_effect_bitcrusher->freeBitCrusher = FUNC_TABLE_ADDRESS + 369 * 2 + 1;
+	playdate_sound_effect_bitcrusher->setAmount = FUNC_TABLE_ADDRESS + 370 * 2 + 1;
+	playdate_sound_effect_bitcrusher->setAmountModulator = FUNC_TABLE_ADDRESS + 371 * 2 + 1;
+	playdate_sound_effect_bitcrusher->getAmountModulator = FUNC_TABLE_ADDRESS + 372 * 2 + 1;
+	playdate_sound_effect_bitcrusher->setUndersampling = FUNC_TABLE_ADDRESS + 373 * 2 + 1;
+	playdate_sound_effect_bitcrusher->setUndersampleModulator = FUNC_TABLE_ADDRESS + 374 * 2 + 1;
+	playdate_sound_effect_bitcrusher->getUndersampleModulator = FUNC_TABLE_ADDRESS + 375 * 2 + 1;
 	auto playdate_sound_effect_ringmodulator = (playdate_sound_effect_ringmodulator_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->ringmodulator = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_ringmodulator_32);
-	playdate_sound_effect_ringmodulator->newRingmod = FUNC_TABLE_ADDRESS + 342 * 2 + 1;
-	playdate_sound_effect_ringmodulator->freeRingmod = FUNC_TABLE_ADDRESS + 343 * 2 + 1;
-	playdate_sound_effect_ringmodulator->setFrequency = FUNC_TABLE_ADDRESS + 344 * 2 + 1;
-	playdate_sound_effect_ringmodulator->setFrequencyModulator = FUNC_TABLE_ADDRESS + 345 * 2 + 1;
-	playdate_sound_effect_ringmodulator->getFrequencyModulator = FUNC_TABLE_ADDRESS + 346 * 2 + 1;
+	playdate_sound_effect_ringmodulator->newRingmod = FUNC_TABLE_ADDRESS + 376 * 2 + 1;
+	playdate_sound_effect_ringmodulator->freeRingmod = FUNC_TABLE_ADDRESS + 377 * 2 + 1;
+	playdate_sound_effect_ringmodulator->setFrequency = FUNC_TABLE_ADDRESS + 378 * 2 + 1;
+	playdate_sound_effect_ringmodulator->setFrequencyModulator = FUNC_TABLE_ADDRESS + 379 * 2 + 1;
+	playdate_sound_effect_ringmodulator->getFrequencyModulator = FUNC_TABLE_ADDRESS + 380 * 2 + 1;
 	auto playdate_sound_effect_delayline = (playdate_sound_effect_delayline_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->delayline = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_delayline_32);
-	playdate_sound_effect_delayline->newDelayLine = FUNC_TABLE_ADDRESS + 347 * 2 + 1;
-	playdate_sound_effect_delayline->freeDelayLine = FUNC_TABLE_ADDRESS + 348 * 2 + 1;
-	playdate_sound_effect_delayline->setLength = FUNC_TABLE_ADDRESS + 349 * 2 + 1;
-	playdate_sound_effect_delayline->setFeedback = FUNC_TABLE_ADDRESS + 350 * 2 + 1;
-	playdate_sound_effect_delayline->addTap = FUNC_TABLE_ADDRESS + 351 * 2 + 1;
-	playdate_sound_effect_delayline->freeTap = FUNC_TABLE_ADDRESS + 352 * 2 + 1;
-	playdate_sound_effect_delayline->setTapDelay = FUNC_TABLE_ADDRESS + 353 * 2 + 1;
-	playdate_sound_effect_delayline->setTapDelayModulator = FUNC_TABLE_ADDRESS + 354 * 2 + 1;
-	playdate_sound_effect_delayline->getTapDelayModulator = FUNC_TABLE_ADDRESS + 355 * 2 + 1;
-	playdate_sound_effect_delayline->setTapChannelsFlipped = FUNC_TABLE_ADDRESS + 356 * 2 + 1;
+	playdate_sound_effect_delayline->newDelayLine = FUNC_TABLE_ADDRESS + 381 * 2 + 1;
+	playdate_sound_effect_delayline->freeDelayLine = FUNC_TABLE_ADDRESS + 382 * 2 + 1;
+	playdate_sound_effect_delayline->setLength = FUNC_TABLE_ADDRESS + 383 * 2 + 1;
+	playdate_sound_effect_delayline->setFeedback = FUNC_TABLE_ADDRESS + 384 * 2 + 1;
+	playdate_sound_effect_delayline->addTap = FUNC_TABLE_ADDRESS + 385 * 2 + 1;
+	playdate_sound_effect_delayline->freeTap = FUNC_TABLE_ADDRESS + 386 * 2 + 1;
+	playdate_sound_effect_delayline->setTapDelay = FUNC_TABLE_ADDRESS + 387 * 2 + 1;
+	playdate_sound_effect_delayline->setTapDelayModulator = FUNC_TABLE_ADDRESS + 388 * 2 + 1;
+	playdate_sound_effect_delayline->getTapDelayModulator = FUNC_TABLE_ADDRESS + 389 * 2 + 1;
+	playdate_sound_effect_delayline->setTapChannelsFlipped = FUNC_TABLE_ADDRESS + 390 * 2 + 1;
 	auto playdate_sound_effect_overdrive = (playdate_sound_effect_overdrive_32 *) ((uintptr_t) api + offset);
 	playdate_sound_effect->overdrive = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_effect_overdrive_32);
-	playdate_sound_effect_overdrive->newOverdrive = FUNC_TABLE_ADDRESS + 357 * 2 + 1;
-	playdate_sound_effect_overdrive->freeOverdrive = FUNC_TABLE_ADDRESS + 358 * 2 + 1;
-	playdate_sound_effect_overdrive->setGain = FUNC_TABLE_ADDRESS + 359 * 2 + 1;
-	playdate_sound_effect_overdrive->setLimit = FUNC_TABLE_ADDRESS + 360 * 2 + 1;
-	playdate_sound_effect_overdrive->setLimitModulator = FUNC_TABLE_ADDRESS + 361 * 2 + 1;
-	playdate_sound_effect_overdrive->getLimitModulator = FUNC_TABLE_ADDRESS + 362 * 2 + 1;
-	playdate_sound_effect_overdrive->setOffset = FUNC_TABLE_ADDRESS + 363 * 2 + 1;
-	playdate_sound_effect_overdrive->setOffsetModulator = FUNC_TABLE_ADDRESS + 364 * 2 + 1;
-	playdate_sound_effect_overdrive->getOffsetModulator = FUNC_TABLE_ADDRESS + 365 * 2 + 1;
+	playdate_sound_effect_overdrive->newOverdrive = FUNC_TABLE_ADDRESS + 391 * 2 + 1;
+	playdate_sound_effect_overdrive->freeOverdrive = FUNC_TABLE_ADDRESS + 392 * 2 + 1;
+	playdate_sound_effect_overdrive->setGain = FUNC_TABLE_ADDRESS + 393 * 2 + 1;
+	playdate_sound_effect_overdrive->setLimit = FUNC_TABLE_ADDRESS + 394 * 2 + 1;
+	playdate_sound_effect_overdrive->setLimitModulator = FUNC_TABLE_ADDRESS + 395 * 2 + 1;
+	playdate_sound_effect_overdrive->getLimitModulator = FUNC_TABLE_ADDRESS + 396 * 2 + 1;
+	playdate_sound_effect_overdrive->setOffset = FUNC_TABLE_ADDRESS + 397 * 2 + 1;
+	playdate_sound_effect_overdrive->setOffsetModulator = FUNC_TABLE_ADDRESS + 398 * 2 + 1;
+	playdate_sound_effect_overdrive->getOffsetModulator = FUNC_TABLE_ADDRESS + 399 * 2 + 1;
 	auto playdate_sound_lfo = (playdate_sound_lfo_32 *) ((uintptr_t) api + offset);
 	playdate_sound->lfo = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_lfo_32);
-	playdate_sound_lfo->newLFO = FUNC_TABLE_ADDRESS + 366 * 2 + 1;
-	playdate_sound_lfo->freeLFO = FUNC_TABLE_ADDRESS + 367 * 2 + 1;
-	playdate_sound_lfo->setType = FUNC_TABLE_ADDRESS + 368 * 2 + 1;
-	playdate_sound_lfo->setRate = FUNC_TABLE_ADDRESS + 369 * 2 + 1;
-	playdate_sound_lfo->setPhase = FUNC_TABLE_ADDRESS + 370 * 2 + 1;
-	playdate_sound_lfo->setCenter = FUNC_TABLE_ADDRESS + 371 * 2 + 1;
-	playdate_sound_lfo->setDepth = FUNC_TABLE_ADDRESS + 372 * 2 + 1;
-	playdate_sound_lfo->setArpeggiation = FUNC_TABLE_ADDRESS + 373 * 2 + 1;
-	playdate_sound_lfo->setFunction = FUNC_TABLE_ADDRESS + 374 * 2 + 1;
-	playdate_sound_lfo->setDelay = FUNC_TABLE_ADDRESS + 375 * 2 + 1;
-	playdate_sound_lfo->setRetrigger = FUNC_TABLE_ADDRESS + 376 * 2 + 1;
-	playdate_sound_lfo->getValue = FUNC_TABLE_ADDRESS + 377 * 2 + 1;
-	playdate_sound_lfo->setGlobal = FUNC_TABLE_ADDRESS + 378 * 2 + 1;
-	playdate_sound_lfo->setStartPhase = FUNC_TABLE_ADDRESS + 379 * 2 + 1;
+	playdate_sound_lfo->newLFO = FUNC_TABLE_ADDRESS + 400 * 2 + 1;
+	playdate_sound_lfo->freeLFO = FUNC_TABLE_ADDRESS + 401 * 2 + 1;
+	playdate_sound_lfo->setType = FUNC_TABLE_ADDRESS + 402 * 2 + 1;
+	playdate_sound_lfo->setRate = FUNC_TABLE_ADDRESS + 403 * 2 + 1;
+	playdate_sound_lfo->setPhase = FUNC_TABLE_ADDRESS + 404 * 2 + 1;
+	playdate_sound_lfo->setCenter = FUNC_TABLE_ADDRESS + 405 * 2 + 1;
+	playdate_sound_lfo->setDepth = FUNC_TABLE_ADDRESS + 406 * 2 + 1;
+	playdate_sound_lfo->setArpeggiation = FUNC_TABLE_ADDRESS + 407 * 2 + 1;
+	playdate_sound_lfo->setFunction = FUNC_TABLE_ADDRESS + 408 * 2 + 1;
+	playdate_sound_lfo->setDelay = FUNC_TABLE_ADDRESS + 409 * 2 + 1;
+	playdate_sound_lfo->setRetrigger = FUNC_TABLE_ADDRESS + 410 * 2 + 1;
+	playdate_sound_lfo->getValue = FUNC_TABLE_ADDRESS + 411 * 2 + 1;
+	playdate_sound_lfo->setGlobal = FUNC_TABLE_ADDRESS + 412 * 2 + 1;
+	playdate_sound_lfo->setStartPhase = FUNC_TABLE_ADDRESS + 413 * 2 + 1;
 	auto playdate_sound_envelope = (playdate_sound_envelope_32 *) ((uintptr_t) api + offset);
 	playdate_sound->envelope = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_envelope_32);
-	playdate_sound_envelope->newEnvelope = FUNC_TABLE_ADDRESS + 380 * 2 + 1;
-	playdate_sound_envelope->freeEnvelope = FUNC_TABLE_ADDRESS + 381 * 2 + 1;
-	playdate_sound_envelope->setAttack = FUNC_TABLE_ADDRESS + 382 * 2 + 1;
-	playdate_sound_envelope->setDecay = FUNC_TABLE_ADDRESS + 383 * 2 + 1;
-	playdate_sound_envelope->setSustain = FUNC_TABLE_ADDRESS + 384 * 2 + 1;
-	playdate_sound_envelope->setRelease = FUNC_TABLE_ADDRESS + 385 * 2 + 1;
-	playdate_sound_envelope->setLegato = FUNC_TABLE_ADDRESS + 386 * 2 + 1;
-	playdate_sound_envelope->setRetrigger = FUNC_TABLE_ADDRESS + 387 * 2 + 1;
-	playdate_sound_envelope->getValue = FUNC_TABLE_ADDRESS + 388 * 2 + 1;
-	playdate_sound_envelope->setCurvature = FUNC_TABLE_ADDRESS + 389 * 2 + 1;
-	playdate_sound_envelope->setVelocitySensitivity = FUNC_TABLE_ADDRESS + 390 * 2 + 1;
-	playdate_sound_envelope->setRateScaling = FUNC_TABLE_ADDRESS + 391 * 2 + 1;
+	playdate_sound_envelope->newEnvelope = FUNC_TABLE_ADDRESS + 414 * 2 + 1;
+	playdate_sound_envelope->freeEnvelope = FUNC_TABLE_ADDRESS + 415 * 2 + 1;
+	playdate_sound_envelope->setAttack = FUNC_TABLE_ADDRESS + 416 * 2 + 1;
+	playdate_sound_envelope->setDecay = FUNC_TABLE_ADDRESS + 417 * 2 + 1;
+	playdate_sound_envelope->setSustain = FUNC_TABLE_ADDRESS + 418 * 2 + 1;
+	playdate_sound_envelope->setRelease = FUNC_TABLE_ADDRESS + 419 * 2 + 1;
+	playdate_sound_envelope->setLegato = FUNC_TABLE_ADDRESS + 420 * 2 + 1;
+	playdate_sound_envelope->setRetrigger = FUNC_TABLE_ADDRESS + 421 * 2 + 1;
+	playdate_sound_envelope->getValue = FUNC_TABLE_ADDRESS + 422 * 2 + 1;
+	playdate_sound_envelope->setCurvature = FUNC_TABLE_ADDRESS + 423 * 2 + 1;
+	playdate_sound_envelope->setVelocitySensitivity = FUNC_TABLE_ADDRESS + 424 * 2 + 1;
+	playdate_sound_envelope->setRateScaling = FUNC_TABLE_ADDRESS + 425 * 2 + 1;
 	auto playdate_sound_source = (playdate_sound_source_32 *) ((uintptr_t) api + offset);
 	playdate_sound->source = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_source_32);
-	playdate_sound_source->setVolume = FUNC_TABLE_ADDRESS + 392 * 2 + 1;
-	playdate_sound_source->getVolume = FUNC_TABLE_ADDRESS + 393 * 2 + 1;
-	playdate_sound_source->isPlaying = FUNC_TABLE_ADDRESS + 394 * 2 + 1;
-	playdate_sound_source->setFinishCallback = FUNC_TABLE_ADDRESS + 395 * 2 + 1;
+	playdate_sound_source->setVolume = FUNC_TABLE_ADDRESS + 426 * 2 + 1;
+	playdate_sound_source->getVolume = FUNC_TABLE_ADDRESS + 427 * 2 + 1;
+	playdate_sound_source->isPlaying = FUNC_TABLE_ADDRESS + 428 * 2 + 1;
+	playdate_sound_source->setFinishCallback = FUNC_TABLE_ADDRESS + 429 * 2 + 1;
 	auto playdate_control_signal = (playdate_control_signal_32 *) ((uintptr_t) api + offset);
 	playdate_sound->controlsignal = API_ADDRESS + offset;
 	offset += sizeof(playdate_control_signal_32);
-	playdate_control_signal->newSignal = FUNC_TABLE_ADDRESS + 396 * 2 + 1;
-	playdate_control_signal->freeSignal = FUNC_TABLE_ADDRESS + 397 * 2 + 1;
-	playdate_control_signal->clearEvents = FUNC_TABLE_ADDRESS + 398 * 2 + 1;
-	playdate_control_signal->addEvent = FUNC_TABLE_ADDRESS + 399 * 2 + 1;
-	playdate_control_signal->removeEvent = FUNC_TABLE_ADDRESS + 400 * 2 + 1;
-	playdate_control_signal->getMIDIControllerNumber = FUNC_TABLE_ADDRESS + 401 * 2 + 1;
+	playdate_control_signal->newSignal = FUNC_TABLE_ADDRESS + 430 * 2 + 1;
+	playdate_control_signal->freeSignal = FUNC_TABLE_ADDRESS + 431 * 2 + 1;
+	playdate_control_signal->clearEvents = FUNC_TABLE_ADDRESS + 432 * 2 + 1;
+	playdate_control_signal->addEvent = FUNC_TABLE_ADDRESS + 433 * 2 + 1;
+	playdate_control_signal->removeEvent = FUNC_TABLE_ADDRESS + 434 * 2 + 1;
+	playdate_control_signal->getMIDIControllerNumber = FUNC_TABLE_ADDRESS + 435 * 2 + 1;
 	auto playdate_sound_track = (playdate_sound_track_32 *) ((uintptr_t) api + offset);
 	playdate_sound->track = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_track_32);
-	playdate_sound_track->newTrack = FUNC_TABLE_ADDRESS + 402 * 2 + 1;
-	playdate_sound_track->freeTrack = FUNC_TABLE_ADDRESS + 403 * 2 + 1;
-	playdate_sound_track->setInstrument = FUNC_TABLE_ADDRESS + 404 * 2 + 1;
-	playdate_sound_track->getInstrument = FUNC_TABLE_ADDRESS + 405 * 2 + 1;
-	playdate_sound_track->addNoteEvent = FUNC_TABLE_ADDRESS + 406 * 2 + 1;
-	playdate_sound_track->removeNoteEvent = FUNC_TABLE_ADDRESS + 407 * 2 + 1;
-	playdate_sound_track->clearNotes = FUNC_TABLE_ADDRESS + 408 * 2 + 1;
-	playdate_sound_track->getControlSignalCount = FUNC_TABLE_ADDRESS + 409 * 2 + 1;
-	playdate_sound_track->getControlSignal = FUNC_TABLE_ADDRESS + 410 * 2 + 1;
-	playdate_sound_track->clearControlEvents = FUNC_TABLE_ADDRESS + 411 * 2 + 1;
-	playdate_sound_track->getPolyphony = FUNC_TABLE_ADDRESS + 412 * 2 + 1;
-	playdate_sound_track->activeVoiceCount = FUNC_TABLE_ADDRESS + 413 * 2 + 1;
-	playdate_sound_track->setMuted = FUNC_TABLE_ADDRESS + 414 * 2 + 1;
-	playdate_sound_track->getLength = FUNC_TABLE_ADDRESS + 415 * 2 + 1;
-	playdate_sound_track->getIndexForStep = FUNC_TABLE_ADDRESS + 416 * 2 + 1;
-	playdate_sound_track->getNoteAtIndex = FUNC_TABLE_ADDRESS + 417 * 2 + 1;
-	playdate_sound_track->getSignalForController = FUNC_TABLE_ADDRESS + 418 * 2 + 1;
+	playdate_sound_track->newTrack = FUNC_TABLE_ADDRESS + 436 * 2 + 1;
+	playdate_sound_track->freeTrack = FUNC_TABLE_ADDRESS + 437 * 2 + 1;
+	playdate_sound_track->setInstrument = FUNC_TABLE_ADDRESS + 438 * 2 + 1;
+	playdate_sound_track->getInstrument = FUNC_TABLE_ADDRESS + 439 * 2 + 1;
+	playdate_sound_track->addNoteEvent = FUNC_TABLE_ADDRESS + 440 * 2 + 1;
+	playdate_sound_track->removeNoteEvent = FUNC_TABLE_ADDRESS + 441 * 2 + 1;
+	playdate_sound_track->clearNotes = FUNC_TABLE_ADDRESS + 442 * 2 + 1;
+	playdate_sound_track->getControlSignalCount = FUNC_TABLE_ADDRESS + 443 * 2 + 1;
+	playdate_sound_track->getControlSignal = FUNC_TABLE_ADDRESS + 444 * 2 + 1;
+	playdate_sound_track->clearControlEvents = FUNC_TABLE_ADDRESS + 445 * 2 + 1;
+	playdate_sound_track->getPolyphony = FUNC_TABLE_ADDRESS + 446 * 2 + 1;
+	playdate_sound_track->activeVoiceCount = FUNC_TABLE_ADDRESS + 447 * 2 + 1;
+	playdate_sound_track->setMuted = FUNC_TABLE_ADDRESS + 448 * 2 + 1;
+	playdate_sound_track->getLength = FUNC_TABLE_ADDRESS + 449 * 2 + 1;
+	playdate_sound_track->getIndexForStep = FUNC_TABLE_ADDRESS + 450 * 2 + 1;
+	playdate_sound_track->getNoteAtIndex = FUNC_TABLE_ADDRESS + 451 * 2 + 1;
+	playdate_sound_track->getSignalForController = FUNC_TABLE_ADDRESS + 452 * 2 + 1;
 	auto playdate_sound_instrument = (playdate_sound_instrument_32 *) ((uintptr_t) api + offset);
 	playdate_sound->instrument = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_instrument_32);
-	playdate_sound_instrument->newInstrument = FUNC_TABLE_ADDRESS + 419 * 2 + 1;
-	playdate_sound_instrument->freeInstrument = FUNC_TABLE_ADDRESS + 420 * 2 + 1;
-	playdate_sound_instrument->addVoice = FUNC_TABLE_ADDRESS + 421 * 2 + 1;
-	playdate_sound_instrument->playNote = FUNC_TABLE_ADDRESS + 422 * 2 + 1;
-	playdate_sound_instrument->playMIDINote = FUNC_TABLE_ADDRESS + 423 * 2 + 1;
-	playdate_sound_instrument->setPitchBend = FUNC_TABLE_ADDRESS + 424 * 2 + 1;
-	playdate_sound_instrument->setPitchBendRange = FUNC_TABLE_ADDRESS + 425 * 2 + 1;
-	playdate_sound_instrument->setTranspose = FUNC_TABLE_ADDRESS + 426 * 2 + 1;
-	playdate_sound_instrument->noteOff = FUNC_TABLE_ADDRESS + 427 * 2 + 1;
-	playdate_sound_instrument->allNotesOff = FUNC_TABLE_ADDRESS + 428 * 2 + 1;
-	playdate_sound_instrument->setVolume = FUNC_TABLE_ADDRESS + 429 * 2 + 1;
-	playdate_sound_instrument->getVolume = FUNC_TABLE_ADDRESS + 430 * 2 + 1;
-	playdate_sound_instrument->activeVoiceCount = FUNC_TABLE_ADDRESS + 431 * 2 + 1;
+	playdate_sound_instrument->newInstrument = FUNC_TABLE_ADDRESS + 453 * 2 + 1;
+	playdate_sound_instrument->freeInstrument = FUNC_TABLE_ADDRESS + 454 * 2 + 1;
+	playdate_sound_instrument->addVoice = FUNC_TABLE_ADDRESS + 455 * 2 + 1;
+	playdate_sound_instrument->playNote = FUNC_TABLE_ADDRESS + 456 * 2 + 1;
+	playdate_sound_instrument->playMIDINote = FUNC_TABLE_ADDRESS + 457 * 2 + 1;
+	playdate_sound_instrument->setPitchBend = FUNC_TABLE_ADDRESS + 458 * 2 + 1;
+	playdate_sound_instrument->setPitchBendRange = FUNC_TABLE_ADDRESS + 459 * 2 + 1;
+	playdate_sound_instrument->setTranspose = FUNC_TABLE_ADDRESS + 460 * 2 + 1;
+	playdate_sound_instrument->noteOff = FUNC_TABLE_ADDRESS + 461 * 2 + 1;
+	playdate_sound_instrument->allNotesOff = FUNC_TABLE_ADDRESS + 462 * 2 + 1;
+	playdate_sound_instrument->setVolume = FUNC_TABLE_ADDRESS + 463 * 2 + 1;
+	playdate_sound_instrument->getVolume = FUNC_TABLE_ADDRESS + 464 * 2 + 1;
+	playdate_sound_instrument->activeVoiceCount = FUNC_TABLE_ADDRESS + 465 * 2 + 1;
 	auto playdate_sound_signal = (playdate_sound_signal_32 *) ((uintptr_t) api + offset);
 	playdate_sound->signal = API_ADDRESS + offset;
 	offset += sizeof(playdate_sound_signal_32);
-	playdate_sound_signal->newSignal = FUNC_TABLE_ADDRESS + 441 * 2 + 1;
-	playdate_sound_signal->freeSignal = FUNC_TABLE_ADDRESS + 442 * 2 + 1;
-	playdate_sound_signal->getValue = FUNC_TABLE_ADDRESS + 443 * 2 + 1;
-	playdate_sound_signal->setValueScale = FUNC_TABLE_ADDRESS + 444 * 2 + 1;
-	playdate_sound_signal->setValueOffset = FUNC_TABLE_ADDRESS + 445 * 2 + 1;
-	playdate_sound_signal->newSignalForValue = FUNC_TABLE_ADDRESS + 446 * 2 + 1;
+	playdate_sound_signal->newSignal = FUNC_TABLE_ADDRESS + 475 * 2 + 1;
+	playdate_sound_signal->freeSignal = FUNC_TABLE_ADDRESS + 476 * 2 + 1;
+	playdate_sound_signal->getValue = FUNC_TABLE_ADDRESS + 477 * 2 + 1;
+	playdate_sound_signal->setValueScale = FUNC_TABLE_ADDRESS + 478 * 2 + 1;
+	playdate_sound_signal->setValueOffset = FUNC_TABLE_ADDRESS + 479 * 2 + 1;
+	playdate_sound_signal->newSignalForValue = FUNC_TABLE_ADDRESS + 480 * 2 + 1;
 	auto playdate_lua = (playdate_lua_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->lua = API_ADDRESS + offset;
 	offset += sizeof(playdate_lua_32);
-	playdate_lua->addFunction = FUNC_TABLE_ADDRESS + 448 * 2 + 1;
-	playdate_lua->registerClass = FUNC_TABLE_ADDRESS + 449 * 2 + 1;
-	playdate_lua->pushFunction = FUNC_TABLE_ADDRESS + 450 * 2 + 1;
-	playdate_lua->indexMetatable = FUNC_TABLE_ADDRESS + 451 * 2 + 1;
-	playdate_lua->stop = FUNC_TABLE_ADDRESS + 452 * 2 + 1;
-	playdate_lua->start = FUNC_TABLE_ADDRESS + 453 * 2 + 1;
-	playdate_lua->getArgCount = FUNC_TABLE_ADDRESS + 454 * 2 + 1;
-	playdate_lua->getArgType = FUNC_TABLE_ADDRESS + 455 * 2 + 1;
-	playdate_lua->argIsNil = FUNC_TABLE_ADDRESS + 456 * 2 + 1;
-	playdate_lua->getArgBool = FUNC_TABLE_ADDRESS + 457 * 2 + 1;
-	playdate_lua->getArgInt = FUNC_TABLE_ADDRESS + 458 * 2 + 1;
-	playdate_lua->getArgFloat = FUNC_TABLE_ADDRESS + 459 * 2 + 1;
-	playdate_lua->getArgString = FUNC_TABLE_ADDRESS + 460 * 2 + 1;
-	playdate_lua->getArgBytes = FUNC_TABLE_ADDRESS + 461 * 2 + 1;
-	playdate_lua->getArgObject = FUNC_TABLE_ADDRESS + 462 * 2 + 1;
-	playdate_lua->getBitmap = FUNC_TABLE_ADDRESS + 463 * 2 + 1;
-	playdate_lua->getSprite = FUNC_TABLE_ADDRESS + 464 * 2 + 1;
-	playdate_lua->pushNil = FUNC_TABLE_ADDRESS + 465 * 2 + 1;
-	playdate_lua->pushBool = FUNC_TABLE_ADDRESS + 466 * 2 + 1;
-	playdate_lua->pushInt = FUNC_TABLE_ADDRESS + 467 * 2 + 1;
-	playdate_lua->pushFloat = FUNC_TABLE_ADDRESS + 468 * 2 + 1;
-	playdate_lua->pushString = FUNC_TABLE_ADDRESS + 469 * 2 + 1;
-	playdate_lua->pushBytes = FUNC_TABLE_ADDRESS + 470 * 2 + 1;
-	playdate_lua->pushBitmap = FUNC_TABLE_ADDRESS + 471 * 2 + 1;
-	playdate_lua->pushSprite = FUNC_TABLE_ADDRESS + 472 * 2 + 1;
-	playdate_lua->pushObject = FUNC_TABLE_ADDRESS + 473 * 2 + 1;
-	playdate_lua->retainObject = FUNC_TABLE_ADDRESS + 474 * 2 + 1;
-	playdate_lua->releaseObject = FUNC_TABLE_ADDRESS + 475 * 2 + 1;
-	playdate_lua->setUserValue = FUNC_TABLE_ADDRESS + 476 * 2 + 1;
-	playdate_lua->getUserValue = FUNC_TABLE_ADDRESS + 477 * 2 + 1;
-	playdate_lua->callFunction_deprecated = FUNC_TABLE_ADDRESS + 478 * 2 + 1;
-	playdate_lua->callFunction = FUNC_TABLE_ADDRESS + 479 * 2 + 1;
+	playdate_lua->addFunction = FUNC_TABLE_ADDRESS + 482 * 2 + 1;
+	playdate_lua->registerClass = FUNC_TABLE_ADDRESS + 483 * 2 + 1;
+	playdate_lua->pushFunction = FUNC_TABLE_ADDRESS + 484 * 2 + 1;
+	playdate_lua->indexMetatable = FUNC_TABLE_ADDRESS + 485 * 2 + 1;
+	playdate_lua->stop = FUNC_TABLE_ADDRESS + 486 * 2 + 1;
+	playdate_lua->start = FUNC_TABLE_ADDRESS + 487 * 2 + 1;
+	playdate_lua->getArgCount = FUNC_TABLE_ADDRESS + 488 * 2 + 1;
+	playdate_lua->getArgType = FUNC_TABLE_ADDRESS + 489 * 2 + 1;
+	playdate_lua->argIsNil = FUNC_TABLE_ADDRESS + 490 * 2 + 1;
+	playdate_lua->getArgBool = FUNC_TABLE_ADDRESS + 491 * 2 + 1;
+	playdate_lua->getArgInt = FUNC_TABLE_ADDRESS + 492 * 2 + 1;
+	playdate_lua->getArgFloat = FUNC_TABLE_ADDRESS + 493 * 2 + 1;
+	playdate_lua->getArgString = FUNC_TABLE_ADDRESS + 494 * 2 + 1;
+	playdate_lua->getArgBytes = FUNC_TABLE_ADDRESS + 495 * 2 + 1;
+	playdate_lua->getArgObject = FUNC_TABLE_ADDRESS + 496 * 2 + 1;
+	playdate_lua->getBitmap = FUNC_TABLE_ADDRESS + 497 * 2 + 1;
+	playdate_lua->getSprite = FUNC_TABLE_ADDRESS + 498 * 2 + 1;
+	playdate_lua->pushNil = FUNC_TABLE_ADDRESS + 499 * 2 + 1;
+	playdate_lua->pushBool = FUNC_TABLE_ADDRESS + 500 * 2 + 1;
+	playdate_lua->pushInt = FUNC_TABLE_ADDRESS + 501 * 2 + 1;
+	playdate_lua->pushFloat = FUNC_TABLE_ADDRESS + 502 * 2 + 1;
+	playdate_lua->pushString = FUNC_TABLE_ADDRESS + 503 * 2 + 1;
+	playdate_lua->pushBytes = FUNC_TABLE_ADDRESS + 504 * 2 + 1;
+	playdate_lua->pushBitmap = FUNC_TABLE_ADDRESS + 505 * 2 + 1;
+	playdate_lua->pushSprite = FUNC_TABLE_ADDRESS + 506 * 2 + 1;
+	playdate_lua->pushObject = FUNC_TABLE_ADDRESS + 507 * 2 + 1;
+	playdate_lua->retainObject = FUNC_TABLE_ADDRESS + 508 * 2 + 1;
+	playdate_lua->releaseObject = FUNC_TABLE_ADDRESS + 509 * 2 + 1;
+	playdate_lua->setUserValue = FUNC_TABLE_ADDRESS + 510 * 2 + 1;
+	playdate_lua->getUserValue = FUNC_TABLE_ADDRESS + 511 * 2 + 1;
+	playdate_lua->callFunction_deprecated = FUNC_TABLE_ADDRESS + 512 * 2 + 1;
+	playdate_lua->callFunction = FUNC_TABLE_ADDRESS + 513 * 2 + 1;
 	auto playdate_json = (playdate_json_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->json = API_ADDRESS + offset;
 	offset += sizeof(playdate_json_32);
-	playdate_json->initEncoder = FUNC_TABLE_ADDRESS + 480 * 2 + 1;
-	playdate_json->decode = FUNC_TABLE_ADDRESS + 481 * 2 + 1;
-	playdate_json->decodeString = FUNC_TABLE_ADDRESS + 482 * 2 + 1;
+	playdate_json->initEncoder = FUNC_TABLE_ADDRESS + 514 * 2 + 1;
+	playdate_json->decode = FUNC_TABLE_ADDRESS + 515 * 2 + 1;
+	playdate_json->decodeString = FUNC_TABLE_ADDRESS + 516 * 2 + 1;
 	auto playdate_scoreboards = (playdate_scoreboards_32 *) ((uintptr_t) api + offset);
 	PlaydateAPI->scoreboards = API_ADDRESS + offset;
 	offset += sizeof(playdate_scoreboards_32);
-	playdate_scoreboards->addScore = FUNC_TABLE_ADDRESS + 483 * 2 + 1;
-	playdate_scoreboards->getPersonalBest = FUNC_TABLE_ADDRESS + 484 * 2 + 1;
-	playdate_scoreboards->freeScore = FUNC_TABLE_ADDRESS + 485 * 2 + 1;
-	playdate_scoreboards->getScoreboards = FUNC_TABLE_ADDRESS + 486 * 2 + 1;
-	playdate_scoreboards->freeBoardsList = FUNC_TABLE_ADDRESS + 487 * 2 + 1;
-	playdate_scoreboards->getScores = FUNC_TABLE_ADDRESS + 488 * 2 + 1;
-	playdate_scoreboards->freeScoresList = FUNC_TABLE_ADDRESS + 489 * 2 + 1;
+	playdate_scoreboards->addScore = FUNC_TABLE_ADDRESS + 517 * 2 + 1;
+	playdate_scoreboards->getPersonalBest = FUNC_TABLE_ADDRESS + 518 * 2 + 1;
+	playdate_scoreboards->freeScore = FUNC_TABLE_ADDRESS + 519 * 2 + 1;
+	playdate_scoreboards->getScoreboards = FUNC_TABLE_ADDRESS + 520 * 2 + 1;
+	playdate_scoreboards->freeBoardsList = FUNC_TABLE_ADDRESS + 521 * 2 + 1;
+	playdate_scoreboards->getScores = FUNC_TABLE_ADDRESS + 522 * 2 + 1;
+	playdate_scoreboards->freeScoresList = FUNC_TABLE_ADDRESS + 523 * 2 + 1;
+	auto playdate_network = (playdate_network_32 *) ((uintptr_t) api + offset);
+	PlaydateAPI->network = API_ADDRESS + offset;
+	offset += sizeof(playdate_network_32);
+	playdate_network->getStatus = FUNC_TABLE_ADDRESS + 565 * 2 + 1;
+	playdate_network->setEnabled = FUNC_TABLE_ADDRESS + 566 * 2 + 1;
+	auto playdate_http = (playdate_http_32 *) ((uintptr_t) api + offset);
+	playdate_network->http = API_ADDRESS + offset;
+	offset += sizeof(playdate_http_32);
+	playdate_http->requestAccess = FUNC_TABLE_ADDRESS + 524 * 2 + 1;
+	playdate_http->newConnection = FUNC_TABLE_ADDRESS + 525 * 2 + 1;
+	playdate_http->retain = FUNC_TABLE_ADDRESS + 526 * 2 + 1;
+	playdate_http->release = FUNC_TABLE_ADDRESS + 527 * 2 + 1;
+	playdate_http->setConnectTimeout = FUNC_TABLE_ADDRESS + 528 * 2 + 1;
+	playdate_http->setKeepAlive = FUNC_TABLE_ADDRESS + 529 * 2 + 1;
+	playdate_http->setByteRange = FUNC_TABLE_ADDRESS + 530 * 2 + 1;
+	playdate_http->setUserdata = FUNC_TABLE_ADDRESS + 531 * 2 + 1;
+	playdate_http->getUserdata = FUNC_TABLE_ADDRESS + 532 * 2 + 1;
+	playdate_http->get = FUNC_TABLE_ADDRESS + 533 * 2 + 1;
+	playdate_http->post = FUNC_TABLE_ADDRESS + 534 * 2 + 1;
+	playdate_http->query = FUNC_TABLE_ADDRESS + 535 * 2 + 1;
+	playdate_http->getError = FUNC_TABLE_ADDRESS + 536 * 2 + 1;
+	playdate_http->getProgress = FUNC_TABLE_ADDRESS + 537 * 2 + 1;
+	playdate_http->getResponseStatus = FUNC_TABLE_ADDRESS + 538 * 2 + 1;
+	playdate_http->getBytesAvailable = FUNC_TABLE_ADDRESS + 539 * 2 + 1;
+	playdate_http->setReadTimeout = FUNC_TABLE_ADDRESS + 540 * 2 + 1;
+	playdate_http->setReadBufferSize = FUNC_TABLE_ADDRESS + 541 * 2 + 1;
+	playdate_http->read = FUNC_TABLE_ADDRESS + 542 * 2 + 1;
+	playdate_http->close = FUNC_TABLE_ADDRESS + 543 * 2 + 1;
+	playdate_http->setHeaderReceivedCallback = FUNC_TABLE_ADDRESS + 544 * 2 + 1;
+	playdate_http->setHeadersReadCallback = FUNC_TABLE_ADDRESS + 545 * 2 + 1;
+	playdate_http->setResponseCallback = FUNC_TABLE_ADDRESS + 546 * 2 + 1;
+	playdate_http->setRequestCompleteCallback = FUNC_TABLE_ADDRESS + 547 * 2 + 1;
+	playdate_http->setConnectionClosedCallback = FUNC_TABLE_ADDRESS + 548 * 2 + 1;
+	auto playdate_tcp = (playdate_tcp_32 *) ((uintptr_t) api + offset);
+	playdate_network->tcp = API_ADDRESS + offset;
+	offset += sizeof(playdate_tcp_32);
+	playdate_tcp->requestAccess = FUNC_TABLE_ADDRESS + 549 * 2 + 1;
+	playdate_tcp->newConnection = FUNC_TABLE_ADDRESS + 550 * 2 + 1;
+	playdate_tcp->retain = FUNC_TABLE_ADDRESS + 551 * 2 + 1;
+	playdate_tcp->release = FUNC_TABLE_ADDRESS + 552 * 2 + 1;
+	playdate_tcp->getError = FUNC_TABLE_ADDRESS + 553 * 2 + 1;
+	playdate_tcp->setConnectTimeout = FUNC_TABLE_ADDRESS + 554 * 2 + 1;
+	playdate_tcp->setUserdata = FUNC_TABLE_ADDRESS + 555 * 2 + 1;
+	playdate_tcp->getUserdata = FUNC_TABLE_ADDRESS + 556 * 2 + 1;
+	playdate_tcp->open = FUNC_TABLE_ADDRESS + 557 * 2 + 1;
+	playdate_tcp->close = FUNC_TABLE_ADDRESS + 558 * 2 + 1;
+	playdate_tcp->setConnectionClosedCallback = FUNC_TABLE_ADDRESS + 559 * 2 + 1;
+	playdate_tcp->setReadTimeout = FUNC_TABLE_ADDRESS + 560 * 2 + 1;
+	playdate_tcp->setReadBufferSize = FUNC_TABLE_ADDRESS + 561 * 2 + 1;
+	playdate_tcp->getBytesAvailable = FUNC_TABLE_ADDRESS + 562 * 2 + 1;
+	playdate_tcp->read = FUNC_TABLE_ADDRESS + 563 * 2 + 1;
+	playdate_tcp->write = FUNC_TABLE_ADDRESS + 564 * 2 + 1;
 	auto json_encoder = (json_encoder_32 *) ((uintptr_t) api + offset);
 	offset += sizeof(json_encoder_32);
-	json_encoder->startArray = FUNC_TABLE_ADDRESS + 490 * 2 + 1;
-	json_encoder->addArrayMember = FUNC_TABLE_ADDRESS + 491 * 2 + 1;
-	json_encoder->endArray = FUNC_TABLE_ADDRESS + 492 * 2 + 1;
-	json_encoder->startTable = FUNC_TABLE_ADDRESS + 493 * 2 + 1;
-	json_encoder->addTableMember = FUNC_TABLE_ADDRESS + 494 * 2 + 1;
-	json_encoder->endTable = FUNC_TABLE_ADDRESS + 495 * 2 + 1;
-	json_encoder->writeNull = FUNC_TABLE_ADDRESS + 496 * 2 + 1;
-	json_encoder->writeFalse = FUNC_TABLE_ADDRESS + 497 * 2 + 1;
-	json_encoder->writeTrue = FUNC_TABLE_ADDRESS + 498 * 2 + 1;
-	json_encoder->writeInt = FUNC_TABLE_ADDRESS + 499 * 2 + 1;
-	json_encoder->writeDouble = FUNC_TABLE_ADDRESS + 500 * 2 + 1;
-	json_encoder->writeString = FUNC_TABLE_ADDRESS + 501 * 2 + 1;
+	json_encoder->startArray = FUNC_TABLE_ADDRESS + 567 * 2 + 1;
+	json_encoder->addArrayMember = FUNC_TABLE_ADDRESS + 568 * 2 + 1;
+	json_encoder->endArray = FUNC_TABLE_ADDRESS + 569 * 2 + 1;
+	json_encoder->startTable = FUNC_TABLE_ADDRESS + 570 * 2 + 1;
+	json_encoder->addTableMember = FUNC_TABLE_ADDRESS + 571 * 2 + 1;
+	json_encoder->endTable = FUNC_TABLE_ADDRESS + 572 * 2 + 1;
+	json_encoder->writeNull = FUNC_TABLE_ADDRESS + 573 * 2 + 1;
+	json_encoder->writeFalse = FUNC_TABLE_ADDRESS + 574 * 2 + 1;
+	json_encoder->writeTrue = FUNC_TABLE_ADDRESS + 575 * 2 + 1;
+	json_encoder->writeInt = FUNC_TABLE_ADDRESS + 576 * 2 + 1;
+	json_encoder->writeDouble = FUNC_TABLE_ADDRESS + 577 * 2 + 1;
+	json_encoder->writeString = FUNC_TABLE_ADDRESS + 578 * 2 + 1;
 	return offset;
 }

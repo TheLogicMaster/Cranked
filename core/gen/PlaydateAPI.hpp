@@ -5,9 +5,9 @@
 #include "../PlaydateTypes.hpp"
 #include "Utils.hpp"
 
-#define PLAYDATE_SDK_VERSION "2.6.2"
+#define PLAYDATE_SDK_VERSION "2.7.5"
 
-constexpr int FUNCTION_TABLE_SIZE = 502;
+constexpr int FUNCTION_TABLE_SIZE = 579;
 
 namespace cranked {
 
@@ -33,6 +33,34 @@ struct playdate_video_32 {
 	cref_t getError;
 	cref_t getInfo;
 	cref_t getContext;
+};
+
+struct playdate_videostream_32 {
+	cref_t newPlayer;
+	cref_t freePlayer;
+	cref_t setBufferSize;
+	cref_t setFile;
+	cref_t setHTTPConnection;
+	cref_t getFilePlayer;
+	cref_t getVideoPlayer;
+	cref_t update;
+	cref_t getBufferedFrameCount;
+	cref_t getBytesRead;
+	cref_t setTCPConnection;
+};
+
+struct playdate_tilemap_32 {
+	cref_t newTilemap;
+	cref_t freeTilemap;
+	cref_t setImageTable;
+	cref_t getImageTable;
+	cref_t setSize;
+	cref_t getSize;
+	cref_t getPixelSize;
+	cref_t setTiles;
+	cref_t setTileAtPosition;
+	cref_t getTileAtPosition;
+	cref_t drawAtPoint;
 };
 
 struct playdate_graphics_32 {
@@ -100,6 +128,11 @@ struct playdate_graphics_32 {
 	cref_t getBitmapPixel;
 	cref_t getBitmapTableInfo;
 	cref_t drawTextInRect;
+	cref_t getTextHeightForMaxWidth;
+	cref_t drawRoundRect;
+	cref_t fillRoundRect;
+	cref_t tilemap;
+	cref_t videostream;
 };
 
 struct PDDateTime_32 {
@@ -157,6 +190,11 @@ struct playdate_sys_32 {
 	cref_t setSerialMessageCallback;
 	cref_t vaFormatString;
 	cref_t parseString;
+	cref_t delay;
+	cref_t getServerTime;
+	cref_t restartGame;
+	cref_t getLaunchArgs;
+	cref_t sendMirrorData;
 };
 
 struct lua_reg_32 {
@@ -394,6 +432,8 @@ struct playdate_sprite_32 {
 	cref_t setStencilImage;
 	cref_t setCenter;
 	cref_t getCenter;
+	cref_t setTilemap;
+	cref_t getTilemap;
 };
 
 struct playdate_sound_source_32 {
@@ -737,6 +777,8 @@ struct playdate_display_32 {
 	cref_t setMosaic;
 	cref_t setFlipped;
 	cref_t setOffset;
+	cref_t getRefreshRate;
+	cref_t getFPS;
 };
 
 struct PDScore_32 {
@@ -785,6 +827,62 @@ struct PlaydateAPI_32 {
 	cref_t lua;
 	cref_t json;
 	cref_t scoreboards;
+	cref_t network;
+};
+
+struct playdate_http_32 {
+	cref_t requestAccess;
+	cref_t newConnection;
+	cref_t retain;
+	cref_t release;
+	cref_t setConnectTimeout;
+	cref_t setKeepAlive;
+	cref_t setByteRange;
+	cref_t setUserdata;
+	cref_t getUserdata;
+	cref_t get;
+	cref_t post;
+	cref_t query;
+	cref_t getError;
+	cref_t getProgress;
+	cref_t getResponseStatus;
+	cref_t getBytesAvailable;
+	cref_t setReadTimeout;
+	cref_t setReadBufferSize;
+	cref_t read;
+	cref_t close;
+	cref_t setHeaderReceivedCallback;
+	cref_t setHeadersReadCallback;
+	cref_t setResponseCallback;
+	cref_t setRequestCompleteCallback;
+	cref_t setConnectionClosedCallback;
+};
+
+struct playdate_tcp_32 {
+	cref_t requestAccess;
+	cref_t newConnection;
+	cref_t retain;
+	cref_t release;
+	cref_t getError;
+	cref_t setConnectTimeout;
+	cref_t setUserdata;
+	cref_t getUserdata;
+	cref_t open;
+	cref_t close;
+	cref_t setConnectionClosedCallback;
+	cref_t setReadTimeout;
+	cref_t setReadBufferSize;
+	cref_t getBytesAvailable;
+	cref_t read;
+	cref_t write;
+};
+
+struct playdate_network_32 {
+	cref_t http;
+	cref_t tcp;
+	cref_t getStatus;
+	cref_t setEnabled;
+	uint32_t reserved;
 };
 
 
@@ -832,6 +930,11 @@ void playdate_sys_setButtonCallback(Cranked *cranked, cref_t cb, void * buttonud
 void playdate_sys_setSerialMessageCallback(Cranked *cranked, cref_t callback);
 int32_t playdate_sys_vaFormatString(Cranked *cranked, cref_t * outstr, uint8_t * fmt, ... );
 int32_t playdate_sys_parseString(Cranked *cranked, uint8_t * str, uint8_t * format, ... );
+void playdate_sys_delay(Cranked *cranked, uint32_t milliseconds);
+void playdate_sys_getServerTime(Cranked *cranked, cref_t callback);
+void playdate_sys_restartGame(Cranked *cranked, uint8_t * launchargs);
+uint8_t * playdate_sys_getLaunchArgs(Cranked *cranked, cref_t * outpath);
+uint8_t playdate_sys_sendMirrorData(Cranked *cranked, uint8_t command, void * data, int32_t len);
 uint8_t * playdate_file_geterr(Cranked *cranked);
 int32_t playdate_file_listfiles(Cranked *cranked, uint8_t * path, cref_t callback, void * userdata, int32_t showhidden);
 int32_t playdate_file_stat(Cranked *cranked, uint8_t * path, FileStat_32 * stat);
@@ -915,6 +1018,31 @@ void playdate_graphics_setPixel(Cranked *cranked, int32_t x, int32_t y, uint32_t
 int32_t playdate_graphics_getBitmapPixel(Cranked *cranked, LCDBitmap_32 * bitmap, int32_t x, int32_t y);
 void playdate_graphics_getBitmapTableInfo(Cranked *cranked, LCDBitmapTable_32 * table, int32_t * count, int32_t * width);
 void playdate_graphics_drawTextInRect(Cranked *cranked, void * text, uint32_t len, int32_t encoding, int32_t x, int32_t y, int32_t width, int32_t height, int32_t wrap, int32_t align);
+int32_t playdate_graphics_getTextHeightForMaxWidth(Cranked *cranked, LCDFont_32 * font, void * text, uint32_t len, int32_t maxwidth, int32_t encoding, int32_t wrap, int32_t tracking, int32_t extraLeading);
+void playdate_graphics_drawRoundRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, int32_t radius, int32_t lineWidth, uint32_t color);
+void playdate_graphics_fillRoundRect(Cranked *cranked, int32_t x, int32_t y, int32_t width, int32_t height, int32_t radius, uint32_t color);
+LCDTileMap_32 * playdate_tilemap_newTilemap(Cranked *cranked);
+void playdate_tilemap_freeTilemap(Cranked *cranked, LCDTileMap_32 * m);
+void playdate_tilemap_setImageTable(Cranked *cranked, LCDTileMap_32 * m, LCDBitmapTable_32 * table);
+LCDBitmapTable_32 * playdate_tilemap_getImageTable(Cranked *cranked, LCDTileMap_32 * m);
+void playdate_tilemap_setSize(Cranked *cranked, LCDTileMap_32 * m, int32_t tilesWide, int32_t tilesHigh);
+void playdate_tilemap_getSize(Cranked *cranked, LCDTileMap_32 * m, int32_t * tilesWide, int32_t * tilesHigh);
+void playdate_tilemap_getPixelSize(Cranked *cranked, LCDTileMap_32 * m, uint32_t * outWidth, uint32_t * outHeight);
+void playdate_tilemap_setTiles(Cranked *cranked, LCDTileMap_32 * m, uint16_t * indexes, int32_t count, int32_t rowwidth);
+void playdate_tilemap_setTileAtPosition(Cranked *cranked, LCDTileMap_32 * m, int32_t x, int32_t y, uint16_t idx);
+int32_t playdate_tilemap_getTileAtPosition(Cranked *cranked, LCDTileMap_32 * m, int32_t x, int32_t y);
+void playdate_tilemap_drawAtPoint(Cranked *cranked, LCDTileMap_32 * m, float x, float y);
+LCDStreamPlayer_32 * playdate_videostream_newPlayer(Cranked *cranked);
+void playdate_videostream_freePlayer(Cranked *cranked, LCDStreamPlayer_32 * p);
+void playdate_videostream_setBufferSize(Cranked *cranked, LCDStreamPlayer_32 * p, int32_t video, int32_t audio);
+void playdate_videostream_setFile(Cranked *cranked, LCDStreamPlayer_32 * p, SDFile_32 * file);
+void playdate_videostream_setHTTPConnection(Cranked *cranked, LCDStreamPlayer_32 * p, HTTPConnection_32 * conn);
+FilePlayer_32 * playdate_videostream_getFilePlayer(Cranked *cranked, LCDStreamPlayer_32 * p);
+LCDVideoPlayer_32 * playdate_videostream_getVideoPlayer(Cranked *cranked, LCDStreamPlayer_32 * p);
+uint8_t playdate_videostream_update(Cranked *cranked, LCDStreamPlayer_32 * p);
+int32_t playdate_videostream_getBufferedFrameCount(Cranked *cranked, LCDStreamPlayer_32 * p);
+uint32_t playdate_videostream_getBytesRead(Cranked *cranked, LCDStreamPlayer_32 * p);
+void playdate_videostream_setTCPConnection(Cranked *cranked, LCDStreamPlayer_32 * p, TCPConnection_32 * conn);
 void playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32_t flag);
 void playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRect);
 void playdate_sprite_drawSprites(Cranked *cranked);
@@ -978,6 +1106,8 @@ void * playdate_sprite_getUserdata(Cranked *cranked, LCDSprite_32 * sprite);
 void playdate_sprite_setStencilImage(Cranked *cranked, LCDSprite_32 * sprite, LCDBitmap_32 * stencil, int32_t tile);
 void playdate_sprite_setCenter(Cranked *cranked, LCDSprite_32 * s, float x, float y);
 void playdate_sprite_getCenter(Cranked *cranked, LCDSprite_32 * s, float * x, float * y);
+void playdate_sprite_setTilemap(Cranked *cranked, LCDSprite_32 * s, LCDTileMap_32 * tilemap);
+LCDTileMap_32 * playdate_sprite_getTilemap(Cranked *cranked, LCDSprite_32 * s);
 int32_t playdate_display_getWidth(Cranked *cranked);
 int32_t playdate_display_getHeight(Cranked *cranked);
 void playdate_display_setRefreshRate(Cranked *cranked, float rate);
@@ -986,13 +1116,15 @@ void playdate_display_setScale(Cranked *cranked, uint32_t s);
 void playdate_display_setMosaic(Cranked *cranked, uint32_t x, uint32_t y);
 void playdate_display_setFlipped(Cranked *cranked, int32_t x, int32_t y);
 void playdate_display_setOffset(Cranked *cranked, int32_t x, int32_t y);
+float playdate_display_getRefreshRate(Cranked *cranked);
+float playdate_display_getFPS(Cranked *cranked);
 SoundChannel_32 * playdate_sound_channel_newChannel(Cranked *cranked);
 void playdate_sound_channel_freeChannel(Cranked *cranked, SoundChannel_32 * channel);
 int32_t playdate_sound_channel_addSource(Cranked *cranked, SoundChannel_32 * channel, SoundSource_32 * source);
 int32_t playdate_sound_channel_removeSource(Cranked *cranked, SoundChannel_32 * channel, SoundSource_32 * source);
 SoundSource_32 * playdate_sound_channel_addCallbackSource(Cranked *cranked, SoundChannel_32 * channel, cref_t callback, void * context, int32_t stereo);
-void playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel_32 * channel, SoundEffect_32 * effect);
-void playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel_32 * channel, SoundEffect_32 * effect);
+int32_t playdate_sound_channel_addEffect(Cranked *cranked, SoundChannel_32 * channel, SoundEffect_32 * effect);
+int32_t playdate_sound_channel_removeEffect(Cranked *cranked, SoundChannel_32 * channel, SoundEffect_32 * effect);
 void playdate_sound_channel_setVolume(Cranked *cranked, SoundChannel_32 * channel, float volume);
 float playdate_sound_channel_getVolume(Cranked *cranked, SoundChannel_32 * channel);
 void playdate_sound_channel_setVolumeModulator(Cranked *cranked, SoundChannel_32 * channel, PDSynthSignalValue_32 * mod);
@@ -1278,6 +1410,49 @@ int32_t playdate_scoreboards_getScoreboards(Cranked *cranked, cref_t callback);
 void playdate_scoreboards_freeBoardsList(Cranked *cranked, PDBoardsList_32 * boardsList);
 int32_t playdate_scoreboards_getScores(Cranked *cranked, uint8_t * boardId, cref_t callback);
 void playdate_scoreboards_freeScoresList(Cranked *cranked, PDScoresList_32 * scoresList);
+int32_t playdate_http_requestAccess(Cranked *cranked, uint8_t * server, int32_t port, uint8_t usessl, uint8_t * purpose, cref_t requestCallback, void * userdata);
+HTTPConnection_32 * playdate_http_newConnection(Cranked *cranked, uint8_t * server, int32_t port, uint8_t usessl);
+HTTPConnection_32 * playdate_http_retain(Cranked *cranked, HTTPConnection_32 * http);
+void playdate_http_release(Cranked *cranked, HTTPConnection_32 * http);
+void playdate_http_setConnectTimeout(Cranked *cranked, HTTPConnection_32 * connection, int32_t ms);
+void playdate_http_setKeepAlive(Cranked *cranked, HTTPConnection_32 * connection, uint8_t keepalive);
+void playdate_http_setByteRange(Cranked *cranked, HTTPConnection_32 * connection, int32_t start, int32_t end);
+void playdate_http_setUserdata(Cranked *cranked, HTTPConnection_32 * connection, void * userdata);
+void * playdate_http_getUserdata(Cranked *cranked, HTTPConnection_32 * connection);
+int32_t playdate_http_get(Cranked *cranked, HTTPConnection_32 * conn, uint8_t * path, uint8_t * headers, uint32_t headerlen);
+int32_t playdate_http_post(Cranked *cranked, HTTPConnection_32 * conn, uint8_t * path, uint8_t * headers, uint32_t headerlen, uint8_t * body, uint32_t bodylen);
+int32_t playdate_http_query(Cranked *cranked, HTTPConnection_32 * conn, uint8_t * method, uint8_t * path, uint8_t * headers, uint32_t headerlen, uint8_t * body, uint32_t bodylen);
+int32_t playdate_http_getError(Cranked *cranked, HTTPConnection_32 * connection);
+void playdate_http_getProgress(Cranked *cranked, HTTPConnection_32 * conn, int32_t * read, int32_t * total);
+int32_t playdate_http_getResponseStatus(Cranked *cranked, HTTPConnection_32 * connection);
+uint32_t playdate_http_getBytesAvailable(Cranked *cranked, HTTPConnection_32 * conn);
+void playdate_http_setReadTimeout(Cranked *cranked, HTTPConnection_32 * conn, int32_t ms);
+void playdate_http_setReadBufferSize(Cranked *cranked, HTTPConnection_32 * conn, int32_t bytes);
+int32_t playdate_http_read(Cranked *cranked, HTTPConnection_32 * conn, void * buf, uint32_t buflen);
+void playdate_http_close(Cranked *cranked, HTTPConnection_32 * connection);
+void playdate_http_setHeaderReceivedCallback(Cranked *cranked, HTTPConnection_32 * connection, cref_t headercb);
+void playdate_http_setHeadersReadCallback(Cranked *cranked, HTTPConnection_32 * connection, cref_t callback);
+void playdate_http_setResponseCallback(Cranked *cranked, HTTPConnection_32 * connection, cref_t callback);
+void playdate_http_setRequestCompleteCallback(Cranked *cranked, HTTPConnection_32 * connection, cref_t callback);
+void playdate_http_setConnectionClosedCallback(Cranked *cranked, HTTPConnection_32 * connection, cref_t callback);
+int32_t playdate_tcp_requestAccess(Cranked *cranked, uint8_t * server, int32_t port, uint8_t usessl, uint8_t * purpose, cref_t requestCallback, void * userdata);
+TCPConnection_32 * playdate_tcp_newConnection(Cranked *cranked, uint8_t * server, int32_t port, uint8_t usessl);
+TCPConnection_32 * playdate_tcp_retain(Cranked *cranked, TCPConnection_32 * http);
+void playdate_tcp_release(Cranked *cranked, TCPConnection_32 * http);
+int32_t playdate_tcp_getError(Cranked *cranked, TCPConnection_32 * connection);
+void playdate_tcp_setConnectTimeout(Cranked *cranked, TCPConnection_32 * connection, int32_t ms);
+void playdate_tcp_setUserdata(Cranked *cranked, TCPConnection_32 * connection, void * userdata);
+void * playdate_tcp_getUserdata(Cranked *cranked, TCPConnection_32 * connection);
+int32_t playdate_tcp_open(Cranked *cranked, TCPConnection_32 * conn, cref_t cb, void * ud);
+int32_t playdate_tcp_close(Cranked *cranked, TCPConnection_32 * conn);
+void playdate_tcp_setConnectionClosedCallback(Cranked *cranked, TCPConnection_32 * conn, cref_t callback);
+void playdate_tcp_setReadTimeout(Cranked *cranked, TCPConnection_32 * conn, int32_t ms);
+void playdate_tcp_setReadBufferSize(Cranked *cranked, TCPConnection_32 * conn, int32_t bytes);
+uint32_t playdate_tcp_getBytesAvailable(Cranked *cranked, TCPConnection_32 * conn);
+int32_t playdate_tcp_read(Cranked *cranked, TCPConnection_32 * conn, void * buffer, uint32_t length);
+int32_t playdate_tcp_write(Cranked *cranked, TCPConnection_32 * conn, void * buffer, uint32_t length);
+int32_t playdate_network_getStatus(Cranked *cranked);
+void playdate_network_setEnabled(Cranked *cranked, uint8_t flag, cref_t callback);
 void json_encoder_startArray(Cranked *cranked, json_encoder_32 * encoder);
 void json_encoder_addArrayMember(Cranked *cranked, json_encoder_32 * encoder);
 void json_encoder_endArray(Cranked *cranked, json_encoder_32 * encoder);

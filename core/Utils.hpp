@@ -57,6 +57,7 @@
 #include <numbers>
 #include <algorithm>
 #include <locale>
+#include <span>
 
 namespace cranked {
 
@@ -64,10 +65,12 @@ namespace cranked {
 
     enum class ResourceType;
 
+    using namespace std::literals;
+
     using std::stoi, std::stol, std::from_chars, std::to_string, std::isalpha, std::popcount;
-    using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round;
+    using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round, std::clamp;
     using std::string, std::u16string, std::u32string, std::basic_string, std::string_view;
-    using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue, std::priority_queue;
+    using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue, std::priority_queue, std::span;
     using std::function, std::invoke;
     using std::exception, std::runtime_error, std::range_error, std::out_of_range, std::logic_error;
     using std::strong_ordering, std::less, std::greater, std::errc;
@@ -78,7 +81,7 @@ namespace cranked {
     using std::hash, std::equal_to, std::less;
     using std::char_traits, std::numeric_limits;
     using std::size_t, std::time_t;
-    using std::ostringstream, std::istringstream, std::ifstream, std::ofstream, std::getline, std::ios;
+    using std::ostringstream, std::istringstream, std::ifstream, std::ofstream, std::ostream, std::istream, std::getline, std::ios;
     using std::free, std::bad_alloc, std::aligned_alloc, std::addressof;
     using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap, std::mismatch;
     using std::unique_ptr, std::shared_ptr, std::make_shared, std::make_unique;
@@ -90,6 +93,7 @@ namespace cranked {
     namespace this_thread = std::this_thread;
     namespace numbers = std::numbers;
     namespace ranges = std::ranges;
+    namespace asio = boost::asio;
 
     typedef int64_t int64;
     typedef uint64_t uint64;

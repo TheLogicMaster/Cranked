@@ -50,6 +50,43 @@ namespace cranked {
 
     typedef PDSystemEvent SystemEvent;
 
+    enum class AccessReply : int32 {
+        Ask,
+        Deny,
+        Allow,
+    };
+
+    enum class PDNetErr : int32
+    {
+        OK = 0,
+        NoDevice = -1,
+        Busy = -2,
+        WriteError = -3,
+        WriteBusy = -4,
+        WriteTimeout = -5,
+        ReadError = -6,
+        ReadBusy = -7,
+        ReadTimeout = -8,
+        ReadOverflow = -9,
+        FrameError = -10,
+        BadResponse = -11,
+        ErrorResponse = -12,
+        ResetTimeout = -13,
+        BufferTooSmall = -14,
+        UnexpectedResponse = -15,
+        NotConnectedToAccessPoint = -16,
+        NotImplemented = -17,
+        ConnectionClosed = -18,
+    };
+
+    typedef PDNetErr NetErr;
+
+    enum class WifiStatus : int32 {
+        NotConnected,
+        Connected,
+        NotAvailable,
+    };
+
     enum class PDButtons : int32 {
         Left = 1 << 0,
         Right = 1 << 1,
@@ -270,6 +307,7 @@ namespace cranked {
         FontGlyph,
         TileMap,
         VideoPlayer,
+        StreamPlayer,
 
         // Audio
         Channel,
@@ -300,6 +338,8 @@ namespace cranked {
         MenuItem,
         NodeGraph,
         GraphNode,
+        HttpConnection,
+        TcpConnection,
     };
 
     struct PDNodeGraph_32;
@@ -310,9 +350,21 @@ namespace cranked {
     typedef PDGraphNode_32 *GraphNode;
     typedef ResourceRef<PDGraphNode_32> GraphNodeRef;
 
+    struct HTTPConnection_32;
+    typedef HTTPConnection_32 *HttpConnection;
+    typedef ResourceRef<HTTPConnection_32> HttpConnectionRef;
+
+    struct TCPConnection_32;
+    typedef TCPConnection_32 *TcpConnection;
+    typedef ResourceRef<TCPConnection_32> TcpConnectionRef;
+
     struct LCDVideoPlayer_32;
     typedef LCDVideoPlayer_32 *VideoPlayer;
     typedef ResourceRef<LCDVideoPlayer_32> VideoPlayerRef;
+
+    struct LCDStreamPlayer_32;
+    typedef LCDStreamPlayer_32 *StreamPlayer;
+    typedef ResourceRef<LCDStreamPlayer_32> StreamPlayerRef;
 
     struct LCDBitmap_32;
     typedef LCDBitmap_32 *Bitmap;

@@ -7,8 +7,6 @@
 
 namespace cranked {
 
-    namespace asio = boost::asio;
-
     class Cranked;
     class NativeEngine;
 

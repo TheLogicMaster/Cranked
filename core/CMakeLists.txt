@@ -54,6 +54,7 @@ set(cranked_sources
         LuaRuntime.cpp
         Menu.cpp
         NativeEngine.cpp
+        Networking.cpp
         PathFinding.cpp
         Rom.cpp
         Runtime.cpp

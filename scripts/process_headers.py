@@ -39,7 +39,7 @@ class CType:
         ptr = c_type.count('[')
         if ptr > 0:
             c_type = c_type.split('[', 1)[0]
-        c_type = re.sub(r'(?:(?<!\w)const\s)+', '', c_type, re.MULTILINE)
+        c_type = re.sub(r'(?:(?<!\w)const\s)+', '', c_type, flags=re.MULTILINE)
         c_type = c_type.strip()
         if match := re.match(r'\s*struct (\w+)\s*\*', c_type):
             self.emu_type = 'uint32_t'
@@ -78,6 +78,7 @@ class CType:
             'size_t': 'uint32_t',
             'uintptr_t': 'uint32_t',
             'intptr_t': 'int32_t',
+            'bool': 'uint8_t',
         }
 
         matched = re.match(r'u??int\d+_t', c_type) is not None
@@ -204,7 +205,7 @@ def main():
         with open(path) as file:
             contents = file.read()
         contents = '\n'.join([line.split('//')[0] for line in contents.splitlines()])
-        contents = re.sub(r'union\s*\{[\w\W]+?}', lambda m: m[0][:-1] + '|', contents, re.MULTILINE)
+        contents = re.sub(r'union\s*\{[\w\W]+?}', lambda m: m[0][:-1] + '|', contents, flags=re.MULTILINE)
 
         for match in re.findall(r'^\s*(?:typedef)??\s*enum\s*\{[\w\W]*?}\s*(\w+)\s*;', contents, re.MULTILINE):
             known_enums.add(match)
