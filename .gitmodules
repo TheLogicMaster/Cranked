@@ -68,3 +68,7 @@
 [submodule "core/libs/cpp-unicodelib"]
 	path = core/libs/cpp-unicodelib
 	url = https://github.com/yhirose/cpp-unicodelib
+[submodule "desktop/libs/SDL"]
+	path = desktop/libs/SDL
+	url = https://github.com/libsdl-org/SDL/
+	branch = release-2.32.x

@@ -1,4 +1,4 @@
-* text=auto
+* text=auto eol=lf
 
 *.cpp text
 *.hpp text
