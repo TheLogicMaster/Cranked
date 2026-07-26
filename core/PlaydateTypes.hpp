@@ -87,6 +87,12 @@ namespace cranked {
         NotAvailable,
     };
 
+    enum class PowerStatus : int32 {
+        Charging = 1 << 0,
+        Usb = 1 << 1,
+        Screws = 1 << 2,
+    };
+
     enum class PDButtons : int32 {
         Left = 1 << 0,
         Right = 1 << 1,

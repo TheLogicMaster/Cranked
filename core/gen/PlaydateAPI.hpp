@@ -5,9 +5,9 @@
 #include "../PlaydateTypes.hpp"
 #include "Utils.hpp"
 
-#define PLAYDATE_SDK_VERSION "2.7.5"
+#define PLAYDATE_SDK_VERSION "3.1.1"
 
-constexpr int FUNCTION_TABLE_SIZE = 579;
+constexpr int FUNCTION_TABLE_SIZE = 602;
 
 namespace cranked {
 
@@ -122,7 +122,7 @@ struct playdate_graphics_32 {
 	cref_t setBitmapMask;
 	cref_t getBitmapMask;
 	cref_t setStencilImage;
-	cref_t makeFontFromData;
+	cref_t makeFontFromData_deprecated;
 	cref_t getTextTracking;
 	cref_t setPixel;
 	cref_t getBitmapPixel;
@@ -133,6 +133,8 @@ struct playdate_graphics_32 {
 	cref_t fillRoundRect;
 	cref_t tilemap;
 	cref_t videostream;
+	cref_t getFontGlyph;
+	cref_t makeFontFromData;
 };
 
 struct PDDateTime_32 {
@@ -143,6 +145,12 @@ struct PDDateTime_32 {
 	uint8_t hour;
 	uint8_t minute;
 	uint8_t second;
+};
+
+struct PDInfo_32 {
+	uint32_t osversion;
+	int32_t language;
+	uint32_t pdxversion;
 };
 
 struct playdate_sys_32 {
@@ -195,6 +203,11 @@ struct playdate_sys_32 {
 	cref_t restartGame;
 	cref_t getLaunchArgs;
 	cref_t sendMirrorData;
+	cref_t getSystemInfo;
+	cref_t getLocalizedText;
+	cref_t getVolume;
+	cref_t getPowerStatus;
+	cref_t exitToLauncher;
 };
 
 struct lua_reg_32 {
@@ -434,6 +447,7 @@ struct playdate_sprite_32 {
 	cref_t getCenter;
 	cref_t setTilemap;
 	cref_t getTilemap;
+	cref_t markDirtyRect;
 };
 
 struct playdate_sound_source_32 {
@@ -466,6 +480,8 @@ struct playdate_sound_fileplayer_32 {
 	cref_t setStopOnUnderrun;
 	cref_t fadeVolume;
 	cref_t setMP3StreamSource;
+	cref_t setRateModulator;
+	cref_t getRateModulator;
 };
 
 struct playdate_sound_sample_32 {
@@ -497,6 +513,8 @@ struct playdate_sound_sampleplayer_32 {
 	cref_t getOffset;
 	cref_t getRate;
 	cref_t setPaused;
+	cref_t setRateModulator;
+	cref_t getRateModulator;
 };
 
 struct playdate_sound_signal_32 {
@@ -523,6 +541,7 @@ struct playdate_sound_lfo_32 {
 	cref_t getValue;
 	cref_t setGlobal;
 	cref_t setStartPhase;
+	cref_t setRandomSeed;
 };
 
 struct playdate_sound_envelope_32 {
@@ -671,6 +690,13 @@ struct playdate_sound_effect_bitcrusher_32 {
 	cref_t setUndersampling;
 	cref_t setUndersampleModulator;
 	cref_t getUndersampleModulator;
+	cref_t setExponential;
+	cref_t setDepth;
+	cref_t setDepthModulator;
+	cref_t getDepthModulator;
+	cref_t setDownsampling;
+	cref_t setDownsamplingModulator;
+	cref_t getDownsamplingModulator;
 };
 
 struct playdate_sound_effect_ringmodulator_32 {
@@ -739,6 +765,7 @@ struct playdate_sound_channel_32 {
 	cref_t getPanModulator;
 	cref_t getDryLevelSignal;
 	cref_t getWetLevelSignal;
+	cref_t getOutputAsSource;
 };
 
 struct playdate_sound_32 {
@@ -766,6 +793,7 @@ struct playdate_sound_32 {
 	cref_t removeSource;
 	cref_t signal;
 	cref_t getError;
+	cref_t requestMicAccess;
 };
 
 struct playdate_display_32 {
@@ -782,6 +810,13 @@ struct playdate_display_32 {
 };
 
 struct PDScore_32 {
+	uint32_t rank;
+	uint32_t value;
+	cref_t player;
+	cref_t boardID;
+};
+
+struct PDListScore_32 {
 	uint32_t rank;
 	uint32_t value;
 	cref_t player;
@@ -875,6 +910,7 @@ struct playdate_tcp_32 {
 	cref_t getBytesAvailable;
 	cref_t read;
 	cref_t write;
+	cref_t getSentBytesPending;
 };
 
 struct playdate_network_32 {
@@ -935,6 +971,11 @@ void playdate_sys_getServerTime(Cranked *cranked, cref_t callback);
 void playdate_sys_restartGame(Cranked *cranked, uint8_t * launchargs);
 uint8_t * playdate_sys_getLaunchArgs(Cranked *cranked, cref_t * outpath);
 uint8_t playdate_sys_sendMirrorData(Cranked *cranked, uint8_t command, void * data, int32_t len);
+PDInfo_32 * playdate_sys_getSystemInfo(Cranked *cranked);
+uint8_t * playdate_sys_getLocalizedText(Cranked *cranked, uint8_t * key, int32_t language);
+float playdate_sys_getVolume(Cranked *cranked);
+int32_t playdate_sys_getPowerStatus(Cranked *cranked);
+void playdate_sys_exitToLauncher(Cranked *cranked);
 uint8_t * playdate_file_geterr(Cranked *cranked);
 int32_t playdate_file_listfiles(Cranked *cranked, uint8_t * path, cref_t callback, void * userdata, int32_t showhidden);
 int32_t playdate_file_stat(Cranked *cranked, uint8_t * path, FileStat_32 * stat);
@@ -1012,7 +1053,7 @@ void playdate_graphics_setTextLeading(Cranked *cranked, int32_t lineHeightAdustm
 int32_t playdate_graphics_setBitmapMask(Cranked *cranked, LCDBitmap_32 * bitmap, LCDBitmap_32 * mask);
 LCDBitmap_32 * playdate_graphics_getBitmapMask(Cranked *cranked, LCDBitmap_32 * bitmap);
 void playdate_graphics_setStencilImage(Cranked *cranked, LCDBitmap_32 * stencil, int32_t tile);
-LCDFont_32 * playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 * data, int32_t wide);
+LCDFont_32 * playdate_graphics_makeFontFromData_deprecated(Cranked *cranked, LCDFontData_32 * data, int32_t wide);
 int32_t playdate_graphics_getTextTracking(Cranked *cranked);
 void playdate_graphics_setPixel(Cranked *cranked, int32_t x, int32_t y, uint32_t c);
 int32_t playdate_graphics_getBitmapPixel(Cranked *cranked, LCDBitmap_32 * bitmap, int32_t x, int32_t y);
@@ -1043,6 +1084,8 @@ uint8_t playdate_videostream_update(Cranked *cranked, LCDStreamPlayer_32 * p);
 int32_t playdate_videostream_getBufferedFrameCount(Cranked *cranked, LCDStreamPlayer_32 * p);
 uint32_t playdate_videostream_getBytesRead(Cranked *cranked, LCDStreamPlayer_32 * p);
 void playdate_videostream_setTCPConnection(Cranked *cranked, LCDStreamPlayer_32 * p, TCPConnection_32 * conn);
+LCDFontGlyph_32 * playdate_graphics_getFontGlyph(Cranked *cranked, LCDFont_32 * font, uint32_t c, cref_t * bitmap, int32_t * advance);
+LCDFont_32 * playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 * data, int32_t wide, int32_t datalength);
 void playdate_sprite_setAlwaysRedraw(Cranked *cranked, int32_t flag);
 void playdate_sprite_addDirtyRect(Cranked *cranked, LCDRect_32 dirtyRect);
 void playdate_sprite_drawSprites(Cranked *cranked);
@@ -1108,6 +1151,7 @@ void playdate_sprite_setCenter(Cranked *cranked, LCDSprite_32 * s, float x, floa
 void playdate_sprite_getCenter(Cranked *cranked, LCDSprite_32 * s, float * x, float * y);
 void playdate_sprite_setTilemap(Cranked *cranked, LCDSprite_32 * s, LCDTileMap_32 * tilemap);
 LCDTileMap_32 * playdate_sprite_getTilemap(Cranked *cranked, LCDSprite_32 * s);
+void playdate_sprite_markDirtyRect(Cranked *cranked, LCDSprite_32 * s, PDRect_32 rect);
 int32_t playdate_display_getWidth(Cranked *cranked);
 int32_t playdate_display_getHeight(Cranked *cranked);
 void playdate_display_setRefreshRate(Cranked *cranked, float rate);
@@ -1134,6 +1178,7 @@ void playdate_sound_channel_setPanModulator(Cranked *cranked, SoundChannel_32 * 
 PDSynthSignalValue_32 * playdate_sound_channel_getPanModulator(Cranked *cranked, SoundChannel_32 * channel);
 PDSynthSignalValue_32 * playdate_sound_channel_getDryLevelSignal(Cranked *cranked, SoundChannel_32 * channel);
 PDSynthSignalValue_32 * playdate_sound_channel_getWetLevelSignal(Cranked *cranked, SoundChannel_32 * channel);
+SoundSource_32 * playdate_sound_channel_getOutputAsSource(Cranked *cranked, SoundChannel_32 * channel);
 FilePlayer_32 * playdate_sound_fileplayer_newPlayer(Cranked *cranked);
 void playdate_sound_fileplayer_freePlayer(Cranked *cranked, FilePlayer_32 * player);
 int32_t playdate_sound_fileplayer_loadIntoPlayer(Cranked *cranked, FilePlayer_32 * player, uint8_t * path);
@@ -1156,6 +1201,8 @@ float playdate_sound_fileplayer_getRate(Cranked *cranked, FilePlayer_32 * player
 void playdate_sound_fileplayer_setStopOnUnderrun(Cranked *cranked, FilePlayer_32 * player, int32_t flag);
 void playdate_sound_fileplayer_fadeVolume(Cranked *cranked, FilePlayer_32 * player, float left, float right, int32_t len, cref_t finishCallback, void * userdata);
 void playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, FilePlayer_32 * player, cref_t dataSource, void * userdata, float bufferLen);
+void playdate_sound_fileplayer_setRateModulator(Cranked *cranked, FilePlayer_32 * player, PDSynthSignalValue_32 * mod);
+PDSynthSignalValue_32 * playdate_sound_fileplayer_getRateModulator(Cranked *cranked, FilePlayer_32 * player);
 AudioSample_32 * playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32_t byteCount);
 int32_t playdate_sound_sample_loadIntoSample(Cranked *cranked, AudioSample_32 * sample, uint8_t * path);
 AudioSample_32 * playdate_sound_sample_load(Cranked *cranked, uint8_t * path);
@@ -1181,6 +1228,8 @@ void playdate_sound_sampleplayer_setLoopCallback(Cranked *cranked, SamplePlayer_
 float playdate_sound_sampleplayer_getOffset(Cranked *cranked, SamplePlayer_32 * player);
 float playdate_sound_sampleplayer_getRate(Cranked *cranked, SamplePlayer_32 * player);
 void playdate_sound_sampleplayer_setPaused(Cranked *cranked, SamplePlayer_32 * player, int32_t flag);
+void playdate_sound_sampleplayer_setRateModulator(Cranked *cranked, SamplePlayer_32 * player, PDSynthSignalValue_32 * mod);
+PDSynthSignalValue_32 * playdate_sound_sampleplayer_getRateModulator(Cranked *cranked, SamplePlayer_32 * player);
 PDSynth_32 * playdate_sound_synth_newSynth(Cranked *cranked);
 void playdate_sound_synth_freeSynth(Cranked *cranked, PDSynth_32 * synth);
 void playdate_sound_synth_setWaveform(Cranked *cranked, PDSynth_32 * synth, int32_t wave);
@@ -1262,6 +1311,13 @@ PDSynthSignalValue_32 * playdate_sound_effect_bitcrusher_getAmountModulator(Cran
 void playdate_sound_effect_bitcrusher_setUndersampling(Cranked *cranked, BitCrusher_32 * filter, float undersampling);
 void playdate_sound_effect_bitcrusher_setUndersampleModulator(Cranked *cranked, BitCrusher_32 * filter, PDSynthSignalValue_32 * signal);
 PDSynthSignalValue_32 * playdate_sound_effect_bitcrusher_getUndersampleModulator(Cranked *cranked, BitCrusher_32 * filter);
+void playdate_sound_effect_bitcrusher_setExponential(Cranked *cranked, BitCrusher_32 * filter, uint8_t flag);
+void playdate_sound_effect_bitcrusher_setDepth(Cranked *cranked, BitCrusher_32 * filter, float amount);
+void playdate_sound_effect_bitcrusher_setDepthModulator(Cranked *cranked, BitCrusher_32 * filter, PDSynthSignalValue_32 * signal);
+PDSynthSignalValue_32 * playdate_sound_effect_bitcrusher_getDepthModulator(Cranked *cranked, BitCrusher_32 * filter);
+void playdate_sound_effect_bitcrusher_setDownsampling(Cranked *cranked, BitCrusher_32 * filter, float undersampling);
+void playdate_sound_effect_bitcrusher_setDownsamplingModulator(Cranked *cranked, BitCrusher_32 * filter, PDSynthSignalValue_32 * signal);
+PDSynthSignalValue_32 * playdate_sound_effect_bitcrusher_getDownsamplingModulator(Cranked *cranked, BitCrusher_32 * filter);
 RingModulator_32 * playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked);
 void playdate_sound_effect_ringmodulator_freeRingmod(Cranked *cranked, RingModulator_32 * filter);
 void playdate_sound_effect_ringmodulator_setFrequency(Cranked *cranked, RingModulator_32 * filter, float frequency);
@@ -1300,6 +1356,7 @@ void playdate_sound_lfo_setRetrigger(Cranked *cranked, PDSynthLFO_32 * lfo, int3
 float playdate_sound_lfo_getValue(Cranked *cranked, PDSynthLFO_32 * lfo);
 void playdate_sound_lfo_setGlobal(Cranked *cranked, PDSynthLFO_32 * lfo, int32_t global);
 void playdate_sound_lfo_setStartPhase(Cranked *cranked, PDSynthLFO_32 * lfo, float phase);
+void playdate_sound_lfo_setRandomSeed(Cranked *cranked, PDSynthLFO_32 * lfo, uint16_t value);
 PDSynthEnvelope_32 * playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release);
 void playdate_sound_envelope_freeEnvelope(Cranked *cranked, PDSynthEnvelope_32 * env);
 void playdate_sound_envelope_setAttack(Cranked *cranked, PDSynthEnvelope_32 * env, float attack);
@@ -1368,6 +1425,7 @@ void playdate_sound_signal_setValueScale(Cranked *cranked, PDSynthSignal_32 * si
 void playdate_sound_signal_setValueOffset(Cranked *cranked, PDSynthSignal_32 * signal, float offset);
 PDSynthSignal_32 * playdate_sound_signal_newSignalForValue(Cranked *cranked, PDSynthSignalValue_32 * value);
 uint8_t * playdate_sound_getError(Cranked *cranked);
+int32_t playdate_sound_requestMicAccess(Cranked *cranked, uint8_t * purpose, cref_t requestCallback, void * userdata);
 int32_t playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8_t * name, cref_t * outErr);
 int32_t playdate_lua_registerClass(Cranked *cranked, uint8_t * name, lua_reg_32 * reg, lua_val_32 * vals, int32_t isstatic, cref_t * outErr);
 void playdate_lua_pushFunction(Cranked *cranked, cref_t f);
@@ -1451,6 +1509,7 @@ void playdate_tcp_setReadBufferSize(Cranked *cranked, TCPConnection_32 * conn, i
 uint32_t playdate_tcp_getBytesAvailable(Cranked *cranked, TCPConnection_32 * conn);
 int32_t playdate_tcp_read(Cranked *cranked, TCPConnection_32 * conn, void * buffer, uint32_t length);
 int32_t playdate_tcp_write(Cranked *cranked, TCPConnection_32 * conn, void * buffer, uint32_t length);
+uint32_t playdate_tcp_getSentBytesPending(Cranked *cranked, TCPConnection_32 * conn);
 int32_t playdate_network_getStatus(Cranked *cranked);
 void playdate_network_setEnabled(Cranked *cranked, uint8_t flag, cref_t callback);
 void json_encoder_startArray(Cranked *cranked, json_encoder_32 * encoder);

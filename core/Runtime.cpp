@@ -367,7 +367,7 @@ void cranked::playdate_graphics_setStencilImage(Cranked *cranked, Bitmap stencil
     ctx.stencilTiled = tile;
 }
 
-Font cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 *data, int32 wide) {
+Font cranked::playdate_graphics_makeFontFromData_deprecated(Cranked *cranked, LCDFontData_32 *data, int32 wide) {
     return cranked->graphics.getFont((uint8 *) data, wide);
 }
 
@@ -498,7 +498,7 @@ VideoPlayer cranked::playdate_videostream_getVideoPlayer(Cranked *cranked, Strea
     return nullptr; // Todo
 }
 
-uint8_t cranked::playdate_videostream_update(Cranked *cranked, StreamPlayer player) {
+uint8 cranked::playdate_videostream_update(Cranked *cranked, StreamPlayer player) {
     return 0; // Todo
 }
 
@@ -512,6 +512,14 @@ uint32_t cranked::playdate_videostream_getBytesRead(Cranked *cranked, StreamPlay
 
 void cranked::playdate_videostream_setTCPConnection(Cranked *cranked, StreamPlayer player, TcpConnection conn) {
     // Todo
+}
+
+LCDFontGlyph_32 *cranked::playdate_graphics_getFontGlyph(Cranked *cranked, LCDFont_32 *font, uint32 c, cref_t *bitmap, int32 *advance) {
+    return nullptr; // Todo
+}
+
+LCDFont_32 *cranked::playdate_graphics_makeFontFromData(Cranked *cranked, LCDFontData_32 *data, int32 wide, int32 datalength) {
+    return nullptr; // Todo
 }
 
 void *cranked::playdate_sys_realloc(Cranked *cranked, void *ptr, uint32 size) {
@@ -1087,16 +1095,36 @@ void cranked::playdate_sys_getServerTime(Cranked *cranked, cref_t callback) {
     // Todo
 }
 
-void cranked::playdate_sys_restartGame(Cranked *cranked, uint8_t *launchargs) {
+void cranked::playdate_sys_restartGame(Cranked *cranked, uint8 *launchargs) {
     // Todo
 }
 
-uint8_t *cranked::playdate_sys_getLaunchArgs(Cranked *cranked, cref_t *outpath) {
+uint8 *cranked::playdate_sys_getLaunchArgs(Cranked *cranked, cref_t *outpath) {
     return nullptr; // Todo
 }
 
-uint8_t cranked::playdate_sys_sendMirrorData(Cranked *cranked, uint8_t command, void *data, int32 len) {
+uint8 cranked::playdate_sys_sendMirrorData(Cranked *cranked, uint8 command, void *data, int32 len) {
     return 0; // Todo
+}
+
+PDInfo_32 *cranked::playdate_sys_getSystemInfo(Cranked *cranked) {
+    return nullptr; // Todo
+}
+
+uint8 *cranked::playdate_sys_getLocalizedText(Cranked *cranked, uint8 *key, int32 language) {
+    return nullptr; // Todo
+}
+
+float cranked::playdate_sys_getVolume(Cranked *cranked) {
+    return 1.0f; // Todo
+}
+
+int32 cranked::playdate_sys_getPowerStatus(Cranked *cranked) {
+    return (int32)PowerStatus{}; // Todo
+}
+
+void cranked::playdate_sys_exitToLauncher(Cranked *cranked) {
+    // Todo
 }
 
 int32 cranked::playdate_lua_addFunction(Cranked *cranked, cref_t f, uint8 *name, cref_t *outErr) {
@@ -2094,6 +2122,10 @@ TileMap cranked::playdate_sprite_getTilemap(Cranked *cranked, Sprite s) {
     return s->tileMap;
 }
 
+void cranked::playdate_sprite_markDirtyRect(Cranked *cranked, LCDSprite_32 *s, PDRect_32 rect) {
+    // Todo
+}
+
 void cranked::playdate_sound_source_setVolume(Cranked *cranked, SoundSource sourceDerived, float lvol, float rvol) {
     auto source = cranked->audio.sourceFromDerived(sourceDerived);
     source->leftVolume = lvol;
@@ -2214,6 +2246,14 @@ void cranked::playdate_sound_fileplayer_fadeVolume(Cranked *cranked, FilePlayer 
 
 void cranked::playdate_sound_fileplayer_setMP3StreamSource(Cranked *cranked, FilePlayer player, cref_t dataSource, void *userdata, float bufferLen) {
     // Todo
+}
+
+void cranked::playdate_sound_fileplayer_setRateModulator(Cranked *cranked, FilePlayer_32 *player, PDSynthSignalValue_32 *mod) {
+    player->rateModulator = mod;
+}
+
+PDSynthSignalValue_32 *cranked::playdate_sound_fileplayer_getRateModulator(Cranked *cranked, FilePlayer_32 *player) {
+    return player->rateModulator;
 }
 
 AudioSample cranked::playdate_sound_sample_newSampleBuffer(Cranked *cranked, int32 byteCount) {
@@ -2337,6 +2377,14 @@ void cranked::playdate_sound_sampleplayer_setPaused(Cranked *cranked, SamplePlay
     player->paused = flag;
 }
 
+void cranked::playdate_sound_sampleplayer_setRateModulator(Cranked *cranked, SamplePlayer_32 *player, PDSynthSignalValue_32 *mod) {
+    player->rateModulator = mod;
+}
+
+PDSynthSignalValue_32 *cranked::playdate_sound_sampleplayer_getRateModulator(Cranked *cranked, SamplePlayer_32 *player) {
+    return player->rateModulator;
+}
+
 SynthSignal cranked::playdate_sound_signal_newSignal(Cranked *cranked, cref_t step, cref_t noteOn, cref_t noteOff, cref_t dealloc, void *userdata) {
     return cranked->nativeEngine.createReferencedResource<CustomSoundSignal>(step, noteOn, noteOff, dealloc, userdata);
 }
@@ -2367,6 +2415,10 @@ PDSynthSignal_32 *cranked::playdate_sound_signal_newSignalForValue(Cranked *cran
 
 uint8 *cranked::playdate_sound_getError(Cranked *cranked) {
     return cranked->fromVirtualAddress<uint8>(cranked->audio.lastError);
+}
+
+int32 cranked::playdate_sound_requestMicAccess(Cranked *cranked, uint8 *purpose, cref_t requestCallback, void *userdata) {
+    return (int)AccessReply::Allow; // Todo
 }
 
 SynthLFO cranked::playdate_sound_lfo_newLFO(Cranked *cranked, int32 type) {
@@ -2431,6 +2483,10 @@ void cranked::playdate_sound_lfo_setGlobal(Cranked *cranked, SynthLFO lfo, int32
 
 void cranked::playdate_sound_lfo_setStartPhase(Cranked *cranked, SynthLFO  lfo, float phase) {
     lfo->phase = phase;
+}
+
+void cranked::playdate_sound_lfo_setRandomSeed(Cranked *cranked, PDSynthLFO_32 *lfo, uint16 value) {
+    // Todo
 }
 
 SynthEnvelope cranked::playdate_sound_envelope_newEnvelope(Cranked *cranked, float attack, float decay, float sustain, float release) {
@@ -2968,6 +3024,34 @@ SynthSignalValue cranked::playdate_sound_effect_bitcrusher_getUndersampleModulat
     return filter->undersamplingModulator;
 }
 
+void cranked::playdate_sound_effect_bitcrusher_setExponential(Cranked *cranked, BitCrusher_32 *filter, uint8_t flag) {
+    // Todo
+}
+
+void cranked::playdate_sound_effect_bitcrusher_setDepth(Cranked *cranked, BitCrusher_32 *filter, float amount) {
+    // Todo
+}
+
+void cranked::playdate_sound_effect_bitcrusher_setDepthModulator(Cranked *cranked, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
+    // Todo
+}
+
+PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getDepthModulator(Cranked *cranked, BitCrusher_32 *filter) {
+    return nullptr; // Todo
+}
+
+void cranked::playdate_sound_effect_bitcrusher_setDownsampling(Cranked *cranked, BitCrusher_32 *filter, float undersampling) {
+    // Todo
+}
+
+void cranked::playdate_sound_effect_bitcrusher_setDownsamplingModulator(Cranked *cranked, BitCrusher_32 *filter, PDSynthSignalValue_32 *signal) {
+    // Todo
+}
+
+PDSynthSignalValue_32 *cranked::playdate_sound_effect_bitcrusher_getDownsamplingModulator(Cranked *cranked, BitCrusher_32 *filter) {
+    return nullptr; // Todo
+}
+
 RingModulator cranked::playdate_sound_effect_ringmodulator_newRingmod(Cranked *cranked) {
     return cranked->nativeEngine.createReferencedResource<RingModulator>();
 }
@@ -3166,6 +3250,10 @@ SynthSignalValue cranked::playdate_sound_channel_getWetLevelSignal(Cranked *cran
     return channel->wetSignal;
 }
 
+SoundSource_32 *cranked::playdate_sound_channel_getOutputAsSource(Cranked *cranked, SoundChannel_32 *channel) {
+    return nullptr; // Todo
+}
+
 uint32 cranked::playdate_sound_getCurrentTime(Cranked *cranked) {
     return cranked->audio.sampleTime;
 }
@@ -3299,13 +3387,13 @@ void cranked::playdate_scoreboards_freeScoresList(Cranked *cranked, PDScoresList
     // Todo
 }
 
-int32_t cranked::playdate_http_requestAccess(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl, uint8_t *purpose, cref_t requestCallback, void *userdata) {
+int32 cranked::playdate_http_requestAccess(Cranked *cranked, uint8 *server, int32 port, uint8 useSsl, uint8 *purpose, cref_t requestCallback, void *userdata) {
     if (requestCallback)
-        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8_t)true, userdata);
+        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8)true, userdata);
     return (int)AccessReply::Ask; // Todo: Safe to call immediately? Return value?
 }
 
-HttpConnection cranked::playdate_http_newConnection(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl) {
+HttpConnection cranked::playdate_http_newConnection(Cranked *cranked, uint8 *server, int32 port, uint8 useSsl) {
     auto conn = cranked->heap.construct<HTTPConnection_32>(*cranked);
     conn->server = (char *)server;
     conn->port = port > 0 ? port : useSsl ? 443 : 80;
@@ -3326,7 +3414,7 @@ void cranked::playdate_http_setConnectTimeout(Cranked *cranked, HttpConnection c
     conn->connectTimeout = ms;
 }
 
-void cranked::playdate_http_setKeepAlive(Cranked *cranked, HttpConnection conn, uint8_t keepAlive) {
+void cranked::playdate_http_setKeepAlive(Cranked *cranked, HttpConnection conn, uint8 keepAlive) {
     conn->keepAlive = keepAlive;
 }
 
@@ -3343,15 +3431,15 @@ void *cranked::playdate_http_getUserdata(Cranked *cranked, HttpConnection conn) 
     return conn->userdata;
 }
 
-int32 cranked::playdate_http_get(Cranked *cranked, HttpConnection conn, uint8_t *path, uint8_t *headers, uint32 headerLen) {
+int32 cranked::playdate_http_get(Cranked *cranked, HttpConnection conn, uint8 *path, uint8 *headers, uint32 headerLen) {
     return (int)conn->sendRequest("GET", (char *)path, { (char *)headers, headerLen }, {});
 }
 
-int32 cranked::playdate_http_post(Cranked *cranked, HttpConnection conn, uint8_t *path, uint8_t *headers, uint32 headerLen, uint8_t *body, uint32 bodyLen) {
+int32 cranked::playdate_http_post(Cranked *cranked, HttpConnection conn, uint8 *path, uint8 *headers, uint32 headerLen, uint8 *body, uint32 bodyLen) {
     return (int)conn->sendRequest("POST", (char *)path, { (char *)headers, headerLen }, { (char *)body, bodyLen });
 }
 
-int32 cranked::playdate_http_query(Cranked *cranked, HttpConnection conn, uint8_t *method, uint8_t *path, uint8_t *headers, uint32 headerLen, uint8_t *body, uint32 bodyLen) {
+int32 cranked::playdate_http_query(Cranked *cranked, HttpConnection conn, uint8 *method, uint8 *path, uint8 *headers, uint32 headerLen, uint8 *body, uint32 bodyLen) {
     return (int)conn->sendRequest((char *)method, (char *)path, { (char *)headers, headerLen }, { (char *)body, bodyLen });
 }
 
@@ -3410,13 +3498,13 @@ void cranked::playdate_http_setConnectionClosedCallback(Cranked *cranked, HttpCo
     conn->closedCallback = callback;
 }
 
-int32 cranked::playdate_tcp_requestAccess(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl, uint8_t *purpose, cref_t requestCallback, void *userdata) {
+int32 cranked::playdate_tcp_requestAccess(Cranked *cranked, uint8 *server, int32 port, uint8 useSsl, uint8 *purpose, cref_t requestCallback, void *userdata) {
     if (requestCallback)
-        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8_t)true, userdata);
+        cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::uint8_t, ArgType::ptr_t>(requestCallback, (uint8)true, userdata);
     return (int)AccessReply::Ask; // Todo: Safe to call immediately? Return value?
 }
 
-TcpConnection cranked::playdate_tcp_newConnection(Cranked *cranked, uint8_t *server, int32 port, uint8_t useSsl) {
+TcpConnection cranked::playdate_tcp_newConnection(Cranked *cranked, uint8 *server, int32 port, uint8 useSsl) {
     auto conn = cranked->heap.construct<TCPConnection_32>(*cranked);
     conn->server = (char *)server;
     conn->port = port > 0 ? port : useSsl ? 443 : 80;
@@ -3487,11 +3575,15 @@ int32 cranked::playdate_tcp_write(Cranked *cranked, TcpConnection conn, void *bu
     return (int32)conn->send({ (const uint8 *)buffer, length });
 }
 
+uint32_t cranked::playdate_tcp_getSentBytesPending(Cranked *cranked, TCPConnection_32 *conn) {
+    return 0; // Todo
+}
+
 int32 cranked::playdate_network_getStatus(Cranked *cranked) {
     return (int)WifiStatus::Connected; // Todo
 }
 
-void cranked::playdate_network_setEnabled(Cranked *cranked, uint8_t flag, cref_t callback) {
+void cranked::playdate_network_setEnabled(Cranked *cranked, uint8 flag, cref_t callback) {
     // Todo
 }
 
