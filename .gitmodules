@@ -55,10 +55,6 @@
 	path = desktop/libs/cxxopts
 	url = https://github.com/jarro2783/cxxopts
 	update = merge
-[submodule "core/libs/asio"]
-	path = core/libs/asio
-	url = https://github.com/boostorg/asio
-	update = merge
 [submodule "core/libs/tracy"]
 	path = core/libs/tracy
 	url = https://github.com/wolfpld/tracy
@@ -72,3 +68,6 @@
 	path = desktop/libs/SDL
 	url = https://github.com/libsdl-org/SDL/
 	branch = release-2.32.x
+[submodule "core/libs/asio"]
+	path = core/libs/asio
+	url = https://github.com/OlivierLDff/asio.cmake

@@ -9,7 +9,7 @@ Recursively clone the repo with: `git clone --recursive https://github.com/TheLo
 Conan must be installed. See the [official instructions](https://docs.conan.io/2/installation.html).
 A Conan profile must exist (Create a default one with: `conan profile detect --force`).
 Originally libraries would be built as Git submodules, but they were a pain to maintain. Externally installed
-or git submodules may still work on Unix for convenience, though. 
+or git submodules may still work on Unix for convenience, though.
 
 ## Windows
 To build in Release mode with Visual Studio 2022 (Must be installed), run the following in PowerShell from the project directory:
@@ -21,10 +21,26 @@ cmake --build . --config Release
 ```
 
 ## Linux
+
+### With Conan
 See the [Windows](#Windows) section and replace the generator `-G <name>` argument with the desired CMake generator or
 simply remove it to use the default. Building without Conan may still work, but won't necessarily be up to date or build.
+Potential steps on Ubuntu/Debian from project directory:
+```shell
+sudo apt install pipx
+pipx ensurepath
+pipx install conan
+conan profile detect --force
+CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install . --output-folder=build --build=missing -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=true
+cmake .. -DCMAKE_TOOLCHAIN_FILE="conan_toolchain.cmake"
+cmake --build .
+```
+
+## Updating Playdate SDK Headers
+Run the `process_headers` python script with the `PLAYDATE_SDK_PATH` environment variable set to the current
+[Playdate SDK](https://play.date/dev/) install.
 
 ## Linking
 The project currently builds using shared libraries for external dependencies due to a symbol conflict between *Unicorn*
-and *zlib* (*crc32*), but it should be possible to statically link all libraries eventually (Required for homebrew 
+and *zlib* (*crc32*), but it should be possible to statically link all libraries eventually (Required for homebrew
 platforms and such, anyway).

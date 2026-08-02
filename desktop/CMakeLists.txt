@@ -6,8 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(SDL2)
-find_package(cxxopts)
+find_package(SDL2 QUIET)
+find_package(cxxopts QUIET)
 
 if (NOT TARGET SDL2::SDL2)
     add_subdirectory(libs/SDL)

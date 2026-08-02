@@ -13,11 +13,16 @@
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
-#include "libzippp/libzippp.h"
 #include "zlib.h"
 #include "tracy/Tracy.hpp"
 #include "tracy/TracyLua.hpp"
 #include "magic_enum/magic_enum.hpp"
+
+#ifdef LIBZIPPP_SUBMODULE
+#include "libzippp.h"
+#else
+#include "libzippp/libzippp.h"
+#endif
 
 #ifdef USE_CAPSTONE
 #include "capstone/platform.h"

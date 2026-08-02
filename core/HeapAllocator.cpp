@@ -37,7 +37,7 @@ void *HeapAllocator::allocate(size_t size) {
     auto ptr = (void *)((intptr_t) node + sizeof(Node));
     memset(ptr, 0, size); // No need to bother with heap garbage, should help identify memory bugs
 
-    TracySecureAlloc(ptr, (int)size);
+    TracyAlloc(ptr, (int)size);
 
     return ptr;
 }
@@ -58,7 +58,7 @@ void HeapAllocator::free(void *ptr) {
     if (!ptr)
         return;
 
-    TracySecureFree(ptr);
+    TracyFree(ptr);
 
     Node *node = (Node *)((intptr_t) ptr - sizeof(Node));
 

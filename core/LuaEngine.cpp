@@ -100,14 +100,14 @@ void LuaEngine::runUpdateLoop() {
 void *LuaEngine::luaAllocator(void *userData, void *ptr, size_t osize, size_t nsize) {
     [[maybe_unused]] static const auto luaHeapProfileName = "Lua Heap";
     auto cranked = (Cranked *) userData;
-    TracySecureFreeN(ptr, luaHeapProfileName);
+    TracyFreeN(ptr, luaHeapProfileName);
     if (nsize == 0) {
         cranked->heap.free(ptr);
         return nullptr;
     }
     try {
         auto allocated = cranked->heap.reallocate(ptr, (int)nsize);
-        TracySecureAllocN(allocated, (int)nsize, luaHeapProfileName);
+        TracyAllocN(allocated, (int)nsize, luaHeapProfileName);
         return allocated;
     } catch (exception &) {
         return nullptr;
