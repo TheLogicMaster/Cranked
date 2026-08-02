@@ -1,6 +1,6 @@
 # This file is included just for IDE functionality, prefer building tests with Makefile
 
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.5)
 set(CMAKE_C_STANDARD 11)
 
 set(ENVSDK $ENV{PLAYDATE_SDK_PATH})

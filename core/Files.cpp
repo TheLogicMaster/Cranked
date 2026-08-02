@@ -45,7 +45,7 @@ int Files::listFiles(string path, bool showHidden, vector<string> &files) {
         try {
             for (auto &entry: fs::directory_iterator(dataPath))
                 if (showHidden or !entry.path().filename().string().starts_with("."))
-                    files.emplace_back(string(fs::path(entry).lexically_relative(dataPath)) + (entry.is_directory() ? "/" : ""));
+                    files.emplace_back(fs::path(entry).lexically_relative(dataPath).string() + (entry.is_directory() ? "/" : ""));
         } catch (exception &ex) {
             lastError = cranked.getEmulatedStringLiteral(ex.what());
             return -1;
@@ -128,8 +128,8 @@ int Files::stat(string path, FileStat_32 &stat) {
         auto timeOffset = modTimePoint - chrono::floor<chrono::days>(modTimePoint);
         chrono::hh_mm_ss time{timeOffset};
         stat.m_year = (int) ymd.year();
-        stat.m_month = (int) (uint) ymd.month();
-        stat.m_day = (int) (uint) ymd.day();
+        stat.m_month = (int) (uint32) ymd.month();
+        stat.m_day = (int) (uint32) ymd.day();
         stat.m_hour = (int) time.hours().count();
         stat.m_minute = (int) time.minutes().count();
         stat.m_second = (int) time.seconds().count();
@@ -152,7 +152,7 @@ int Files::stat(string path, FileStat_32 &stat) {
 File Files::open(string path, FileOptions mode) {
     path = normalizePath(path);
 
-    auto dataPath = romDataPath / path;
+    auto dataPath = (romDataPath / path).string();
     if (mode == FileOptions::Write or mode == FileOptions::Append) {
         auto fd = fopen(dataPath.c_str(), mode == FileOptions::Append ? "ab" : "wb");
         if (!fd) {
@@ -166,7 +166,7 @@ File Files::open(string path, FileOptions mode) {
     }
 
     if (mode == FileOptions::ReadData or mode == FileOptions::ReadDataFallback) {
-        if (fs::exists(dataPath) and !is_directory(dataPath)) {
+        if (fs::exists(dataPath) and !fs::is_directory(dataPath)) {
             auto fd = fopen(dataPath.c_str(), "rb");
             if (!fd) {
                 lastError = cranked.getEmulatedStringLiteral("Failed to open file");
@@ -187,7 +187,7 @@ File Files::open(string path, FileOptions mode) {
     if (romFile) {
         File file;
         if (romFile->data.empty()) {
-            auto fd = fopen((cranked.rom->path / romFile->name).c_str(), "rb");
+            auto fd = fopen((cranked.rom->path / romFile->name).string().c_str(), "rb");
             if (!fd) {
                 lastError = cranked.getEmulatedStringLiteral("Failed to open file");
                 return nullptr;

@@ -18,7 +18,7 @@ SoundSource_32::~SoundSource_32() {
 }
 
 AudioSample_32::AudioSample_32(Cranked &cranked, int size)
-    : NativeResource(cranked, ResourceType::AudioSample, this), data(vheap_vector(size, cranked.heap.allocator<uint8>())) {}
+    : NativeResource(cranked, ResourceType::AudioSample, this), data(vheap_vector<uint8>(size, cranked.heap.allocator<uint8>())) {}
 
 SoundEffect_32::SoundEffect_32(Cranked &cranked, ResourceType type, void *address) : NativeResource(cranked, type, address) {
     cranked.audio.effectMappings[address] = this;

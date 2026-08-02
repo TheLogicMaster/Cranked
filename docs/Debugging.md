@@ -1,5 +1,22 @@
 # Debugging
 
+## Debugging the Emulator
+Simply run the project built from sources in a debug or release-with-symbols using your debugger of choice.
+
+### CLion
+CLion should work out of the box on Windows and Unix. 
+Under Windows, a CMake profile with the following is needed (After running the build commands to create hte ): 
+- Build Type: `Debug` or `Release` (Must match build command and other settings which use this type)
+- Toolchain: `Visual Studio 2022` (Also create a CLion Toolchain pointing to the Visual Studio install)
+- Generator: `Let CMake Decide` (Defaults to whatever was selected in build command)
+- CMake Options `-DCMAKE_TOOLCHAIN_FILE="conan_toolchain.cmake"` (Same as build command)
+- Build Directory: `cmake-build-debug` or `cmake-build-release` (Created with build command)
+- Build Options: `--config Debug` or `--config Release` (Must match others)
+
+### Visual Studio
+When using the Visual Studio CMake generator, the configured project can be built and debugged using the generated 
+solution file.
+
 ## GDB Debugging the Emulated Program
 Requires gdb-multiarch and is run from the project directory.
 - Run emulator: `build/desktop/cranked_desktop --debug 1337 "PROGRAM.pdx"`

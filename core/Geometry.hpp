@@ -74,7 +74,7 @@ namespace cranked {
         }
 
         [[nodiscard]] bool isInvalid() const {
-            return isnanf((float)x) or isnanf((float)y);
+            return isnan((float)x) or isnan((float)y);
         }
 
         [[nodiscard]] CollisionPoint_32 asCollisionPoint() const {
@@ -243,7 +243,7 @@ namespace cranked {
             };
         }
 
-        static constexpr Transform rotate(float angle) {
+        static Transform rotate(float angle) {
             return {
                 cosf(angle), -sinf(angle), 0,
                 sinf(angle), cosf(angle), 0

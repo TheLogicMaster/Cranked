@@ -11,7 +11,7 @@
 
 #include <SDL.h>
 
-#include "magic_enum_all.hpp"
+#include "magic_enum/magic_enum_all.hpp"
 
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -131,6 +131,7 @@ int main(int argc, const char *args[]) {
         settingsHandler.ReadLineFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler, void *entry, const char *line) {
             auto userdata = (Userdata *)handler->UserData;
             string lineStr(line);
+            if (lineStr.empty()) return;
             size_t typeSeparatorIndex = lineStr.find('@');
             size_t valueSeparatorIndex = lineStr.find('=');
             if (typeSeparatorIndex == string::npos or valueSeparatorIndex == string::npos)

@@ -75,11 +75,11 @@ void retro_unload_game() {
     instance->unload();
 }
 
-uint retro_api_version(void) {
+unsigned int retro_api_version(void) {
     return RETRO_API_VERSION;
 }
 
-void retro_set_controller_port_device(uint port, uint device) {
+void retro_set_controller_port_device(unsigned int port, unsigned int device) {
 
 }
 
@@ -136,11 +136,11 @@ void retro_set_video_refresh(retro_video_refresh_t cb) {
     video_cb = cb;
 }
 
-uint retro_get_region() {
+unsigned int retro_get_region() {
     return RETRO_REGION_NTSC;
 }
 
-bool retro_load_game_special(uint type, const retro_game_info *info, size_t num) {
+bool retro_load_game_special(unsigned int type, const retro_game_info *info, size_t num) {
     return false;
 }
 
@@ -156,11 +156,11 @@ bool retro_unserialize(const void *data, size_t size) {
     return true;
 }
 
-void *retro_get_memory_data(uint id) {
+void *retro_get_memory_data(unsigned int id) {
     return nullptr;
 }
 
-size_t retro_get_memory_size(uint id) {
+size_t retro_get_memory_size(unsigned int id) {
     return 0;
 }
 
@@ -168,6 +168,6 @@ void retro_cheat_reset() {
 
 }
 
-void retro_cheat_set(uint index, bool enabled, const char *code) {
+void retro_cheat_set(unsigned int index, bool enabled, const char *code) {
 
 }

@@ -636,8 +636,8 @@ namespace cranked {
             auto timeOffset = time - chrono::floor<chrono::days>(time);
             chrono::hh_mm_ss hms{timeOffset};
             table.setIntField("year", (int) ymd.year());
-            table.setIntField("month", (int) (uint) ymd.month());
-            table.setIntField("day", (int) (uint) ymd.day());
+            table.setIntField("month", (int) (uint32) ymd.month());
+            table.setIntField("day", (int) (uint32) ymd.day());
             table.setIntField("hour", (int) hms.hours().count());
             table.setIntField("minute", (int) hms.minutes().count());
             table.setIntField("second", (int) hms.seconds().count());

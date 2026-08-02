@@ -108,7 +108,7 @@ namespace cranked {
         }
 
         void sendHaltResponse() {
-            sendResponse(format("S{:02x}", SIGTRAP));
+            sendResponse(format("S{:02x}", /*SIGTRAP*/ 5));
         }
 
         void handleCmdHaltReason(const vector<string> &args);

@@ -3,20 +3,21 @@
 #include "Constants.hpp"
 #include "ffi.h"
 #include "nlohmann/json.hpp"
-#include "boost/asio.hpp"
-#include "dynarmic/interface/A32/a32.h"
-#include "dynarmic/interface/A32/config.h"
+#include <zlib.h>
+#include "asio.hpp"
+// #include "dynarmic/interface/A32/a32.h"
+// #include "dynarmic/interface/A32/config.h"
 #include "unicorn/unicorn.h"
 #include "cpp-unicodelib/unicodelib.h"
 #include "cpp-unicodelib/unicodelib_encodings.h"
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
-#include "libzippp.h"
+#include "libzippp/libzippp.h"
 #include "zlib.h"
 #include "tracy/Tracy.hpp"
 #include "tracy/TracyLua.hpp"
-#include "magic_enum.hpp"
+#include "magic_enum/magic_enum.hpp"
 
 #ifdef USE_CAPSTONE
 #include "capstone/platform.h"
@@ -68,7 +69,7 @@ namespace cranked {
     using namespace std::literals;
 
     using std::stoi, std::stol, std::from_chars, std::to_string, std::isalpha, std::popcount;
-    using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round, std::clamp;
+    using std::abs, std::min, std::max, std::ceil, std::floor, std::pow, std::log2, std::round, std::clamp, std::isnan;
     using std::string, std::u16string, std::u32string, std::basic_string, std::string_view;
     using std::array, std::vector, std::set, std::map, std::unordered_set, std::unordered_map, std::multimap, std::queue, std::priority_queue, std::span;
     using std::function, std::invoke;
@@ -82,7 +83,7 @@ namespace cranked {
     using std::char_traits, std::numeric_limits;
     using std::size_t, std::time_t;
     using std::ostringstream, std::istringstream, std::ifstream, std::ofstream, std::ostream, std::istream, std::getline, std::ios;
-    using std::free, std::bad_alloc, std::aligned_alloc, std::addressof;
+    using std::free, std::bad_alloc, std::addressof;
     using std::sort, std::find, std::find_if, std::erase, std::remove, std::swap, std::mismatch;
     using std::unique_ptr, std::shared_ptr, std::make_shared, std::make_unique;
     using std::format, std::vformat, std::make_format_args;
@@ -93,7 +94,7 @@ namespace cranked {
     namespace this_thread = std::this_thread;
     namespace numbers = std::numbers;
     namespace ranges = std::ranges;
-    namespace asio = boost::asio;
+    namespace asio = ::asio;
 
     typedef int64_t int64;
     typedef uint64_t uint64;
@@ -330,7 +331,7 @@ namespace cranked {
         T t{};
         uint8 byte{};
         for (int i = 0; i < (int)sizeof(T); i++) {
-            auto result = from_chars(string.begin() + i * 2, string.begin() + i * 2 + 2, byte, 16);
+            auto result = from_chars(string.data() + i * 2, string.data() + i * 2 + 2, byte, 16);
             if (result.ec != errc{})
                 throw CrankedError("Invalid hex byte");
             t |= byte << i * 8;

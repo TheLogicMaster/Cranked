@@ -134,7 +134,7 @@ void Rom::load() {
                     type = getFileType((uint8 *) buffer);
                 } catch (exception &) {}
             outerFiles.emplace_back(File{
-                    .name = normalizePath(entry.path().lexically_relative(path)),
+                    .name = normalizePath(entry.path().lexically_relative(path).string()),
                     .type = type,
                     .isDir = entry.is_directory(),
                     .size = entry.is_directory() ? 0 : (uint32) entry.file_size(),
@@ -223,7 +223,7 @@ vector<uint8> Rom::readRomFile(string name, const string &extension, const vecto
         memcpy(data.data(), zipData, data.size());
         delete[] (char *) zipData;
     } else
-        data = readFileData(path / name);
+        data = readFileData((path / name).string());
     return data;
 }
 
@@ -714,7 +714,7 @@ vector<uint8> Rom::writeImage(Bitmap image) {
 }
 
 Rom::File *Rom::findSystemFile(string path) {
-    path = fs::path(normalizePath(path)).replace_extension().string();
+    path = fs::path(normalizePath(std::move(path))).replace_extension().string();
     if (auto it = systemFiles.find(path); it != systemFiles.end())
         return &it->second;
     return nullptr;

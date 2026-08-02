@@ -15,7 +15,7 @@ NetErr HTTPConnection_32::sendRequest(const string &method, const string &path, 
 }
 
 asio::awaitable<void> HTTPConnection_32::sendRequestAsync(string method, string path, string headers, string body) {
-    boost::system::error_code err{};
+    asio::error_code err{};
     asio::streambuf response{MaxNetworkReceiveBufferSize};
 
     // Todo: Errors initiated by the underlying connection destroyed must immediately return and not access `this` (May require a separate cookie to detect)
@@ -137,7 +137,7 @@ NetErr TCPConnection_32::open() {
 }
 
 asio::awaitable<void> TCPConnection_32::openAsync() {
-    boost::system::error_code err{};
+    asio::error_code err{};
     asio::streambuf response{MaxNetworkReceiveBufferSize};
 
     // Todo: Errors initiated by the underlying connection destroyed must immediately return and not access `this` (May require a separate cookie to detect)
@@ -172,7 +172,7 @@ NetErr TCPConnection_32::close() {
 }
 
 int32 TCPConnection_32::send(span<const uint8> data) {
-    boost::system::error_code err{};
+    asio::error_code err{};
     size_t count = asio::write(socket, asio::buffer(data.data(), data.size()), err);
     if (err) return (int)NetErr::WriteError; // Todo
     return (int)count;
@@ -184,7 +184,7 @@ void Networking::init() {
 }
 
 void Networking::reset() {
-    ioContext.reset();
+    ioContext.restart();
 }
 
 void Networking::update() {

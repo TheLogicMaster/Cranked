@@ -173,7 +173,7 @@ LCDVideoPlayer_32::LCDVideoPlayer_32(Cranked &cranked, float frameRate, IntVec2 
 LCDStreamPlayer_32::LCDStreamPlayer_32(Cranked &cranked) : NativeResource(cranked, ResourceType::StreamPlayer, this) {}
 
 LCDBitmap_32::LCDBitmap_32(Cranked &cranked, int width, int height)
-        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector(ceilDiv(width, 8) * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
+        : NativeResource(cranked, ResourceType::Bitmap, this), width(width), height(height), data(vheap_vector<uint8>(ceilDiv(width, 8) * height, cranked.heap.allocator<uint8>())), mask(nullptr) {}
 
 LCDBitmap_32::LCDBitmap_32(const LCDBitmap_32 &other)
         : NativeResource(other.cranked, ResourceType::Bitmap, this), width(other.width), height(other.height), data(other.data), mask(other.mask ? cranked.heap.construct<LCDBitmap_32>(*other.mask) : nullptr) {}

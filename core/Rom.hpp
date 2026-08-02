@@ -255,7 +255,7 @@ namespace cranked {
         static File *findSystemFile(string path);
 
         static Font readSystemFont(const string &path) {
-            auto file = findSystemFile(fs::path("System/Fonts") / path);
+            auto file = findSystemFile((fs::path("System/Fonts") / path).string());
             if (!file)
                 throw CrankedError("No such system file: " + path);
             return readFont(file->data.data(), file->data.size());

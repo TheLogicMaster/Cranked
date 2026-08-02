@@ -4,12 +4,12 @@
 using namespace cranked;
 
 HeapAllocator::HeapAllocator(size_t size) : totalSize(size), freeList(nullptr) {
-    startPtr = aligned_alloc(4096, size);
+    startPtr = new uint8[size];
     reset();
 }
 
 HeapAllocator::~HeapAllocator() {
-    ::free(startPtr);
+    delete[] (uint8 *)startPtr;
 }
 
 void *HeapAllocator::allocate(size_t size) {

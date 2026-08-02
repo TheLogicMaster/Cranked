@@ -731,8 +731,8 @@ void cranked::playdate_sys_convertEpochToDateTime(Cranked *cranked, uint32 epoch
     auto timeOffset = time - chrono::floor<chrono::days>(time);
     chrono::hh_mm_ss hms{timeOffset};
     datetime->year = (int) ymd.year();
-    datetime->month = (int) (uint) ymd.month();
-    datetime->day = (int) (uint) ymd.day();
+    datetime->month = (int) (uint32) ymd.month();
+    datetime->day = (int) (uint32) ymd.day();
     datetime->hour = (int) hms.hours().count();
     datetime->minute = (int) hms.minutes().count();
     datetime->second = (int) hms.seconds().count();
@@ -767,10 +767,10 @@ void cranked::playdate_sys_setSerialMessageCallback(Cranked *cranked, cref_t cal
 }
 
 int32 cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, uint8 *fmt, ...) {
-    char *buffer{};
+    char buffer[1024];
     va_list list{};
     va_start(list, fmt);
-    int size = vasprintf(&buffer, (char *)fmt, list);
+    int size = vsnprintf(buffer, sizeof(buffer), (char *)fmt, list);
     va_end(list);
     if (size < 0)
         return -1;
@@ -780,11 +780,7 @@ int32 cranked::playdate_sys_vaFormatString(Cranked *cranked, cref_t *outstr, uin
         *outstr = cranked->toVirtualAddress(string);
     } catch (bad_alloc &) {
         size = -1;
-    } catch (...) {
-        free(buffer);
-        throw;
     }
-    free(buffer);
     return size;
 }
 
@@ -1453,7 +1449,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
         string lastKey;
     };
     const string rootString = "_root";
-    vheap_vector stack(cranked->heap.allocator<JsonContext>());
+    vheap_vector<JsonContext> stack(cranked->heap.allocator<JsonContext>());
     nlohmann::json::parser_callback_t cb = [&](int depth, nlohmann::json::parse_event_t event, nlohmann::json &parsed) -> bool {
         switch (event) {
             case nlohmann::json::parse_event_t::object_start:
@@ -1520,7 +1516,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                             cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeArrayValue, &parentContext.decoder, parentContext.arrayIndex, sublist);
                     } else {
-                        auto keyData = vheap_vector(parentContext.lastKey.begin(), parentContext.lastKey.end() + 1, cranked->heap.allocator<char>());
+                        auto keyData = vheap_vector<char>(parentContext.lastKey.begin(), parentContext.lastKey.end() + 1, cranked->heap.allocator<char>());
                         if (parentContext.decoder.didDecodeTableValue)
                             cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                     (parentContext.decoder.didDecodeTableValue, &parentContext.decoder, keyData.data(), sublist);
@@ -1538,7 +1534,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 if (context.decoder.returnString)
                     return true;
                 auto key = parsed.get<string>();
-                auto keyData = vheap_vector(key.begin(), key.end(), cranked->heap.allocator<char>());
+                auto keyData = vheap_vector<char>(key.begin(), key.end(), cranked->heap.allocator<char>());
                 bool shouldDecode = true;
                 context.lastKey = key;
                 if (context.decoder.shouldDecodeTableValueForKey)
@@ -1553,7 +1549,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                 auto &context = stack.back();
                 if (context.decoder.returnString)
                     return true;
-                auto stringValue = vheap_vector(cranked->heap.allocator<char>()); // Todo: Is this expected to be valid after the `didDecode` functions?
+                auto stringValue = vheap_vector<char>(cranked->heap.allocator<char>()); // Todo: Is this expected to be valid after the `didDecode` functions?
                 auto parseValue = [&]{
                     json_value_32 value{};
                     if (parsed.is_null())
@@ -1589,7 +1585,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
                                     (context.decoder.didDecodeArrayValue, &stack.back().decoder, context.arrayIndex, parseValue());
                     }
                 } else {
-                    auto keyData = vheap_vector(context.lastKey.begin(), context.lastKey.end(), cranked->heap.allocator<char>());
+                    auto keyData = vheap_vector<char>(context.lastKey.begin(), context.lastKey.end(), cranked->heap.allocator<char>());
                     if (context.decoder.didDecodeTableValue)
                         cranked->nativeEngine.invokeEmulatedFunction<void, ArgType::void_t, ArgType::ptr_t, ArgType::ptr_t, ArgType::struct2_t>
                                 (context.decoder.didDecodeTableValue, &stack.back().decoder, keyData.data(), parseValue());
@@ -1614,7 +1610,7 @@ static int json_decode(Cranked *cranked, json_decoder_32 *functions, json_value_
 int32 cranked::playdate_json_decode(Cranked *cranked, json_decoder_32 *functions, json_reader_32 reader, json_value_32 *outval) {
     constexpr int BUFFER_SEGMENT = 512;
     int size = 0;
-    vheap_vector buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
+    vheap_vector<char> buffer(BUFFER_SEGMENT, cranked->heap.allocator<char>());
     while (true) {
         int returned = cranked->nativeEngine.invokeEmulatedFunction<int32, ArgType::int32_t, ArgType::uint32_t, ArgType::ptr_t, ArgType::int32_t>
                 (reader.read, reader.userdata, buffer.data() + size, buffer.size() - size);
@@ -1641,7 +1637,7 @@ static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const char 
 
 static void encoderWrite(Cranked *cranked, json_encoder_32 *encoder, const string &string) {
     // Use vector rather than heap_string to prevent non-heap addresses for small strings
-    auto data = vheap_vector(string.c_str(), string.c_str() + string.size(), cranked->heap.allocator<char>());
+    auto data = vheap_vector<char>(string.c_str(), string.c_str() + string.size(), cranked->heap.allocator<char>());
     encoderWrite(cranked, encoder, cranked->toVirtualAddress(data.data()), (int)string.length());
 }
 
