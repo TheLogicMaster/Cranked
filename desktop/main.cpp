@@ -51,6 +51,7 @@ int main(int argc, const char *args[]) {
         ("program", "The program to run", cxxopts::value<string>());
     commandArgOptions.parse_positional({"program"});
 
+    // Todo: Catch and print out exceptions
     auto result = commandArgOptions.parse(argc, args);
     string programPath = result["program"].as<string>();
     int debugPort = result["debug"].as_optional<int>().value_or(0);

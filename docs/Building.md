@@ -1,15 +1,19 @@
 # Building Cranked
 
 ## Downloading Sources
-Required libraries are mostly embedded either as submodules or built using Conan.
-
+Required libraries are mostly embedded either as submodules or built using Conan, so a recursive repository clone is needed.
 Recursively clone the repo with: `git clone --recursive https://github.com/TheLogicMaster/Cranked`.
+
+## External Dependencies
+Some external dependencies are required.
+For APT: `sudo apt install cmake`
+- [CMake](https://cmake.org/download/)
 
 ## Conan
 Conan must be installed. See the [official instructions](https://docs.conan.io/2/installation.html).
 A Conan profile must exist (Create a default one with: `conan profile detect --force`).
 Originally libraries would be built as Git submodules, but they were a pain to maintain. Externally installed
-or git submodules may still work on Unix for convenience, though.
+or git submodules may still work on Unix for convenience, though (See [Using Submodules](Using-Submodules)).
 
 ## Windows
 To build in Release mode with Visual Studio 2022 (Must be installed), run the following in PowerShell from the project directory:
@@ -32,8 +36,17 @@ pipx ensurepath
 pipx install conan
 conan profile detect --force
 CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install . --output-folder=build --build=missing -c tools.system.package_manager:mode=install -c tools.system.package_manager:sudo=true
+cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE="conan_toolchain.cmake"
 cmake --build .
+```
+
+### Using Submodules
+There's probably a few missing dependencies which must be installed externally using a system package manager or such.
+Build as a regular CMake project from the project root directory (If it works):
+```shell
+cmake -S . -B build
+cmake --build build
 ```
 
 ## Updating Playdate SDK Headers
